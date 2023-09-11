@@ -1,14 +1,9 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+pub mod streaming_sumcheck;
+pub mod linear_space_sumcheck;
+pub mod blended_sumcheck;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+use ark_ff::Field;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub trait SumcheckProver<F: Field> {
+    type SumcheckParameters;
 }
