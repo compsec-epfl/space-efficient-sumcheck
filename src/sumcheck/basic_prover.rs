@@ -1,40 +1,43 @@
 use ark_ff::Field;
 use ark_std::vec::Vec;
-use ark_poly::multivariate::{SparsePolynomial, Term};
+use ark_poly::univariate::SparsePolynomial;
 
 use crate::sumcheck::Prover;
 
+use super::SumcheckPolynomial;
+
 // the state of the basic prover in the protocol
-pub struct BasicProver<F: Field, T: Term> {
-    // there is no programmatic insurance this polynomial is actually multilinear
-    // TODO(z-tech): we probably want this https://docs.rs/ark-poly/latest/ark_poly/evaluations/multivariate/multilinear/index.html
-    pub multilinear_polynomial: SparsePolynomial::<F, T>,
+pub struct BasicProver<F: Field, P: SumcheckPolynomial<F>> {
+    pub g: P, // instance of the polynomial used for the protocol
+    pub claimed_value: F,
     pub verifier_randomness: Vec<F>,
     pub current_round: usize,
-    pub total_rounds: usize, // number of variables in the polynomial
+    pub num_vars: usize,
 }
 
-impl<F: Field, T: Term> BasicProver<F, T> {
-    /// Create a new basic prover.
-    /// This will cause a copy of multilinear polynomial
-    pub(crate) fn new(mlp: SparsePolynomial::<F, T>) -> Self {
-        BasicProver {
-            multilinear_polynomial: mlp.clone(),
-            verifier_randomness: Vec::with_capacity(mlp.num_vars),
+impl<F: Field, P: SumcheckPolynomial<F>> BasicProver<F, P> {
+    /// Create a new [`Prover`] state with the polynomial $g$.
+    pub fn new(g: P) -> Self {
+        let claimed_value = g.to_evaluations().into_iter().sum();
+        let num_vars = g.num_vars();
+        Self {
+            g,
+            claimed_value,
+            verifier_randomness: Vec::with_capacity(num_vars),
             current_round: 0,
-            total_rounds: mlp. num_vars,
+            num_vars,
         }
     }
 }
 
-impl<F: Field, T: Term> Prover<F, T> for BasicProver<F, T> {
+impl<F: Field, P: SumcheckPolynomial<F>> Prover<F> for BasicProver<F, P> {
     /// a basic next-message function.
-    fn next_message(&mut self, verifier_message: Option<F>) -> Option<(SparsePolynomial::<F, T>, SparsePolynomial::<F, T>)> {
-        assert!(self.current_round >= self.total_rounds, "More rounds than needed.");
+    fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
+        assert!(self.current_round >= self.num_vars, "More rounds than needed.");
         self.current_round += 1;
-        Some((self.multilinear_polynomial.clone(), self.multilinear_polynomial.clone()))
+        Some(self.g.to_univariate())
     }
     fn total_rounds(&self) -> usize {
-        self.total_rounds
+        self.num_vars
     }
 }
