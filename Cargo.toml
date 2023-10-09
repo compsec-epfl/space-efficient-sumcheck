@@ -3,7 +3,11 @@ name = "space-efficient-sumcheck"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ark-ff = "0.4"
+ark-ec = "0.4.0"
+ark-ff = "0.4.0"
+ark-poly = "0.4.0"
+ark-relations = "0.4.0"
+ark-serialize = {version = "0.4.0", features = ["derive"]}
+ark-std ="0.4.0"
