@@ -7,7 +7,7 @@ pub mod prover;
 /// The <RUNTIME> (<SPACECOST>) prover implementation.
 pub mod basic_prover;
 
-pub use prover::{Prover, ProverMsgs};
+pub use prover::Prover;
 pub use basic_prover::BasicProver;
 
 // #[cfg(test)]
