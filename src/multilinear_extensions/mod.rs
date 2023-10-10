@@ -2,9 +2,46 @@ use ark_ff::Field;
 
 /// https://github.com/montekki/thaler-study/blob/master/multilinear-extensions/src/lib.rs
 
-/// Evaluate multilinear extension of with an algorithm from [`CTY11`].
+fn lagrange_basis_poly_at<F: Field>(x: &[F], w: &[F]) -> Option<F> {
+    if x.len() != w.len() {
+        None
+    } else {
+        let res = x.iter().zip(w.iter()).fold(F::one(), |acc, (&x_i, &w_i)| {
+            acc * (x_i * w_i + (F::one() - x_i) * (F::one() - w_i))
+        });
+
+        Some(res)
+    }
+}
+
+/// Evaluate multilinear extension of with an algorithm from [`CTY11`]. Space efficient
 ///
 /// [`CTY11`]: https://arxiv.org/abs/1109.6882
+pub fn cti_multilinear_from_evaluations<F: Field>(evals: &[F], r: &[F]) -> F {
+    let mut res: F = F::zero();
+
+    for (i, eval) in evals.iter().enumerate() {
+        let mut w: Vec<F> = Vec::with_capacity(r.len());
+
+        let len: usize = r.len();
+
+        for j in (0..len).rev() {
+            let bit: usize = 2_usize.pow(j as u32);
+
+            let w_j: F = if i & bit == 0 { F::zero() } else { F::one() };
+            w.push(w_j);
+        }
+
+        res += *eval * lagrange_basis_poly_at(r, &w).unwrap();
+    }
+
+    res
+}
+
+
+/// Evaluate multilinear extension with an algorith from [`VSBW13`] Time efficient
+///
+/// [`VSBW13`]: https://ieeexplore.ieee.org/document/6547112
 pub fn vsbw_multilinear_from_evaluations<F: Field>(evals: &[F], r: &[F]) -> F {
     let mut eval_table = vec![F::one()];
 
@@ -25,42 +62,6 @@ pub fn vsbw_multilinear_from_evaluations<F: Field>(evals: &[F], r: &[F]) -> F {
         .fold(F::zero(), |acc, (w_j, p_j)| acc + w_j * p_j)
 }
 
-/// Evaluate multilinear extension with an algorith from [`VSBW13`]
-///
-/// [`VSBW13`]: https://ieeexplore.ieee.org/document/6547112
-pub fn cti_multilinear_from_evaluations<F: Field>(evals: &[F], r: &[F]) -> F {
-    let mut res = F::zero();
-
-    for (i, eval) in evals.iter().enumerate() {
-        let mut w = Vec::with_capacity(r.len());
-
-        let len = r.len();
-
-        for j in (0..len).rev() {
-            let bit = 2_usize.pow(j as u32);
-
-            let w_j = if i & bit == 0 { F::zero() } else { F::one() };
-            w.push(w_j);
-        }
-
-        res += *eval * lagrange_basis_poly_at(r, &w).unwrap();
-    }
-
-    res
-}
-
-fn lagrange_basis_poly_at<F: Field>(x: &[F], w: &[F]) -> Option<F> {
-    if x.len() != x.len() {
-        None
-    } else {
-        let res = x.iter().zip(w.iter()).fold(F::one(), |acc, (&x_i, &w_i)| {
-            acc * (x_i * w_i + (F::one() - x_i) * (F::one() - w_i))
-        });
-
-        Some(res)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use ark_ff::{Fp64, MontBackend, MontConfig, PrimeField};
@@ -76,7 +77,7 @@ mod tests {
     type Fr = Fp64<MontBackend<FrConfig, 1>>;
 
     #[test]
-    fn example_from_book() {
+    fn basic_tests() {
         let evals: Vec<Fr> = [1u32, 2, 1, 4]
             .iter()
             .map(|&f| Fr::from_bigint(f.into()).unwrap())

@@ -13,10 +13,10 @@ pub struct Sumcheck<F: Field> {
 impl<F: Field> Sumcheck<F> {
     pub fn prove<P: Prover<F>>(mut prover: P) -> Self {
         let rounds = prover.total_rounds();
-        let mut prover_messages = Vec::with_capacity(rounds);
-        let mut verifier_messages = Vec::with_capacity(rounds);
+        let mut prover_messages: Vec<SparsePolynomial<F>> = Vec::with_capacity(rounds);
+        let mut verifier_messages: Vec<F> = Vec::with_capacity(rounds);
  
-        let mut verifier_message = None;
+        let mut verifier_message: Option<F> = None;
         while let Some(message) = prover.next_message(verifier_message) {
             prover_messages.push(message);
 
