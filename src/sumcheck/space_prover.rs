@@ -37,18 +37,19 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for SpaceProver<F
     // a basic next-message function.
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
         assert!(self.current_round <= self.total_rounds() - 1, "More rounds than needed."); // self.current_round is zero-indexed
-        // first round only send univariate polynomial for verifier to check g0(0) + g0(1) = claim
-        // all other rounds fix a variable with randomness from the verifier
+        // first round there's no randomness just cti compute for: g0(0) + g0(1) = claim
+        // all other rounds we reduce computation for fixed variables via verifier randomness
         if self.current_round != 0 {
-            // track the verifier challenges
-            let random_field_element: F = verifier_message.unwrap();
-            self.random_challenges.push(random_field_element);
+            self.random_challenges.push(verifier_message.unwrap());
         }
 
+        println!("##########");
         // compute the evaluation using cti
-        let cti_round_evaluation: F = cti_multilinear_from_evaluations(&self.mlp_evaluated_per_input, &self.random_challenges);
+        let cti_round_evaluation: F = cti_multilinear_from_evaluations(&self.mlp.to_evaluations(), &self.random_challenges);
+        println!("cti_round_evaluation: {}", cti_round_evaluation);
         // form any univariate polynomial summing to this value for g0(0) + g1(1), suffices f(x) = cti_round_evaluation * x
         let g_round: SparsePolynomial<F> = SparsePolynomial::<F>::from_coefficients_vec(vec![(1, cti_round_evaluation)]);
+        println!("g_round: {:?}", g_round);
 
         // don't forget to increment the round
         self.current_round += 1;
@@ -79,7 +80,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[derive(MontConfig)]
-    #[modulus = "5"]
+    #[modulus = "97"]
     #[generator = "2"]
     struct FrConfig;
 
@@ -120,7 +121,7 @@ mod tests {
         // 101 = 3
         // 011 = 1
         // 111 = 4
-        // sum = 12 mod 5 = 2
+        // sum = 12 mod 97 = 12
         let test_g0 = test_prover.next_message(None).unwrap();
         let test_claim_0: Fp5 = Fp5::from(12);
         let test_verifier_eval_1 = test_g0.evaluate(&Fp5::ZERO) + test_g0.evaluate(&Fp5::ONE);
@@ -132,7 +133,7 @@ mod tests {
         // 001 = 0
         // 010 = 0
         // 011 = 1
-        // sum = 1 mod 5 = 1
+        // sum = 1 mod 97 = 1
         let test_g1 = test_prover.next_message(Some(Fp5::ZERO)).unwrap();
         let test_claim_1: Fp5 = Fp5::from(1);
         let test_verifier_eval_1 = test_g1.evaluate(&Fp5::ZERO) + test_g1.evaluate(&Fp5::ONE);
@@ -142,7 +143,7 @@ mod tests {
         // x2 fixed to 1
         // 010 = 0
         // 011 = 1
-        // sum = 1 mod 5 = 1
+        // sum = 1 mod 97 = 1
         let test_g2 = test_prover.next_message(Some(Fp5::ONE)).unwrap();
         let test_claim_2: Fp5 = Fp5::from(1);
         let test_verifier_eval_2 = test_g2.evaluate(&Fp5::ZERO) + test_g2.evaluate(&Fp5::ONE);
