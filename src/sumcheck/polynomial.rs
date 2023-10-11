@@ -8,7 +8,6 @@ use ark_poly::{
 use crate::sumcheck::BooleanHypercube;
 
 // https://github.com/montekki/thaler-study/blob/master/sum-check-protocol/src/lib.rs
-
 pub trait SumcheckMultivariatePolynomial<F: Field> {
     fn evaluate(&self, point: &[F]) -> Option<F>;
     fn fix_variables(&self, partial_point: &[F]) -> Self;

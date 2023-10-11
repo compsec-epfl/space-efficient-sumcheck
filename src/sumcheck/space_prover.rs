@@ -47,9 +47,9 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for SpaceProver<F
         // compute the evaluation using cti
         let cti_round_evaluation: F = cti_multilinear_from_evaluations(&self.mlp.to_evaluations(), &self.random_challenges);
         println!("cti_round_evaluation: {}", cti_round_evaluation);
-        // form any univariate polynomial summing to this value for g0(0) + g1(1), suffices f(x) = cti_round_evaluation * x
+        // form a polynomial that sums to p1(w1)
         let g_round: SparsePolynomial<F> = SparsePolynomial::<F>::from_coefficients_vec(vec![(1, cti_round_evaluation)]);
-        println!("g_round: {:?}", g_round);
+        // println!("g_round: {:?}", g_round);
 
         // don't forget to increment the round
         self.current_round += 1;
@@ -80,7 +80,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[derive(MontConfig)]
-    #[modulus = "97"]
+    #[modulus = "5"]
     #[generator = "2"]
     struct FrConfig;
 
@@ -124,6 +124,7 @@ mod tests {
         // sum = 12 mod 97 = 12
         let test_g0 = test_prover.next_message(None).unwrap();
         let test_claim_0: Fp5 = Fp5::from(12);
+        println!("sums: {}, {}", test_g0.evaluate(&Fp5::ZERO), test_g0.evaluate(&Fp5::ONE));
         let test_verifier_eval_1 = test_g0.evaluate(&Fp5::ZERO) + test_g0.evaluate(&Fp5::ONE);
         assert_eq!(test_claim_0, test_verifier_eval_1, "should form the correct first message");
 
