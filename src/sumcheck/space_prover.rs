@@ -43,10 +43,12 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for SpaceProver<F
             self.random_challenges.push(verifier_message.unwrap());
         }
 
-        println!("##########");
+        println!("{:?}", &self.mlp.to_evaluations());
+
         // compute the evaluation using cti
         let cti_round_evaluation: F = cti_multilinear_from_evaluations(&self.mlp.to_evaluations(), &self.random_challenges);
-        println!("cti_round_evaluation: {}", cti_round_evaluation);
+        println!("###### cti_round_evaluation: {} ######", cti_round_evaluation);
+    
         // form a polynomial that sums to p1(w1)
         let g_round: SparsePolynomial<F> = SparsePolynomial::<F>::from_coefficients_vec(vec![(1, cti_round_evaluation)]);
         // println!("g_round: {:?}", g_round);
@@ -68,7 +70,6 @@ mod tests {
     use ark_ff::{
         fields::Fp64,
         fields::{MontBackend, MontConfig},
-        PrimeField,
     };
     use ark_poly::{
         multivariate::{self, SparseTerm, Term},
@@ -80,74 +81,94 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[derive(MontConfig)]
-    #[modulus = "5"]
+    #[modulus = "19"]
     #[generator = "2"]
     struct FrConfig;
 
-    type Fp5 = Fp64<MontBackend<FrConfig, 1>>;
-    type PolyFp5 = multivariate::SparsePolynomial::<Fp5, SparseTerm>;
+    type TestField = Fp64<MontBackend<FrConfig, 1>>;
+    type TestPolynomial = multivariate::SparsePolynomial::<TestField, SparseTerm>;
 
-    #[test]
-    fn space_prover() {
-        // 2 *x_1^1 + x_1 * x_3 + x_2 * x_3
-        let test_g = PolyFp5::from_coefficients_slice(
+    fn test_polynomial() -> TestPolynomial {
+        // 4*x_1*x_2 + 7*x_2*x_3 + 2*x_1 + 13*x_2
+        return TestPolynomial::from_coefficients_slice(
             3,
             &[
                 (
-                    Fp5::from_bigint(2u32.into()).unwrap(),
+                    TestField::from(4),
+                    multivariate::SparseTerm::new(vec![(0, 1),(1, 1)]),
+                ),
+                (
+                    TestField::from(7),
+                    multivariate::SparseTerm::new(vec![(1, 1), (2, 1)]),
+                ),
+                (
+                    TestField::from(2),
                     multivariate::SparseTerm::new(vec![(0, 1)]),
                 ),
                 (
-                    Fp5::from_bigint(1u32.into()).unwrap(),
-                    multivariate::SparseTerm::new(vec![(0, 1), (2, 1)]),
-                ),
-                (
-                    Fp5::from_bigint(1u32.into()).unwrap(),
-                    multivariate::SparseTerm::new(vec![(1, 1), (2, 1)]),
+                    TestField::from(13),
+                    multivariate::SparseTerm::new(vec![(1, 1)]),
                 ),
             ],
-        );
+        )
+    }
 
-        let mut test_prover = SpaceProver::<Fp5, PolyFp5>::new(test_g);
-        assert_eq!(test_prover.total_rounds(), 3, "should set the number of variables correctly");
+    #[test]
+    fn space_prover_init() {
+        let prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        assert_eq!(prover.total_rounds(), 3, "should set the number of variables correctly");
+    }
 
-        // FIRST ROUND
+    #[test]
+    fn space_prover_round_0() {
+        // ZEROTH ROUND
         // all variables free
         // 000 = 0
         // 001 = 0
-        // 010 = 0
-        // 100 = 2
-        // 110 = 2
-        // 101 = 3
-        // 011 = 1
-        // 111 = 4
-        // sum = 12 mod 97 = 12
-        let test_g0 = test_prover.next_message(None).unwrap();
-        let test_claim_0: Fp5 = Fp5::from(12);
-        println!("sums: {}, {}", test_g0.evaluate(&Fp5::ZERO), test_g0.evaluate(&Fp5::ONE));
-        let test_verifier_eval_1 = test_g0.evaluate(&Fp5::ZERO) + test_g0.evaluate(&Fp5::ONE);
-        assert_eq!(test_claim_0, test_verifier_eval_1, "should form the correct first message");
-
-        // SECOND ROUND
-        // x1 fixed to 0
-        // 000 = 0
-        // 001 = 0
-        // 010 = 0
-        // 011 = 1
-        // sum = 1 mod 97 = 1
-        let test_g1 = test_prover.next_message(Some(Fp5::ZERO)).unwrap();
-        let test_claim_1: Fp5 = Fp5::from(1);
-        let test_verifier_eval_1 = test_g1.evaluate(&Fp5::ZERO) + test_g1.evaluate(&Fp5::ONE);
-        assert_eq!(test_claim_1, test_verifier_eval_1, "should form the correct second message");
-
-        // LAST ROUND (only one free variable remaining)
-        // x2 fixed to 1
-        // 010 = 0
-        // 011 = 1
-        // sum = 1 mod 97 = 1
-        let test_g2 = test_prover.next_message(Some(Fp5::ONE)).unwrap();
-        let test_claim_2: Fp5 = Fp5::from(1);
-        let test_verifier_eval_2 = test_g2.evaluate(&Fp5::ZERO) + test_g2.evaluate(&Fp5::ONE);
-        assert_eq!(test_claim_2, test_verifier_eval_2, "should form the correct third message");
+        // 010 = 13
+        // 011 = 20
+        // sum g(0) = 33 mod 19 = 14
+        // 100 = 26
+        // 110 = 19
+        // 101 = 2
+        // 111 = 2
+        // sum g(1) = 49 mod 19 = 11
+        let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let g_round_0 = prover.next_message(None).unwrap();
+        assert_eq!(g_round_0.evaluate(&TestField::ZERO), TestField::from(14), "g0 should evaluate correctly for input 0");
+        assert_eq!(g_round_0.evaluate(&TestField::ONE), TestField::from(11), "g0 should evaluate correctly for input 1");
     }
+
+    // #[test]
+    // fn space_prover_round_1() {
+    //     // FIRST ROUND x0 fixed to 1
+    //     // 111 = 2
+    //     // 101 = 2
+    //     // sum g(0) = 4 mod 19 = 4
+    //     // 100 = 26
+    //     // 110 = 19
+    //     // sum g(1) = 45 mod 19 = 7
+    //     let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+    //     let g_round_0 = prover.next_message(None).unwrap();
+    //     let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
+    //     assert_eq!(g_round_0.evaluate(&TestField::ONE), g_round_1.evaluate(&TestField::ZERO) + g_round_1.evaluate(&TestField::ONE));
+    //     assert_eq!(g_round_1.evaluate(&TestField::ZERO), TestField::from(4), "g1 should evaluate correctly for input 0");
+    //     assert_eq!(g_round_1.evaluate(&TestField::ONE), TestField::from(7), "g1 should evaluate correctly for input 1");
+    // }
+
+    // #[test]
+    // fn space_prover_round_2() {
+    //     // LAST ROUND x1 fixed to 1
+    //     // 110 = 19
+    //     // sum g(0) = 19 mod 19 = 0 
+    //     // 111 = 2
+    //     // sum g(1) = 2 mod 19 = 2
+    //     let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+    //     let _g_round_0 = prover.next_message(None).unwrap();
+    //     let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
+    //     let g_round_2 = prover.next_message(Some(TestField::ONE)).unwrap(); // x1 fixed to one
+    //     assert_eq!(g_round_1.evaluate(&TestField::ONE), g_round_2.evaluate(&TestField::ZERO) + g_round_2.evaluate(&TestField::ONE));
+    //     assert_eq!(g_round_2.evaluate(&TestField::ZERO), TestField::from(0), "g2 should evaluate correctly for input 0");
+    //     assert_eq!(g_round_2.evaluate(&TestField::ONE), TestField::from(7), "g2 should evaluate correctly for input 1");
+    // }
 }

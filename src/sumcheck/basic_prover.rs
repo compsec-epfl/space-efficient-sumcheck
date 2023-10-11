@@ -65,7 +65,6 @@ mod tests {
         DenseMVPolynomial,
         Polynomial,
     };
-    // use ark_std::{rand::Rng, test_rng};
 
     use pretty_assertions::assert_eq;
 
@@ -104,8 +103,8 @@ mod tests {
 
     #[test]
     fn basic_prover_init() {
-        let test_prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
-        assert_eq!(test_prover.total_rounds(), 3, "should set the number of variables correctly");
+        let prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
+        assert_eq!(prover.total_rounds(), 3, "should set the number of variables correctly");
     }
 
     #[test]
