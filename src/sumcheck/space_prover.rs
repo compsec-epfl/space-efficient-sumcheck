@@ -126,13 +126,13 @@ mod tests {
         // 000 = 0
         // 001 = 0
         // 010 = 13
-        // 011 = 20
-        // sum g(0) = 33 mod 19 = 14
-        // 100 = 26
-        // 110 = 19
+        // 011 = 1
+        // sum g0(0) = 14
+        // 100 = 2
+        // 110 = 0
         // 101 = 2
-        // 111 = 2
-        // sum g(1) = 49 mod 19 = 11
+        // 111 = 7
+        // sum g0(1) = 11
         let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         assert_eq!(g_round_0.evaluate(&TestField::ZERO), TestField::from(14), "g0 should evaluate correctly for input 0");
@@ -142,12 +142,12 @@ mod tests {
     // #[test]
     // fn space_prover_round_1() {
     //     // FIRST ROUND x0 fixed to 1
-    //     // 111 = 2
     //     // 101 = 2
-    //     // sum g(0) = 4 mod 19 = 4
-    //     // 100 = 26
-    //     // 110 = 19
-    //     // sum g(1) = 45 mod 19 = 7
+    //     // 100 = 2
+    //     // sum g1(0) = 4
+    //     // 111 = 7
+    //     // 110 = 0
+    //     // sum g1(1) = 7
     //     let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
     //     let g_round_0 = prover.next_message(None).unwrap();
     //     let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
@@ -159,10 +159,10 @@ mod tests {
     // #[test]
     // fn space_prover_round_2() {
     //     // LAST ROUND x1 fixed to 1
-    //     // 110 = 19
-    //     // sum g(0) = 19 mod 19 = 0 
-    //     // 111 = 2
-    //     // sum g(1) = 2 mod 19 = 2
+    //     // 110 = 0
+    //     // sum g(0) = 0 
+    //     // 111 = 7
+    //     // sum g(1) = 7
     //     let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
     //     let _g_round_0 = prover.next_message(None).unwrap();
     //     let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
