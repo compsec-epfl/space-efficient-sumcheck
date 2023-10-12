@@ -1,7 +1,7 @@
 //! The sumcheck protocol is an IP that
 //!
 
-pub mod boolean_hypercube;
+pub mod hypercube;
 pub mod polynomial;
 pub mod proof;
 pub mod prover;
@@ -10,7 +10,7 @@ pub mod prover;
 pub mod basic_prover;
 pub mod space_prover;
 
-pub use boolean_hypercube::BooleanHypercube;
+pub use hypercube::BooleanHypercube;
 pub use polynomial::SumcheckMultivariatePolynomial;
 pub use proof::Sumcheck;
 pub use prover::Prover;
