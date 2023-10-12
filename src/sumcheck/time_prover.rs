@@ -2,13 +2,13 @@ use ark_ff::Field;
 use ark_poly::univariate::SparsePolynomial;
 use ark_std::vec::Vec;
 
-use crate::multilinear_extensions::cti_multilinear_from_evaluations;
+use crate::multilinear_extensions::vsbw_multilinear_from_evaluations;
 use crate::sumcheck::BooleanHypercube;
 use crate::sumcheck::Prover;
 use crate::sumcheck::SumcheckMultivariatePolynomial;
 
-// the state of the space prover in the protocol
-pub struct SpaceProver<F: Field, P: SumcheckMultivariatePolynomial<F>> {
+// the state of the time prover in the protocol
+pub struct TimeProver<F: Field, P: SumcheckMultivariatePolynomial<F>> {
     pub mlp: P, // a polynomial that will be treated as multilinear
     pub mlp_claim: F, // the claimed evaluation of mpl
     pub mlp_evaluated_per_input: Vec<F>,
@@ -17,8 +17,8 @@ pub struct SpaceProver<F: Field, P: SumcheckMultivariatePolynomial<F>> {
     pub num_vars: usize,
 }
 
-impl<F: Field, P: SumcheckMultivariatePolynomial<F>> SpaceProver<F, P> {
-    // create new space prover state
+impl<F: Field, P: SumcheckMultivariatePolynomial<F>> TimeProver<F, P> {
+    // create new time prover state
     pub fn new(mlp: P) -> Self {
         let mlp_claim = mlp.to_evaluations().into_iter().sum();
         let mlp_evaluated_per_input = mlp.to_evaluations();
@@ -34,8 +34,8 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> SpaceProver<F, P> {
     }
 }
 
-impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for SpaceProver<F, P> {
-    // a next-message function using cti
+impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for TimeProver<F, P> {
+    // a next-message function using vsbw
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
         assert!(self.current_round <= self.total_rounds() - 1, "More rounds than needed."); // self.current_round is zero-indexed
         if self.current_round != 0 {
@@ -56,7 +56,7 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for SpaceProver<F
             if self.current_round != self.total_rounds() - 1 {
                 point.extend_from_slice(&partial_point);
             }
-            sum_0 += cti_multilinear_from_evaluations(&self.mlp_evaluated_per_input, &point);
+            sum_0 += vsbw_multilinear_from_evaluations(&self.mlp_evaluated_per_input, &point);
         }
         let mut sum_1 = F::ZERO;
         for partial_point in BooleanHypercube::<F>::new(free_variables as u32) {
@@ -66,7 +66,7 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for SpaceProver<F
             if self.current_round != self.total_rounds() - 1 {
                 point.extend_from_slice(&partial_point);
             }
-            sum_1 += cti_multilinear_from_evaluations(&self.mlp_evaluated_per_input, &point);
+            sum_1 += vsbw_multilinear_from_evaluations(&self.mlp_evaluated_per_input, &point);
         }
     
         // form a polynomial that s.t. g_round(0) = sum_0, g_round(1) = sum_1
@@ -130,13 +130,13 @@ mod tests {
     }
 
     #[test]
-    fn space_prover_init() {
-        let prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+    fn time_prover_init() {
+        let prover = TimeProver::<TestField, TestPolynomial>::new(test_polynomial());
         assert_eq!(prover.total_rounds(), 3, "should set the number of variables correctly");
     }
 
     #[test]
-    fn space_prover_round_0() {
+    fn time_prover_round_0() {
         // ZEROTH ROUND
         // all variables free
         // 000 = 0
@@ -149,14 +149,14 @@ mod tests {
         // 110 = 0
         // 111 = 7
         // sum g0(1) = 11
-        let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let mut prover = TimeProver::<TestField, TestPolynomial>::new(test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         assert_eq!(g_round_0.evaluate(&TestField::ZERO), TestField::from(14), "g0 should evaluate correctly for input 0");
         assert_eq!(g_round_0.evaluate(&TestField::ONE), TestField::from(11), "g0 should evaluate correctly for input 1");
     }
 
     #[test]
-    fn space_prover_round_1() {
+    fn time_prover_round_1() {
         // FIRST ROUND x0 fixed to 1
         // 101 = 2
         // 100 = 2
@@ -164,7 +164,7 @@ mod tests {
         // 111 = 7
         // 110 = 0
         // sum g1(1) = 7
-        let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let mut prover = TimeProver::<TestField, TestPolynomial>::new(test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         assert_eq!(g_round_0.evaluate(&TestField::ONE), g_round_1.evaluate(&TestField::ZERO) + g_round_1.evaluate(&TestField::ONE));
@@ -173,13 +173,13 @@ mod tests {
     }
 
     #[test]
-    fn space_prover_round_2() {
+    fn time_prover_round_2() {
         // LAST ROUND x1 fixed to 1
         // 110 = 0
         // sum g(0) = 0 
         // 111 = 7
         // sum g(1) = 7
-        let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let mut prover = TimeProver::<TestField, TestPolynomial>::new(test_polynomial());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         let g_round_2 = prover.next_message(Some(TestField::ONE)).unwrap(); // x1 fixed to one
