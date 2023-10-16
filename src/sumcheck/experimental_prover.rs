@@ -69,40 +69,39 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for ExperimentalP
             self.random_challenges.push(verifier_message.unwrap());
         }
 
-        // Define the start and end of the range to sum over for g0
+        // COMPUTE g(0)
+        // Define the start and end of the range to sum over
         let g_0_range_start_exclusive: Vec<F> = self.random_challenges.iter().chain(vec![F::ZERO].iter()).chain(vec![F::ZERO; self.num_free_variables()].iter()).cloned().collect();
         let g_0_range_end_inclusive: Vec<F> = self.random_challenges.iter().chain(vec![F::ZERO].iter()).chain(vec![F::ONE; self.num_free_variables()].iter()).cloned().collect();
-        
         // Create range indices
         let sum_0_start_index_exclusive = ExperimentalProver::<F, P>::bits_to_index(&g_0_range_start_exclusive);
         let sum_0_end_index_inclusive = ExperimentalProver::<F, P>::bits_to_index(&g_0_range_end_inclusive);
-
-        // Compute the sum of evaluations using the range
+        // Compute the sum of evaluations using the range lookup
         let mut g_0_evalutations_not_in_the_sum = F::ZERO;
         if sum_0_start_index_exclusive > 0 {
             g_0_evalutations_not_in_the_sum = self.range_sums[sum_0_start_index_exclusive - 1];
         }
         let sum_0 = self.range_sums[sum_0_end_index_inclusive] - g_0_evalutations_not_in_the_sum;
 
-        // Define the start and end of the range to sum over for g1
+        // COMPUTE g(1)
+        // Define the start and end of the range to sum over
         let g_1_range_start_exclusive = g_0_range_end_inclusive;
         let g_1_range_end_inclusive: Vec<F> = self.random_challenges.iter().chain(vec![F::ONE].iter()).chain(vec![F::ONE; self.num_free_variables()].iter()).cloned().collect();
-
         // Create range indices
         let sum_1_start_index_exclusive = ExperimentalProver::<F, P>::bits_to_index(&g_1_range_start_exclusive);
         let sum_1_end_index_inclusive = ExperimentalProver::<F, P>::bits_to_index(&g_1_range_end_inclusive);
-
-        // Compute the sum of evaluations using the range
+        // Compute the sum of evaluations using the range lookup
         let g_1_evalutations_not_in_the_sum = self.range_sums[sum_1_start_index_exclusive];
         let sum_1 = self.range_sums[sum_1_end_index_inclusive] - g_1_evalutations_not_in_the_sum;
     
-        // form a polynomial that s.t. g(0) = sum_0, g(1) = sum_1
-        let g_round: SparsePolynomial<F> = SparsePolynomial::<F>::from_coefficients_vec(vec![(0, sum_0), (1, -sum_0 + sum_1)]);
+        // FORM POLYNOMIAL
+        // Form a polynomial s.t. g(0) = sum_0 and g(1) = sum_1
+        let g: SparsePolynomial<F> = SparsePolynomial::<F>::from_coefficients_vec(vec![(0, sum_0), (1, -sum_0 + sum_1)]);
 
-        // don't forget to increment the round
+        // Increment the round counter
         self.current_round += 1;
-    
-        return Some(g_round);
+        // Return the computed polynomial
+        return Some(g);
     }
     fn total_rounds(&self) -> usize {
         self.num_variables
