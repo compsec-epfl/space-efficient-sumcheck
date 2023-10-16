@@ -40,20 +40,20 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> ExperimentalProver<F, P> {
         }
     }
     fn bits_to_index(bits: &[F]) -> usize {
-        let mut size: usize = 0;
-        let mut shift = 0;
+        let mut index: usize = 0;
 
-        // Iterate through the bits in reverse order (from least significant to most significant)
-        for &bit in bits.iter().rev() {
-            // If the bit is 1, set the corresponding bit in the size variable
+        // Iterate through the bits from most significant to least significant
+        for &bit in bits {
+            // Shift the index to the left by 1 bit position
+            index <<= 1;
+
+            // If the current bit is 1, set the least significant bit of the index to 1
             if bit == F::ONE {
-                size |= 1 << shift;
+                index |= 1;
             }
-            // Increment the shift value to move to the next bit position
-            shift += 1;
         }
 
-        size
+        index
     }
 }
 
@@ -71,22 +71,19 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for ExperimentalP
             self.random_challenges.push(verifier_message.unwrap());
         }
 
-        // COMPUTE g(0)
-        // Define the start and end of the range to sum over
-        let g_0_range_start_exclusive: Vec<F> = self
-            .random_challenges
-            .iter()
-            .chain(vec![F::ZERO].iter())
-            .chain(vec![F::ZERO; self.num_free_variables()].iter())
-            .cloned()
-            .collect();
-        let g_0_range_end_inclusive: Vec<F> = self
-            .random_challenges
-            .iter()
-            .chain(vec![F::ZERO].iter())
-            .chain(vec![F::ONE; self.num_free_variables()].iter())
-            .cloned()
-            .collect();
+        // Define the start and end of the range to sum over for g(0)
+        let g_0_range_start_exclusive = [
+            self.random_challenges.clone(),
+            vec![F::ZERO],
+            vec![F::ZERO; self.num_free_variables()],
+        ]
+        .concat();
+        let g_0_range_end_inclusive = [
+            self.random_challenges.clone(),
+            vec![F::ZERO],
+            vec![F::ONE; self.num_free_variables()],
+        ]
+        .concat();
         // Create range indices
         let sum_0_start_index_exclusive =
             ExperimentalProver::<F, P>::bits_to_index(&g_0_range_start_exclusive);
@@ -99,16 +96,14 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for ExperimentalP
         }
         let sum_0 = self.range_sums[sum_0_end_index_inclusive] - g_0_evalutations_not_in_the_sum;
 
-        // COMPUTE g(1)
-        // Define the start and end of the range to sum over
+        // Define the start and end of the range to sum over for g(1)
         let g_1_range_start_exclusive = g_0_range_end_inclusive;
-        let g_1_range_end_inclusive: Vec<F> = self
-            .random_challenges
-            .iter()
-            .chain(vec![F::ONE].iter())
-            .chain(vec![F::ONE; self.num_free_variables()].iter())
-            .cloned()
-            .collect();
+        let g_1_range_end_inclusive = [
+            self.random_challenges.clone(),
+            vec![F::ONE],
+            vec![F::ONE; self.num_free_variables()],
+        ]
+        .concat();
         // Create range indices
         let sum_1_start_index_exclusive =
             ExperimentalProver::<F, P>::bits_to_index(&g_1_range_start_exclusive);
@@ -118,7 +113,6 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for ExperimentalP
         let g_1_evalutations_not_in_the_sum = self.range_sums[sum_1_start_index_exclusive];
         let sum_1 = self.range_sums[sum_1_end_index_inclusive] - g_1_evalutations_not_in_the_sum;
 
-        // FORM POLYNOMIAL
         // Form a polynomial s.t. g(0) = sum_0 and g(1) = sum_1
         let g: SparsePolynomial<F> =
             SparsePolynomial::<F>::from_coefficients_vec(vec![(0, sum_0), (1, -sum_0 + sum_1)]);
@@ -186,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn time_prover_init() {
+    fn init() {
         let prover = ExperimentalProver::<TestField, TestPolynomial>::new(test_polynomial());
         assert_eq!(
             prover.total_rounds(),
@@ -196,19 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn time_prover_round_0() {
-        // ZEROTH ROUND
-        // all variables free
-        // 000 = 0
-        // 001 = 0
-        // 010 = 13
-        // 011 = 1
-        // sum g0(0) = 14
-        // 100 = 2
-        // 101 = 2
-        // 110 = 0
-        // 111 = 7
-        // sum g0(1) = 11
+    fn round_0() {
         let mut prover = ExperimentalProver::<TestField, TestPolynomial>::new(test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         assert_eq!(
@@ -224,14 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn time_prover_round_1() {
-        // FIRST ROUND x0 fixed to 1
-        // 101 = 2
-        // 100 = 2
-        // sum g1(0) = 4
-        // 111 = 7
-        // 110 = 0
-        // sum g1(1) = 7
+    fn round_1() {
         let mut prover = ExperimentalProver::<TestField, TestPolynomial>::new(test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
@@ -252,12 +227,7 @@ mod tests {
     }
 
     #[test]
-    fn time_prover_round_2() {
-        // LAST ROUND x1 fixed to 1
-        // 110 = 0
-        // sum g(0) = 0
-        // 111 = 7
-        // sum g(1) = 7
+    fn round_2() {
         let mut prover = ExperimentalProver::<TestField, TestPolynomial>::new(test_polynomial());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one

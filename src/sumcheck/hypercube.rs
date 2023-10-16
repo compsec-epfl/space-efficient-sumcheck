@@ -3,13 +3,13 @@ use std::marker::PhantomData;
 use ark_ff::Field;
 
 pub struct BooleanHypercube<F: Field> {
-    n: u32,
-    current: u64,
+    n: usize,
+    current: usize,
     __f: PhantomData<F>,
 }
 
 impl<F: Field> BooleanHypercube<F> {
-    pub fn new(n: u32) -> Self {
+    pub fn new(n: usize) -> Self {
         Self {
             n,
             current: 0,
@@ -20,31 +20,16 @@ impl<F: Field> BooleanHypercube<F> {
 
 impl<F: Field> Iterator for BooleanHypercube<F> {
     type Item = Vec<F>;
-
-    // TODO: (z-tech) improve this
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current == 2u64.pow(self.n) {
-            None
-        } else {
-            let mut point_binary_str: String = format!("{:b}", self.current);
-            if self.n > 1 {
-                let zero_padding: String = vec!['0'; (self.n as usize) - point_binary_str.len()]
-                    .into_iter()
-                    .collect();
-                point_binary_str = zero_padding + &point_binary_str;
-            }
-
-            let mut point = Vec::<F>::with_capacity(self.n as usize);
-            for bit in point_binary_str.chars() {
-                if bit == '0' {
-                    point.push(F::ZERO);
-                } else {
-                    point.push(F::ONE);
-                }
-            }
-            self.current += 1;
-            Some(point)
+        if self.current >= 2usize.pow(self.n as u32) {
+            return None;
         }
+    
+        let point_binary_str = format!("{:0width$b}", self.current, width = self.n as usize);
+        let point: Vec<F> = point_binary_str.chars().map(|c| if c == '0' { F::ZERO } else { F::ONE }).collect();
+    
+        self.current += 1;
+        Some(point)
     }
 }
 
@@ -68,7 +53,7 @@ mod tests {
 
     #[test]
     fn small_n() {
-        let hypercube = BooleanHypercube::<TestField>::new(0_u32);
+        let hypercube = BooleanHypercube::<TestField>::new(0);
         let points = vec![vec![TestField::ZERO], vec![TestField::ONE]];
         for (i, point) in hypercube.enumerate() {
             assert_eq!(points[i], point);
@@ -77,7 +62,7 @@ mod tests {
 
     #[test]
     fn numerical_order() {
-        let hypercube = BooleanHypercube::<TestField>::new(3_u32);
+        let hypercube = BooleanHypercube::<TestField>::new(3);
         let points = vec![
             vec![TestField::ZERO, TestField::ZERO, TestField::ZERO],
             vec![TestField::ZERO, TestField::ZERO, TestField::ONE],
@@ -92,4 +77,5 @@ mod tests {
             assert_eq!(points[i], point);
         }
     }
+    
 }

@@ -53,7 +53,7 @@ impl<F: Field> SumcheckMultivariatePolynomial<F> for multivariate::SparsePolynom
     fn to_univariate(&self) -> univariate::SparsePolynomial<F> {
         let mut res: univariate::SparsePolynomial<F> = univariate::SparsePolynomial::zero();
 
-        for p in BooleanHypercube::<F>::new((DenseMVPolynomial::num_vars(self) - 1) as u32) {
+        for p in BooleanHypercube::<F>::new(DenseMVPolynomial::num_vars(self) - 1) {
             let mut point: Vec<F> = vec![F::one()];
             point.extend_from_slice(&p);
             let mut r: univariate::SparsePolynomial<F> = univariate::SparsePolynomial::zero();
@@ -79,7 +79,7 @@ impl<F: Field> SumcheckMultivariatePolynomial<F> for multivariate::SparsePolynom
         DenseMVPolynomial::num_vars(self)
     }
     fn to_evaluations(&self) -> Vec<F> {
-        BooleanHypercube::<F>::new(DenseMVPolynomial::<F>::num_vars(self) as u32)
+        BooleanHypercube::<F>::new(DenseMVPolynomial::<F>::num_vars(self))
             .map(|point: Vec<F>| {
                 SumcheckMultivariatePolynomial::<F>::evaluate(self, &point).unwrap()
             })

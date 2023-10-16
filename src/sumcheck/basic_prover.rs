@@ -6,58 +6,59 @@ use crate::sumcheck::SumcheckMultivariatePolynomial;
 
 // the state of the basic prover in the protocol
 pub struct BasicProver<F: Field, P: SumcheckMultivariatePolynomial<F>> {
-    pub mlp: P,       // a polynomial that will be treated as multilinear
-    pub mlp_claim: F, // the claimed evaluation of mpl
-    pub verifier_randomness: Vec<F>,
-    pub current_round: usize,
-    pub num_vars: usize,
+    pub multilinear_polynomial: P, // a polynomial that will be treated as multilinear
+    pub claimed_evaluation: F,     // the claimed evaluation of the multilinear polynomial
+    pub random_challenges: Vec<F>, // random challenges for the protocol
+    pub current_round: usize,      // current round of the protocol
+    pub num_variables: usize,      // number of variables in the multilinear polynomial
 }
 
 impl<F: Field, P: SumcheckMultivariatePolynomial<F>> BasicProver<F, P> {
     // create new basic prover state
-    pub fn new(mlp: P) -> Self {
-        let mlp_claim = mlp.to_evaluations().into_iter().sum();
-        let num_vars = mlp.num_vars();
+    pub fn new(multilinear_polynomial: P) -> Self {
+        let claimed_evaluation = multilinear_polynomial.to_evaluations().into_iter().sum();
+        let num_variables = multilinear_polynomial.num_vars();
         Self {
-            mlp,
-            mlp_claim,
-            verifier_randomness: Vec::with_capacity(num_vars),
+            multilinear_polynomial,
+            claimed_evaluation,
+            random_challenges: Vec::with_capacity(num_variables),
             current_round: 0,
-            num_vars,
+            num_variables,
         }
     }
 }
 
 impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for BasicProver<F, P> {
-    // a basic next-message function.
+    // Generates the next message for the verifier in the interactive protocol.
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
+        // Ensure the current round is within bounds
         assert!(
             self.current_round <= self.total_rounds() - 1,
             "More rounds than needed."
-        ); // self.current_round is zero-indexed
-           // first round only send univariate polynomial for verifier to check g0(0) + g0(1) = claim
-           // all other rounds fix a variable with randomness from the verifier
+        );
+
+        // If it's not the first round, add the verifier message to random_challenges
         if self.current_round != 0 {
-            // fix variables with verifier challenges (if any)
-            let random_field_element: F = verifier_message.unwrap();
-            self.verifier_randomness.push(random_field_element);
+            self.random_challenges.push(verifier_message.unwrap());
         }
 
-        // don't forget to increment the round
+        // Don't forget to increment the round
         self.current_round += 1;
 
-        // return a univariate polynomial evaluated over the current (smaller) hypercube
-        let tmp_mlp = self.mlp.fix_variables(&self.verifier_randomness);
-        return Some(tmp_mlp.to_univariate());
+        // Return a univariate polynomial evaluated over the current (smaller) hypercube
+        let fixed_mlp = self
+            .multilinear_polynomial
+            .fix_variables(&self.random_challenges);
+        Some(fixed_mlp.to_univariate())
     }
     fn total_rounds(&self) -> usize {
-        self.num_vars
+        self.num_variables
     }
     fn num_free_variables(&self) -> usize {
-        if self.num_vars == self.verifier_randomness.len() {
+        if self.num_variables == self.random_challenges.len() {
             return 0;
         }
-        return self.num_vars - self.verifier_randomness.len() - 1;
+        return self.num_variables - self.random_challenges.len() - 1;
     }
 }
 
@@ -149,7 +150,7 @@ mod tests {
 
     #[test]
     fn basic_prover_round_1() {
-        // FIRST ROUND x0 fixed to 1
+        // FIRST ROUND x0 fixed to 0
         // 101 = 2
         // 100 = 2
         // sum g1(0) = 4
@@ -198,6 +199,61 @@ mod tests {
         assert_eq!(
             g_round_2.evaluate(&TestField::ONE),
             TestField::from(7),
+            "g2 should evaluate correctly for input 1"
+        );
+    }
+
+    #[test]
+    fn basic_prover_outside_hypercube_round_1() {
+        // FIRST ROUND x0 fixed to 3
+        // 3,0,1 = 6
+        // 3,0,0 = 6
+        // sum g1(0) = 12
+        // 3,1,1 = 38 = 0 mod 19
+        // 3,1,0 = 31 = 12 mod 19
+        // sum g1(1) = 12
+        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let g_round_0 = prover.next_message(None).unwrap();
+        let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
+        assert_eq!(
+            g_round_0.evaluate(&TestField::from(3)),
+            g_round_1.evaluate(&TestField::ZERO) + g_round_1.evaluate(&TestField::ONE)
+        );
+        assert_eq!(
+            g_round_1.evaluate(&TestField::ZERO),
+            TestField::from(12),
+            "g1 should evaluate correctly for input 0"
+        );
+        assert_eq!(
+            g_round_1.evaluate(&TestField::ONE),
+            TestField::from(12),
+            "g1 should evaluate correctly for input 1"
+        );
+    }
+
+    #[test]
+    fn basic_prover_outside_hypercube_round_2() {
+        // LAST ROUND x1 fixed to 4
+        // 3,4,0 = 108 = 11 mod 19
+        // sum g(0) = 11
+        // 3,4,1 = 138 = 1 mod 19
+        // sum g(1) = 1
+        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let _g_round_0 = prover.next_message(None).unwrap();
+        let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
+        let g_round_2 = prover.next_message(Some(TestField::from(4))).unwrap(); // x1 fixed to 4
+        assert_eq!(
+            g_round_1.evaluate(&TestField::from(4)),
+            g_round_2.evaluate(&TestField::ZERO) + g_round_2.evaluate(&TestField::ONE)
+        );
+        assert_eq!(
+            g_round_2.evaluate(&TestField::ZERO),
+            TestField::from(11),
+            "g2 should evaluate correctly for input 0"
+        );
+        assert_eq!(
+            g_round_2.evaluate(&TestField::ONE),
+            TestField::from(1),
             "g2 should evaluate correctly for input 1"
         );
     }

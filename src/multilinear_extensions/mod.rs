@@ -17,7 +17,7 @@ fn lagrange_basis_poly_at<F: Field>(x: &[F], w: &[F]) -> Option<F> {
 /// Evaluate multilinear extension of with an algorithm from [`CTY11`]. Space efficient
 ///
 /// [`CTY11`]: https://arxiv.org/abs/1109.6882
-pub fn cti_multilinear_from_evaluations<F: Field>(evals: &[F], r: &[F]) -> F {
+pub fn cty_multilinear_from_evaluations<F: Field>(evals: &[F], r: &[F]) -> F {
     let mut res: F = F::zero();
 
     for (i, eval) in evals.iter().enumerate() {
@@ -93,7 +93,7 @@ mod tests {
         for i in 0u32..5 {
             let mut line = Vec::with_capacity(5);
             for j in 0u32..5 {
-                let f_r = cti_multilinear_from_evaluations(
+                let f_r = cty_multilinear_from_evaluations(
                     &evals,
                     &[
                         Fr::from_bigint(i.into()).unwrap(),
