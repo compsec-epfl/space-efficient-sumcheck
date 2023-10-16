@@ -5,110 +5,98 @@ use ark_std::vec::Vec;
 use crate::sumcheck::Prover;
 use crate::sumcheck::SumcheckMultivariatePolynomial;
 
-// the state of the time prover in the protocol
 pub struct ExperimentalProver<F: Field, P: SumcheckMultivariatePolynomial<F>> {
-    pub mlp: P, // a polynomial that will be treated as multilinear
-    pub mlp_claim: F, // the claimed evaluation of mpl
-    pub mlp_evaluated_per_input: Vec<F>,
-    pub inter_sums: Vec<F>,
-    pub random_challenges: Vec<F>,
-    pub current_round: usize,
-    pub num_vars: usize,
-}
-
-fn bits_to_size<F: Field>(bits: &[F]) -> usize {
-    let mut size: usize = 0;
-    let mut shift = 0;
-
-    // Iterate through the bits in reverse order (from least significant to most significant)
-    for &bit in bits.iter().rev() {
-        // If the bit is 1, set the corresponding bit in the size variable
-        if bit == F::ONE {
-            size |= 1 << shift;
-        }
-        // Increment the shift value to move to the next bit position
-        shift += 1;
-    }
-
-    size
+    pub multilinear_polynomial: P, // a polynomial that will be treated as multilinear
+    pub claimed_evaluation: F, // the claimed evaluation of the multilinear polynomial
+    pub evaluations_per_input: Vec<F>, // evaluated values of the multilinear polynomial for each input
+    pub range_sums: Vec<F>, // range sums used in the computation
+    pub random_challenges: Vec<F>, // random challenges for the protocol
+    pub current_round: usize, // current round of the protocol
+    pub num_variables: usize, // number of variables in the multilinear polynomial
 }
 
 impl<F: Field, P: SumcheckMultivariatePolynomial<F>> ExperimentalProver<F, P> {
     // create new time prover state
-    pub fn new(mlp: P) -> Self {
-        let mlp_claim = mlp.to_evaluations().into_iter().sum();
-        let mlp_evaluated_per_input = mlp.to_evaluations();
-        let num_vars = mlp.num_vars();
+    pub fn new(multilinear_polynomial: P) -> Self {
+        let num_variables = multilinear_polynomial.num_vars();
+        // compute the input-output pairs
+        let evaluations_per_input = multilinear_polynomial.to_evaluations();
+        // compute the range sum lookup
         let mut running_sum = F::ZERO;
-        let mut inter_sums = Vec::<F>::with_capacity(num_vars);
-        for point_eval in &mlp_evaluated_per_input {
+        let mut range_sums = Vec::<F>::with_capacity(num_variables);
+        for point_eval in &evaluations_per_input {
             running_sum += point_eval;
-            inter_sums.push(running_sum);
+            range_sums.push(running_sum);
         }
+        // return ExperimentalProver instance
         Self {
-            mlp,
-            mlp_claim,
-            mlp_evaluated_per_input,
-            inter_sums,
-            random_challenges: Vec::<F>::with_capacity(num_vars),
+            multilinear_polynomial,
+            claimed_evaluation: range_sums[num_variables - 1],
+            evaluations_per_input,
+            range_sums,
+            random_challenges: Vec::<F>::with_capacity(num_variables),
             current_round: 0,
-            num_vars,
+            num_variables,
         }
     }
+    fn bits_to_index(bits: &[F]) -> usize {
+        let mut size: usize = 0;
+        let mut shift = 0;
+    
+        // Iterate through the bits in reverse order (from least significant to most significant)
+        for &bit in bits.iter().rev() {
+            // If the bit is 1, set the corresponding bit in the size variable
+            if bit == F::ONE {
+                size |= 1 << shift;
+            }
+            // Increment the shift value to move to the next bit position
+            shift += 1;
+        }
+    
+        size
+    }
+    
 }
 
 impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for ExperimentalProver<F, P> {
     // a next-message function using vsbw
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
-        assert!(self.current_round <= self.total_rounds() - 1, "More rounds than needed."); // self.current_round is zero-indexed
+        // Ensure the current round is within bounds
+        assert!(self.current_round <= self.total_rounds() - 1, "More rounds than needed.");
+
+        // If it's not the first round, add the verifier message to random_challenges
         if self.current_round != 0 {
             self.random_challenges.push(verifier_message.unwrap());
         }
 
-        // TODO: (z-tech) make this better
-        let mut free_variables = self.num_vars - self.random_challenges.len();
-        if free_variables > 0 {
-            free_variables -= 1;
-            // println!("free variables: {}", free_variables);
-        }
+        // Define the start and end of the range to sum over for g0
+        let g_0_range_start_exclusive: Vec<F> = self.random_challenges.iter().chain(vec![F::ZERO].iter()).chain(vec![F::ZERO; self.num_free_variables()].iter()).cloned().collect();
+        let g_0_range_end_inclusive: Vec<F> = self.random_challenges.iter().chain(vec![F::ZERO].iter()).chain(vec![F::ONE; self.num_free_variables()].iter()).cloned().collect();
+        
+        // Create range indices
+        let sum_0_start_index_exclusive = ExperimentalProver::<F, P>::bits_to_index(&g_0_range_start_exclusive);
+        let sum_0_end_index_inclusive = ExperimentalProver::<F, P>::bits_to_index(&g_0_range_end_inclusive);
 
-        let mut point_0_range_start = vec![];
-        point_0_range_start.extend_from_slice(&self.random_challenges);
-        point_0_range_start.extend_from_slice(&vec![F::ZERO]);
-        if free_variables > 0 {
-            point_0_range_start.extend_from_slice(&vec![F::ZERO; free_variables]);
+        // Compute the sum of evaluations using the range
+        let mut g_0_evalutations_not_in_the_sum = F::ZERO;
+        if sum_0_start_index_exclusive > 0 {
+            g_0_evalutations_not_in_the_sum = self.range_sums[sum_0_start_index_exclusive - 1];
         }
-        let mut point_0_range_end = vec![];
-        point_0_range_end.extend_from_slice(&self.random_challenges);
-        point_0_range_end.extend_from_slice(&vec![F::ZERO]);
-        if free_variables > 0 {
-            point_0_range_end.extend_from_slice(&vec![F::ONE; free_variables]);
-        }
-        let a0 = bits_to_size(&point_0_range_start);
-        let b0 = bits_to_size(&point_0_range_end);
-        let mut left = F::ZERO;
-        if a0 > 0 {
-            left = self.inter_sums[a0 - 1];
-        }
-        let sum_0 = self.inter_sums[b0] - left;
-        println!("a0: {}, b0: {}, sum_0: {}", a0, b0, sum_0);
+        let sum_0 = self.range_sums[sum_0_end_index_inclusive] - g_0_evalutations_not_in_the_sum;
 
-        let mut point_1_range_end = vec![];
-        point_1_range_end.extend_from_slice(&self.random_challenges);
-        point_1_range_end.extend_from_slice(&vec![F::ONE]);
-        if free_variables > 0 {
-            point_1_range_end.extend_from_slice(&vec![F::ONE; free_variables]);
-        }
-        let b1 = bits_to_size(&point_1_range_end);
-        let sum_1 = self.inter_sums[b1] - self.inter_sums[b0];
-        println!("b1: {}, sums[b1]: {}, sum_1: {}", b1, self.inter_sums[b1], sum_1);
+        // Define the start and end of the range to sum over for g1
+        let g_1_range_start_exclusive = g_0_range_end_inclusive;
+        let g_1_range_end_inclusive: Vec<F> = self.random_challenges.iter().chain(vec![F::ONE].iter()).chain(vec![F::ONE; self.num_free_variables()].iter()).cloned().collect();
 
-        println!("{}, {}", sum_0, sum_1);
-        println!("### ROUND DONE #####");
-        // println!("b1: {}, sums[b1]: {}, sum_0: {}, diff: {}", b1, self.inter_sums[b1], sum_0, self.inter_sums[b1] - sum_0);
-        // println!("end: {}, start: {}, diff: {}", self.inter_sums[b0], self.inter_sums[a0], self.inter_sums[b0] - self.inter_sums[a0]);
+        // Create range indices
+        let sum_1_start_index_exclusive = ExperimentalProver::<F, P>::bits_to_index(&g_1_range_start_exclusive);
+        let sum_1_end_index_inclusive = ExperimentalProver::<F, P>::bits_to_index(&g_1_range_end_inclusive);
+
+        // Compute the sum of evaluations using the range
+        let g_1_evalutations_not_in_the_sum = self.range_sums[sum_1_start_index_exclusive];
+        let sum_1 = self.range_sums[sum_1_end_index_inclusive] - g_1_evalutations_not_in_the_sum;
     
-        // form a polynomial that s.t. g_round(0) = sum_0, g_round(1) = sum_1
+        // form a polynomial that s.t. g(0) = sum_0, g(1) = sum_1
         let g_round: SparsePolynomial<F> = SparsePolynomial::<F>::from_coefficients_vec(vec![(0, sum_0), (1, -sum_0 + sum_1)]);
 
         // don't forget to increment the round
@@ -117,7 +105,13 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for ExperimentalP
         return Some(g_round);
     }
     fn total_rounds(&self) -> usize {
-        self.num_vars
+        self.num_variables
+    }
+    fn num_free_variables(&self) -> usize {
+        if self.num_variables == self.random_challenges.len() {
+            return 0;
+        }
+        return self.num_variables - self.random_challenges.len() - 1;
     }
 }
 

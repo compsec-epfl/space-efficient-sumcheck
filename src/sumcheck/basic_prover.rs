@@ -50,6 +50,12 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for BasicProver<F
     fn total_rounds(&self) -> usize {
         self.num_vars
     }
+    fn num_free_variables(&self) -> usize {
+        if self.num_vars == self.verifier_randomness.len() {
+            return 0;
+        }
+        return self.num_vars - self.verifier_randomness.len() - 1;
+    }
 }
 
 #[cfg(test)]

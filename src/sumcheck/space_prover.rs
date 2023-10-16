@@ -80,6 +80,12 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for SpaceProver<F
     fn total_rounds(&self) -> usize {
         self.num_vars
     }
+    fn num_free_variables(&self) -> usize {
+        if self.num_vars == self.random_challenges.len() {
+            return 0;
+        }
+        return self.num_vars - self.random_challenges.len() - 1;
+    }
 }
 
 #[cfg(test)]
