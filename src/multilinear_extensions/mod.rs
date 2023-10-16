@@ -38,7 +38,6 @@ pub fn cti_multilinear_from_evaluations<F: Field>(evals: &[F], r: &[F]) -> F {
     res
 }
 
-
 /// Evaluate multilinear extension with an algorith from [`VSBW13`] Time efficient
 ///
 /// [`VSBW13`]: https://ieeexplore.ieee.org/document/6547112

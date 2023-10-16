@@ -6,7 +6,7 @@ use crate::sumcheck::SumcheckMultivariatePolynomial;
 
 // the state of the basic prover in the protocol
 pub struct BasicProver<F: Field, P: SumcheckMultivariatePolynomial<F>> {
-    pub mlp: P, // a polynomial that will be treated as multilinear
+    pub mlp: P,       // a polynomial that will be treated as multilinear
     pub mlp_claim: F, // the claimed evaluation of mpl
     pub verifier_randomness: Vec<F>,
     pub current_round: usize,
@@ -31,9 +31,12 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> BasicProver<F, P> {
 impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for BasicProver<F, P> {
     // a basic next-message function.
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
-        assert!(self.current_round <= self.total_rounds() - 1, "More rounds than needed."); // self.current_round is zero-indexed
-        // first round only send univariate polynomial for verifier to check g0(0) + g0(1) = claim
-        // all other rounds fix a variable with randomness from the verifier
+        assert!(
+            self.current_round <= self.total_rounds() - 1,
+            "More rounds than needed."
+        ); // self.current_round is zero-indexed
+           // first round only send univariate polynomial for verifier to check g0(0) + g0(1) = claim
+           // all other rounds fix a variable with randomness from the verifier
         if self.current_round != 0 {
             // fix variables with verifier challenges (if any)
             let random_field_element: F = verifier_message.unwrap();
@@ -42,7 +45,7 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for BasicProver<F
 
         // don't forget to increment the round
         self.current_round += 1;
-    
+
         // return a univariate polynomial evaluated over the current (smaller) hypercube
         let tmp_mlp = self.mlp.fix_variables(&self.verifier_randomness);
         return Some(tmp_mlp.to_univariate());
@@ -68,8 +71,7 @@ mod tests {
     };
     use ark_poly::{
         multivariate::{self, SparseTerm, Term},
-        DenseMVPolynomial,
-        Polynomial,
+        DenseMVPolynomial, Polynomial,
     };
 
     use pretty_assertions::assert_eq;
@@ -80,7 +82,7 @@ mod tests {
     struct FrConfig;
 
     type TestField = Fp64<MontBackend<FrConfig, 1>>;
-    type TestPolynomial = multivariate::SparsePolynomial::<TestField, SparseTerm>;
+    type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
 
     fn test_polynomial() -> TestPolynomial {
         // 4*x_1*x_2 + 7*x_2*x_3 + 2*x_1 + 13*x_2
@@ -89,7 +91,7 @@ mod tests {
             &[
                 (
                     TestField::from(4),
-                    multivariate::SparseTerm::new(vec![(0, 1),(1, 1)]),
+                    multivariate::SparseTerm::new(vec![(0, 1), (1, 1)]),
                 ),
                 (
                     TestField::from(7),
@@ -104,13 +106,17 @@ mod tests {
                     multivariate::SparseTerm::new(vec![(1, 1)]),
                 ),
             ],
-        )
+        );
     }
 
     #[test]
     fn basic_prover_init() {
         let prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
-        assert_eq!(prover.total_rounds(), 3, "should set the number of variables correctly");
+        assert_eq!(
+            prover.total_rounds(),
+            3,
+            "should set the number of variables correctly"
+        );
     }
 
     #[test]
@@ -129,8 +135,16 @@ mod tests {
         // sum g0(1) = 11
         let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
-        assert_eq!(g_round_0.evaluate(&TestField::ZERO), TestField::from(14), "g0 should evaluate correctly for input 0");
-        assert_eq!(g_round_0.evaluate(&TestField::ONE), TestField::from(11), "g0 should evaluate correctly for input 1");
+        assert_eq!(
+            g_round_0.evaluate(&TestField::ZERO),
+            TestField::from(14),
+            "g0 should evaluate correctly for input 0"
+        );
+        assert_eq!(
+            g_round_0.evaluate(&TestField::ONE),
+            TestField::from(11),
+            "g0 should evaluate correctly for input 1"
+        );
     }
 
     #[test]
@@ -145,24 +159,46 @@ mod tests {
         let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
-        assert_eq!(g_round_0.evaluate(&TestField::ONE), g_round_1.evaluate(&TestField::ZERO) + g_round_1.evaluate(&TestField::ONE));
-        assert_eq!(g_round_1.evaluate(&TestField::ZERO), TestField::from(4), "g1 should evaluate correctly for input 0");
-        assert_eq!(g_round_1.evaluate(&TestField::ONE), TestField::from(7), "g1 should evaluate correctly for input 1");
+        assert_eq!(
+            g_round_0.evaluate(&TestField::ONE),
+            g_round_1.evaluate(&TestField::ZERO) + g_round_1.evaluate(&TestField::ONE)
+        );
+        assert_eq!(
+            g_round_1.evaluate(&TestField::ZERO),
+            TestField::from(4),
+            "g1 should evaluate correctly for input 0"
+        );
+        assert_eq!(
+            g_round_1.evaluate(&TestField::ONE),
+            TestField::from(7),
+            "g1 should evaluate correctly for input 1"
+        );
     }
 
     #[test]
     fn basic_prover_round_2() {
         // LAST ROUND x1 fixed to 1
         // 110 = 0
-        // sum g(0) = 0 
+        // sum g(0) = 0
         // 111 = 7
         // sum g(1) = 7
         let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         let g_round_2 = prover.next_message(Some(TestField::ONE)).unwrap(); // x1 fixed to one
-        assert_eq!(g_round_1.evaluate(&TestField::ONE), g_round_2.evaluate(&TestField::ZERO) + g_round_2.evaluate(&TestField::ONE));
-        assert_eq!(g_round_2.evaluate(&TestField::ZERO), TestField::from(0), "g2 should evaluate correctly for input 0");
-        assert_eq!(g_round_2.evaluate(&TestField::ONE), TestField::from(7), "g2 should evaluate correctly for input 1");
+        assert_eq!(
+            g_round_1.evaluate(&TestField::ONE),
+            g_round_2.evaluate(&TestField::ZERO) + g_round_2.evaluate(&TestField::ONE)
+        );
+        assert_eq!(
+            g_round_2.evaluate(&TestField::ZERO),
+            TestField::from(0),
+            "g2 should evaluate correctly for input 0"
+        );
+        assert_eq!(
+            g_round_2.evaluate(&TestField::ONE),
+            TestField::from(7),
+            "g2 should evaluate correctly for input 1"
+        );
     }
 }

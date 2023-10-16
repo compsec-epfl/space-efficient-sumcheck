@@ -1,6 +1,6 @@
 use ark_ff::Field;
-use ark_std::vec::Vec;
 use ark_poly::univariate::SparsePolynomial;
+use ark_std::vec::Vec;
 
 use crate::sumcheck::Prover;
 
@@ -15,7 +15,7 @@ impl<F: Field> Sumcheck<F> {
         let rounds = prover.total_rounds();
         let mut prover_messages: Vec<SparsePolynomial<F>> = Vec::with_capacity(rounds);
         let mut verifier_messages: Vec<F> = Vec::with_capacity(rounds);
- 
+
         let mut verifier_message: Option<F> = None;
         while let Some(message) = prover.next_message(verifier_message) {
             prover_messages.push(message);

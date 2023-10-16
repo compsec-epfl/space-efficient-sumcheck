@@ -1,4 +1,3 @@
-
 use std::marker::PhantomData;
 
 use ark_ff::Field;
@@ -29,7 +28,9 @@ impl<F: Field> Iterator for BooleanHypercube<F> {
         } else {
             let mut point_binary_str: String = format!("{:b}", self.current);
             if self.n > 1 {
-                let zero_padding: String = vec!['0'; (self.n as usize) - point_binary_str.len()].into_iter().collect();
+                let zero_padding: String = vec!['0'; (self.n as usize) - point_binary_str.len()]
+                    .into_iter()
+                    .collect();
                 point_binary_str = zero_padding + &point_binary_str;
             }
 
@@ -68,10 +69,7 @@ mod tests {
     #[test]
     fn small_n() {
         let hypercube = BooleanHypercube::<TestField>::new(0_u32);
-        let points = vec![
-            vec![TestField::ZERO],
-            vec![TestField::ONE],
-        ];
+        let points = vec![vec![TestField::ZERO], vec![TestField::ONE]];
         for (i, point) in hypercube.enumerate() {
             assert_eq!(points[i], point);
         }
@@ -84,7 +82,7 @@ mod tests {
             vec![TestField::ZERO, TestField::ZERO, TestField::ZERO],
             vec![TestField::ZERO, TestField::ZERO, TestField::ONE],
             vec![TestField::ZERO, TestField::ONE, TestField::ZERO],
-            vec![TestField::ZERO, TestField::ONE, TestField::ONE],           
+            vec![TestField::ZERO, TestField::ONE, TestField::ONE],
             vec![TestField::ONE, TestField::ZERO, TestField::ZERO],
             vec![TestField::ONE, TestField::ZERO, TestField::ONE],
             vec![TestField::ONE, TestField::ONE, TestField::ZERO],

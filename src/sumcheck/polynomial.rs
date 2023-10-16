@@ -39,10 +39,11 @@ impl<F: Field> SumcheckMultivariatePolynomial<F> for multivariate::SparsePolynom
                     .map(|(var, power)| (var - partial_point.len(), *power))
                     .collect(),
             );
-            let poly: multivariate::SparsePolynomial<F, SparseTerm> = multivariate::SparsePolynomial {
-                num_vars: num_vars - partial_point.len(),
-                terms: vec![(eval, new_term)],
-            };
+            let poly: multivariate::SparsePolynomial<F, SparseTerm> =
+                multivariate::SparsePolynomial {
+                    num_vars: num_vars - partial_point.len(),
+                    terms: vec![(eval, new_term)],
+                };
 
             res += &poly;
         }
@@ -79,7 +80,9 @@ impl<F: Field> SumcheckMultivariatePolynomial<F> for multivariate::SparsePolynom
     }
     fn to_evaluations(&self) -> Vec<F> {
         BooleanHypercube::<F>::new(DenseMVPolynomial::<F>::num_vars(self) as u32)
-            .map(|point: Vec<F>| SumcheckMultivariatePolynomial::<F>::evaluate(self, &point).unwrap())
+            .map(|point: Vec<F>| {
+                SumcheckMultivariatePolynomial::<F>::evaluate(self, &point).unwrap()
+            })
             .collect()
     }
 }
@@ -99,7 +102,7 @@ mod tests {
     struct FrConfig;
 
     type TestField = Fp64<MontBackend<FrConfig, 1>>;
-    type TestPolynomial = multivariate::SparsePolynomial::<TestField, SparseTerm>;
+    type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
 
     fn test_polynomial() -> TestPolynomial {
         // 4*x_1*x_2 + 7*x_2*x_3 + 2*x_1 + 13*x_2
@@ -108,7 +111,7 @@ mod tests {
             &[
                 (
                     TestField::from(4),
-                    multivariate::SparseTerm::new(vec![(0, 1),(1, 1)]),
+                    multivariate::SparseTerm::new(vec![(0, 1), (1, 1)]),
                 ),
                 (
                     TestField::from(7),
@@ -123,13 +126,26 @@ mod tests {
                     multivariate::SparseTerm::new(vec![(1, 1)]),
                 ),
             ],
-        )
+        );
     }
 
     #[test]
     fn sumcheck_multivariate_polynomial_to_evaluations() {
         let p = test_polynomial();
-        let evals = vec![TestField::from(0), TestField::from(0), TestField::from(13), TestField::from(1), TestField::from(2), TestField::from(2), TestField::from(0), TestField::from(7)];
-        assert_eq!(p.to_evaluations(), evals, "should return the correct point-value evaluations");
+        let evals = vec![
+            TestField::from(0),
+            TestField::from(0),
+            TestField::from(13),
+            TestField::from(1),
+            TestField::from(2),
+            TestField::from(2),
+            TestField::from(0),
+            TestField::from(7),
+        ];
+        assert_eq!(
+            p.to_evaluations(),
+            evals,
+            "should return the correct point-value evaluations"
+        );
     }
 }
