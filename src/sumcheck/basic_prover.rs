@@ -32,10 +32,9 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for BasicProver<F
     // Generates the next message for the verifier in the interactive protocol.
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
         // Ensure the current round is within bounds
-        assert!(
-            self.current_round <= self.total_rounds() - 1,
-            "More rounds than needed."
-        );
+        if self.current_round >= self.total_rounds() {
+            return None;
+        }
 
         // If it's not the first round, add the verifier message to random_challenges
         if self.current_round != 0 {
@@ -59,6 +58,9 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for BasicProver<F
             return 0;
         }
         return self.num_variables - self.random_challenges.len() - 1;
+    }
+    fn claimed_evaluation(&self) -> F {
+        self.claimed_evaluation
     }
 }
 
