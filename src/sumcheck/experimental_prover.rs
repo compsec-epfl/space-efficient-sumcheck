@@ -64,42 +64,57 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for ExperimentalP
         if self.current_round >= self.total_rounds() {
             return None;
         }
-    
+
         // If it's not the first round, add the verifier message to random_challenges
         if self.current_round != 0 {
             self.random_challenges.push(verifier_message.unwrap());
         }
 
         // Define the start and end of the range to sum over for g(0)
-        let sum_0_start_index = ExperimentalProver::<F, P>::bits_to_index(&[
-            self.random_challenges.clone(),
-            vec![F::ZERO],
-            vec![F::ZERO; self.num_free_variables()],
-        ].concat());
-        let sum_0_end_index = ExperimentalProver::<F, P>::bits_to_index(&[
-            self.random_challenges.clone(),
-            vec![F::ZERO],
-            vec![F::ONE; self.num_free_variables()],
-        ].concat());
-    
+        let sum_0_start_index = ExperimentalProver::<F, P>::bits_to_index(
+            &[
+                self.random_challenges.clone(),
+                vec![F::ZERO],
+                vec![F::ZERO; self.num_free_variables()],
+            ]
+            .concat(),
+        );
+        let sum_0_end_index = ExperimentalProver::<F, P>::bits_to_index(
+            &[
+                self.random_challenges.clone(),
+                vec![F::ZERO],
+                vec![F::ONE; self.num_free_variables()],
+            ]
+            .concat(),
+        );
+
         // Define the start and end of the range to sum over for g(1)
         let sum_1_start_index = sum_0_end_index; // Start index for g(1) is the same as end index fore g(0)
-        let sum_1_end_index = ExperimentalProver::<F, P>::bits_to_index(&[
-            self.random_challenges.clone(),
-            vec![F::ONE],
-            vec![F::ONE; self.num_free_variables()],
-        ].concat());
-    
+        let sum_1_end_index = ExperimentalProver::<F, P>::bits_to_index(
+            &[
+                self.random_challenges.clone(),
+                vec![F::ONE],
+                vec![F::ONE; self.num_free_variables()],
+            ]
+            .concat(),
+        );
+
         // // Compute the sums of evaluations using range lookup
-        let sum_0 = self.range_sums[sum_0_end_index] - if sum_0_start_index > 0 { self.range_sums[sum_0_start_index - 1] } else { F::ZERO };
+        let sum_0 = self.range_sums[sum_0_end_index]
+            - if sum_0_start_index > 0 {
+                self.range_sums[sum_0_start_index - 1]
+            } else {
+                F::ZERO
+            };
         let sum_1 = self.range_sums[sum_1_end_index] - self.range_sums[sum_1_start_index];
-    
+
         // Form a polynomial s.t. g(0) = sum_0 and g(1) = sum_1
-        let g: SparsePolynomial<F> = SparsePolynomial::from_coefficients_vec(vec![(0, sum_0), (1, sum_1 - sum_0)]);
-    
+        let g: SparsePolynomial<F> =
+            SparsePolynomial::from_coefficients_vec(vec![(0, sum_0), (1, sum_1 - sum_0)]);
+
         // Increment the round counter
         self.current_round += 1;
-    
+
         // Return the computed polynomial
         Some(g)
     }

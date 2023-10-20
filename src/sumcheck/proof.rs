@@ -1,6 +1,6 @@
 use ark_ff::Field;
 use ark_poly::{univariate::SparsePolynomial, Polynomial};
-use ark_std::{vec::Vec, rand::Rng};
+use ark_std::{rand::Rng, vec::Vec};
 
 use crate::sumcheck::Prover;
 
@@ -13,7 +13,8 @@ pub struct Sumcheck<F: Field> {
 
 impl<F: Field> Sumcheck<F> {
     pub fn prove<P: Prover<F>, R: Rng>(mut prover: P, rng: &mut R) -> Self {
-        let mut prover_messages: Vec<SparsePolynomial<F>> = Vec::with_capacity(prover.total_rounds());
+        let mut prover_messages: Vec<SparsePolynomial<F>> =
+            Vec::with_capacity(prover.total_rounds());
         let mut verifier_messages: Vec<F> = Vec::with_capacity(prover.total_rounds());
         let mut is_accepted = true;
 
@@ -28,7 +29,11 @@ impl<F: Field> Sumcheck<F> {
             } else {
                 // only add verifier message to transcript when not "None"
                 verifier_messages.push(verifier_message.unwrap());
-                is_round_accepted = round_evaluation == prover_messages.last().unwrap().evaluate(&verifier_message.unwrap());
+                is_round_accepted = round_evaluation
+                    == prover_messages
+                        .last()
+                        .unwrap()
+                        .evaluate(&verifier_message.unwrap());
             }
 
             // always add prover message to transcript
@@ -109,4 +114,3 @@ mod tests {
         assert_eq!(transcript.is_accepted, true);
     }
 }
-

@@ -3,9 +3,9 @@ use ark_poly::univariate::SparsePolynomial;
 use ark_std::vec::Vec;
 
 use crate::multilinear_extensions::vsbw_multilinear_from_evaluations;
-use crate::sumcheck::BooleanHypercube;
 use crate::sumcheck::Prover;
 use crate::sumcheck::SumcheckMultivariatePolynomial;
+use crate::sumcheck::{Hypercube, HypercubeChunk};
 
 // the state of the time prover in the protocol
 pub struct TimeProver<F: Field, P: SumcheckMultivariatePolynomial<F>> {
@@ -50,10 +50,10 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for TimeProver<F,
             self.random_challenges.push(verifier_message.unwrap());
         }
 
-        // Compute the sum of both evaluations using the vsbw
+        // Compute the sum of both evaluations using the vsbw in chunks
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
-        for mut partial_point in BooleanHypercube::<F>::new(self.num_free_variables()) {
+        for mut partial_point in Hypercube::<F>::new(self.num_free_variables()) {
             partial_point = if self.num_free_variables() == 0 {
                 vec![]
             } else {

@@ -5,7 +5,7 @@ use ark_poly::{
     univariate,
 };
 
-use crate::sumcheck::BooleanHypercube;
+use crate::sumcheck::Hypercube;
 
 // https://github.com/montekki/thaler-study/blob/master/sum-check-protocol/src/lib.rs
 pub trait SumcheckMultivariatePolynomial<F: Field> {
@@ -53,7 +53,7 @@ impl<F: Field> SumcheckMultivariatePolynomial<F> for multivariate::SparsePolynom
     fn to_univariate(&self) -> univariate::SparsePolynomial<F> {
         let mut res: univariate::SparsePolynomial<F> = univariate::SparsePolynomial::zero();
 
-        for p in BooleanHypercube::<F>::new(DenseMVPolynomial::num_vars(self) - 1) {
+        for p in Hypercube::<F>::new(DenseMVPolynomial::num_vars(self) - 1) {
             let mut point: Vec<F> = vec![F::one()];
             point.extend_from_slice(&p);
             let mut r: univariate::SparsePolynomial<F> = univariate::SparsePolynomial::zero();
@@ -79,7 +79,7 @@ impl<F: Field> SumcheckMultivariatePolynomial<F> for multivariate::SparsePolynom
         DenseMVPolynomial::num_vars(self)
     }
     fn to_evaluations(&self) -> Vec<F> {
-        BooleanHypercube::<F>::new(DenseMVPolynomial::<F>::num_vars(self))
+        Hypercube::<F>::new(DenseMVPolynomial::<F>::num_vars(self))
             .map(|point: Vec<F>| {
                 SumcheckMultivariatePolynomial::<F>::evaluate(self, &point).unwrap()
             })

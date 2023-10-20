@@ -3,7 +3,7 @@ use ark_poly::univariate::SparsePolynomial;
 use ark_std::vec::Vec;
 
 use crate::multilinear_extensions::cty_multilinear_from_evaluations;
-use crate::sumcheck::BooleanHypercube;
+use crate::sumcheck::{Hypercube, HypercubeChunk};
 use crate::sumcheck::Prover;
 use crate::sumcheck::SumcheckMultivariatePolynomial;
 
@@ -54,21 +54,23 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for SpaceProver<F
         // Compute the sum of both evaluations using the cty
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
-        for mut partial_point in BooleanHypercube::<F>::new(self.num_free_variables()) {
-            partial_point = if self.num_free_variables() == 0 {
-                vec![]
-            } else {
-                partial_point
-            };
-            let point0 = [
-                self.random_challenges.clone(),
-                vec![F::ZERO],
-                partial_point.clone(),
-            ]
-            .concat();
-            let point1 = [self.random_challenges.clone(), vec![F::ONE], partial_point].concat();
-            sum_0 += cty_multilinear_from_evaluations(&self.evaluations_per_input, &point0);
-            sum_1 += cty_multilinear_from_evaluations(&self.evaluations_per_input, &point1);
+        for hypercube in HypercubeChunk::new(self.num_free_variables(), 10000) {
+            for mut partial_point in hypercube {
+                partial_point = if self.num_free_variables() == 0 {
+                    vec![]
+                } else {
+                    partial_point
+                };
+                let point0 = [
+                    self.random_challenges.clone(),
+                    vec![F::ZERO],
+                    partial_point.clone(),
+                ]
+                .concat();
+                let point1 = [self.random_challenges.clone(), vec![F::ONE], partial_point].concat();
+                sum_0 += cty_multilinear_from_evaluations(&self.evaluations_per_input, &point0);
+                sum_1 += cty_multilinear_from_evaluations(&self.evaluations_per_input, &point1);
+            }
         }
 
         // form a polynomial that s.t. g_round(0) = sum_0, g_round(1) = sum_1
