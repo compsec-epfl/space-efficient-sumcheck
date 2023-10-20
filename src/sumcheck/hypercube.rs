@@ -45,7 +45,7 @@ impl<F: Field> HypercubeChunk<F> {
             current_member: 0,
             _f: PhantomData,
         }
-    } 
+    }
     pub fn new_from_hypercube(hypercube: Hypercube<F>, chunk_size: usize) -> Self {
         assert_ne!(0, chunk_size);
         Self {

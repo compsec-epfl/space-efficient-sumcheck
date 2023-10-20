@@ -5,7 +5,7 @@ use ark_std::vec::Vec;
 use crate::multilinear_extensions::vsbw_multilinear_from_evaluations;
 use crate::sumcheck::Prover;
 use crate::sumcheck::SumcheckMultivariatePolynomial;
-use crate::sumcheck::{Hypercube, HypercubeChunk};
+use crate::sumcheck::Hypercube;
 
 // the state of the time prover in the protocol
 pub struct TimeProver<F: Field, P: SumcheckMultivariatePolynomial<F>> {
