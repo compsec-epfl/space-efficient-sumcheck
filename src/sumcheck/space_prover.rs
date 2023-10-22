@@ -1,9 +1,7 @@
 use ark_ff::Field;
 use ark_poly::univariate::SparsePolynomial;
-use ark_std::vec::Vec;
+use ark_std::{sync::Mutex, vec::Vec};
 use rayon::{iter::ParallelIterator, prelude::ParallelBridge};
-use std::sync::Mutex;
-use std::time::Instant;
 
 use crate::multilinear_extensions::cty_multilinear_from_evaluations;
 use crate::sumcheck::Prover;
@@ -62,7 +60,6 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F> + std::marker::Sync> Prover<
         HypercubeChunk::<F>::new(self.num_free_variables())
             .par_bridge()
             .for_each(|hypercube: Hypercube<F>| {
-                let thread_number = rayon::current_thread_index();
                 let mut local_sum_0 = F::ZERO;
                 let mut local_sum_1 = F::ZERO;
                 for partial_point in hypercube {
@@ -74,22 +71,10 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F> + std::marker::Sync> Prover<
                     .concat();
                     let point1 =
                         [self.random_challenges.clone(), vec![F::ONE], partial_point].concat();
-                    let start_time = Instant::now();
                     local_sum_0 +=
                         cty_multilinear_from_evaluations(&self.evaluations_per_input, &point0);
                     local_sum_1 +=
                         cty_multilinear_from_evaluations(&self.evaluations_per_input, &point1);
-                    let end_time = Instant::now();
-
-                    // Calculate the time elapsed
-                    let elapsed_time = end_time - start_time;
-                    println!(
-                        "Thread: {:?}, Started: {:?}, Elapsed time: {} seconds and {} milliseconds",
-                        thread_number,
-                        start_time,
-                        elapsed_time.as_secs(),
-                        elapsed_time.subsec_millis()
-                    );
                 }
                 *sum_0_mutex.lock().unwrap() += local_sum_0;
                 *sum_1_mutex.lock().unwrap() += local_sum_1;

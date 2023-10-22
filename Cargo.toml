@@ -3,7 +3,6 @@ name = "space-efficient-sumcheck"
 version = "0.1.0"
 edition = "2021"
 
-
 [dependencies]
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
@@ -16,3 +15,8 @@ rayon = "1.5"
 
 [dev-dependencies]
 pretty_assertions = "1"
+criterion = "0.3"
+
+[[bench]]
+harness = false
+name = "sumcheck"
