@@ -111,10 +111,7 @@ fn test_terms(num_terms: usize) -> Vec<(ark_ff::Fp<MontBackend<FrConfig, 1>, 1>,
 }
 
 fn test_polynomial(num_terms: usize) -> TestPolynomial {
-    return TestPolynomial::from_coefficients_vec(
-        num_terms,
-        test_terms(num_terms),
-    );
+    return TestPolynomial::from_coefficients_vec(num_terms, test_terms(num_terms));
 }
 
 fn sumcheck_benchmark(c: &mut Criterion) {
