@@ -49,7 +49,7 @@ impl<F: Field> Hypercube<F> {
 impl<F: Field> HypercubeChunk<F> {
     pub fn new(num_variables: usize) -> Self {
         let hypercube: Hypercube<F> = Hypercube::<F>::new(num_variables);
-        let num_threads: usize = rayon::current_num_threads();
+        let num_threads: usize = rayon::current_num_threads() * 2;
         let chunk_size: usize = cmp::max(hypercube.stop_member / num_threads, 1);
         Self {
             hypercube,
@@ -59,7 +59,7 @@ impl<F: Field> HypercubeChunk<F> {
         }
     }
     pub fn new_from_hypercube(hypercube: Hypercube<F>) -> Self {
-        let num_threads: usize = rayon::current_num_threads();
+        let num_threads: usize = rayon::current_num_threads() * 2;
         let chunk_size: usize = cmp::max(hypercube.stop_member / num_threads, 1);
         Self {
             hypercube,
@@ -139,13 +139,10 @@ impl<F: Field> Iterator for HypercubeChunk<F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use ark_ff::{
         fields::Fp64,
         fields::{MontBackend, MontConfig},
     };
-
-    use pretty_assertions::assert_eq;
 
     #[derive(MontConfig)]
     #[modulus = "19"]

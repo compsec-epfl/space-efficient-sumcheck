@@ -3,33 +3,26 @@ use ark_poly::univariate::SparsePolynomial;
 use ark_std::{sync::Mutex, vec::Vec};
 use rayon::{iter::ParallelIterator, prelude::ParallelBridge};
 
-use crate::multilinear_extensions::cty_multilinear_from_evaluations;
+use crate::multilinear_extensions::cty_interpolation;
 use crate::sumcheck::Prover;
-use crate::sumcheck::SumcheckMultivariatePolynomial;
 use crate::sumcheck::{Hypercube, HypercubeChunk};
 
 // the state of the space prover in the protocol
-
-pub struct SpaceProver<F: Field, P: SumcheckMultivariatePolynomial<F>> {
-    pub multilinear_polynomial: P, // a polynomial that will be treated as multilinear
-    pub claimed_evaluation: F,     // the claimed evaluation of the multilinear polynomial
-    pub evaluations_per_input: Vec<F>, // evaluated values of the multilinear polynomial for each input
+pub struct SpaceProver<F: Field> {
+    pub claimed_evaluation: F, // the claimed evaluation of the multilinear polynomial
+    pub evaluations_per_input: Vec<F>, // evaluated values of the multilinear polynomial for each input of the boolean hypercube
     pub random_challenges: Vec<F>,     // random challenges for the protocol
     pub current_round: usize,          // current round of the protocol
     pub num_variables: usize,          // number of variables in the multilinear polynomial
 }
 
-impl<F: Field, P: SumcheckMultivariatePolynomial<F>> SpaceProver<F, P> {
+impl<F: Field> SpaceProver<F> {
     // create new time prover state
-    pub fn new(multilinear_polynomial: P) -> Self {
-        let num_variables = multilinear_polynomial.num_vars();
-        // compute the input-output pairs
-        let evaluations_per_input = multilinear_polynomial.to_evaluations();
+    pub fn new(num_variables: usize, evaluations_per_input: Vec<F>) -> Self {
         // compute the claim
         let claimed_evaluation = evaluations_per_input.iter().sum();
         // return ExperimentalProver instance
         Self {
-            multilinear_polynomial,
             claimed_evaluation,
             evaluations_per_input,
             random_challenges: Vec::<F>::with_capacity(num_variables),
@@ -39,10 +32,8 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> SpaceProver<F, P> {
     }
 }
 
-impl<F: Field, P: SumcheckMultivariatePolynomial<F> + std::marker::Sync> Prover<F>
-    for SpaceProver<F, P>
-{
-    // a next-message function using cti
+impl<F: Field> Prover<F> for SpaceProver<F> {
+    // a next-message function using cty
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
         // Ensure the current round is within bounds
         if self.current_round >= self.total_rounds() {
@@ -71,10 +62,8 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F> + std::marker::Sync> Prover<
                     .concat();
                     let point1 =
                         [self.random_challenges.clone(), vec![F::ONE], partial_point].concat();
-                    local_sum_0 +=
-                        cty_multilinear_from_evaluations(&self.evaluations_per_input, &point0);
-                    local_sum_1 +=
-                        cty_multilinear_from_evaluations(&self.evaluations_per_input, &point1);
+                    local_sum_0 += cty_interpolation(&self.evaluations_per_input, &point0);
+                    local_sum_1 += cty_interpolation(&self.evaluations_per_input, &point1);
                 }
                 *sum_0_mutex.lock().unwrap() += local_sum_0;
                 *sum_1_mutex.lock().unwrap() += local_sum_1;
@@ -118,6 +107,8 @@ mod tests {
         DenseMVPolynomial, Polynomial,
     };
 
+    use crate::sumcheck::SumcheckMultivariatePolynomial;
+
     #[derive(MontConfig)]
     #[modulus = "19"]
     #[generator = "2"]
@@ -125,7 +116,6 @@ mod tests {
 
     type TestField = Fp64<MontBackend<FrConfig, 1>>;
     type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
-
     fn test_polynomial() -> TestPolynomial {
         // 4*x_1*x_2 + 7*x_2*x_3 + 2*x_1 + 13*x_2
         return TestPolynomial::from_coefficients_slice(
@@ -153,7 +143,9 @@ mod tests {
 
     #[test]
     fn init() {
-        let prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let polynomial = test_polynomial();
+        let prover =
+            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
         assert_eq!(
             prover.total_rounds(),
             3,
@@ -163,7 +155,9 @@ mod tests {
 
     #[test]
     fn round_0() {
-        let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let polynomial = test_polynomial();
+        let mut prover =
+            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
         let g_round_0 = prover.next_message(None).unwrap();
         assert_eq!(
             g_round_0.evaluate(&TestField::ZERO),
@@ -179,7 +173,9 @@ mod tests {
 
     #[test]
     fn round_1() {
-        let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let polynomial = test_polynomial();
+        let mut prover =
+            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         assert_eq!(
@@ -200,7 +196,9 @@ mod tests {
 
     #[test]
     fn round_2() {
-        let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let polynomial = test_polynomial();
+        let mut prover =
+            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         let g_round_2 = prover.next_message(Some(TestField::ONE)).unwrap(); // x1 fixed to one
@@ -222,7 +220,9 @@ mod tests {
 
     #[test]
     fn outside_hypercube_round_1() {
-        let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let polynomial = test_polynomial();
+        let mut prover =
+            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
         assert_eq!(
@@ -243,7 +243,9 @@ mod tests {
 
     #[test]
     fn outside_hypercube_round_2() {
-        let mut prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let polynomial = test_polynomial();
+        let mut prover =
+            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
         let g_round_2 = prover.next_message(Some(TestField::from(4))).unwrap(); // x1 fixed to 4

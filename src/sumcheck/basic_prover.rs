@@ -65,9 +65,8 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for BasicProver<F
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-
     use ark_ff::{
         fields::Fp64,
         fields::{MontBackend, MontConfig},
@@ -77,44 +76,45 @@ mod tests {
         DenseMVPolynomial, Polynomial,
     };
 
-    use pretty_assertions::assert_eq;
-
     #[derive(MontConfig)]
     #[modulus = "19"]
     #[generator = "2"]
-    struct FrConfig;
+    pub struct FrConfig;
 
     type TestField = Fp64<MontBackend<FrConfig, 1>>;
     type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
 
-    fn test_polynomial() -> TestPolynomial {
-        // 4*x_1*x_2 + 7*x_2*x_3 + 2*x_1 + 13*x_2
-        return TestPolynomial::from_coefficients_slice(
-            3,
-            &[
-                (
-                    TestField::from(4),
-                    multivariate::SparseTerm::new(vec![(0, 1), (1, 1)]),
-                ),
-                (
-                    TestField::from(7),
-                    multivariate::SparseTerm::new(vec![(1, 1), (2, 1)]),
-                ),
-                (
-                    TestField::from(2),
-                    multivariate::SparseTerm::new(vec![(0, 1)]),
-                ),
-                (
-                    TestField::from(13),
-                    multivariate::SparseTerm::new(vec![(1, 1)]),
-                ),
-            ],
-        );
+    pub mod test_util {
+        use super::*;
+        pub fn tiny_test_polynomial() -> TestPolynomial {
+            // 4*x_1*x_2 + 7*x_2*x_3 + 2*x_1 + 13*x_2
+            return TestPolynomial::from_coefficients_slice(
+                3,
+                &[
+                    (
+                        TestField::from(4),
+                        multivariate::SparseTerm::new(vec![(0, 1), (1, 1)]),
+                    ),
+                    (
+                        TestField::from(7),
+                        multivariate::SparseTerm::new(vec![(1, 1), (2, 1)]),
+                    ),
+                    (
+                        TestField::from(2),
+                        multivariate::SparseTerm::new(vec![(0, 1)]),
+                    ),
+                    (
+                        TestField::from(13),
+                        multivariate::SparseTerm::new(vec![(1, 1)]),
+                    ),
+                ],
+            );
+        }
     }
 
     #[test]
     fn basic_prover_init() {
-        let prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         assert_eq!(
             prover.total_rounds(),
             3,
@@ -136,7 +136,7 @@ mod tests {
         // 101 = 2
         // 111 = 7
         // sum g0(1) = 11
-        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         assert_eq!(
             g_round_0.evaluate(&TestField::ZERO),
@@ -159,7 +159,7 @@ mod tests {
         // 111 = 7
         // 110 = 0
         // sum g1(1) = 7
-        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         assert_eq!(
@@ -185,7 +185,7 @@ mod tests {
         // sum g(0) = 0
         // 111 = 7
         // sum g(1) = 7
-        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         let g_round_2 = prover.next_message(Some(TestField::ONE)).unwrap(); // x1 fixed to one
@@ -214,7 +214,7 @@ mod tests {
         // 3,1,1 = 38 = 0 mod 19
         // 3,1,0 = 31 = 12 mod 19
         // sum g1(1) = 12
-        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
         assert_eq!(
@@ -240,7 +240,7 @@ mod tests {
         // sum g(0) = 11
         // 3,4,1 = 138 = 1 mod 19
         // sum g(1) = 1
-        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
         let g_round_2 = prover.next_message(Some(TestField::from(4))).unwrap(); // x1 fixed to 4

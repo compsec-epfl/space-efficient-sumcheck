@@ -2,7 +2,7 @@ use ark_ff::Field;
 use ark_poly::univariate::SparsePolynomial;
 use ark_std::vec::Vec;
 
-use crate::multilinear_extensions::vsbw_multilinear_from_evaluations;
+use crate::multilinear_extensions::vsbw_interpolation;
 use crate::sumcheck::Hypercube;
 use crate::sumcheck::Prover;
 use crate::sumcheck::SumcheckMultivariatePolynomial;
@@ -61,8 +61,8 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for TimeProver<F,
             ]
             .concat();
             let point1 = [self.random_challenges.clone(), vec![F::ONE], partial_point].concat();
-            sum_0 += vsbw_multilinear_from_evaluations(&self.evaluations_per_input, &point0);
-            sum_1 += vsbw_multilinear_from_evaluations(&self.evaluations_per_input, &point1);
+            sum_0 += vsbw_interpolation(&self.evaluations_per_input, &point0);
+            sum_1 += vsbw_interpolation(&self.evaluations_per_input, &point1);
         }
 
         // Form a polynomial s.t. g(0) = sum_0 and g(1) = sum_1

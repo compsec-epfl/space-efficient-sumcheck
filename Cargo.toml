@@ -10,13 +10,16 @@ ark-poly = "0.4.0"
 ark-relations = "0.4.0"
 ark-serialize = {version = "0.4.0", features = ["derive"]}
 ark-std ="0.4.0"
-bitvec = "1.0.0"
 rayon = "1.5"
 
 [dev-dependencies]
-pretty_assertions = "1"
 criterion = "0.3"
+gnuplot = "0.0.39"
 
 [[bench]]
 harness = false
 name = "sumcheck"
+
+[[bench]]
+harness = false
+name = "multilinear_extensions"

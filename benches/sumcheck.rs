@@ -1,7 +1,7 @@
 use ark_std;
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use space_efficient_sumcheck::sumcheck::{SpaceProver, Sumcheck};
+use space_efficient_sumcheck::sumcheck::{SpaceProver, Sumcheck, SumcheckMultivariatePolynomial};
 
 use ark_ff::{
     fields::Fp64,
@@ -117,9 +117,11 @@ fn test_polynomial(num_terms: usize) -> TestPolynomial {
 fn sumcheck_benchmark(c: &mut Criterion) {
     let mut rng = ark_std::test_rng();
 
+    let polynomial = test_polynomial(14);
+    let evaluations = polynomial.to_evaluations();
     c.bench_function("sumcheck_prove", |b: &mut criterion::Bencher<'_>| {
         b.iter(|| {
-            let prover = SpaceProver::<TestField, TestPolynomial>::new(test_polynomial(10));
+            let prover = SpaceProver::<TestField>::new(polynomial.num_vars, evaluations.clone());
             Sumcheck::prove(prover, &mut rng);
         });
     });
