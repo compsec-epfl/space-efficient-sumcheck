@@ -117,7 +117,7 @@ fn test_polynomial(num_terms: usize) -> TestPolynomial {
 fn sumcheck_benchmark(c: &mut Criterion) {
     let mut rng = ark_std::test_rng();
 
-    let polynomial = test_polynomial(14);
+    let polynomial = test_polynomial(15);
     let evaluations = polynomial.to_evaluations();
     c.bench_function("sumcheck_prove", |b: &mut criterion::Bencher<'_>| {
         b.iter(|| {

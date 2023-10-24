@@ -2,7 +2,7 @@ use ark_ff::Field;
 use ark_poly::univariate::SparsePolynomial;
 
 use crate::multilinear_extensions::lagrange_polynomial;
-use crate::sumcheck::Hypercube;
+use crate::sumcheck::{Bitcube, Hypercube};
 use crate::sumcheck::Prover;
 
 // the state of the space prover in the protocol
@@ -30,12 +30,24 @@ impl<F: Field> SpaceProver<F> {
     }
 }
 
-fn to_index<F: Field>(point: Vec<F>) -> usize {
+fn to_index(point: Vec<bool>) -> usize {
     let mut index: usize = 0;
-    for f in point.iter() {
-        index = (index << 1) | if *f == F::ONE { 1 } else { 0 };
+    for bit in point.iter() {
+        index = (index << 1) | if *bit == true { 1 } else { 0 };
     }
     return index;
+}
+
+fn to_field_elements<F: Field>(point: Vec<bool>) -> Vec<F> {
+    let mut res: Vec<F> = Vec::with_capacity(point.len());
+    for bit in point.iter() {
+        if *bit == false {
+            res.push(F::ZERO);
+        } else {
+            res.push(F::ONE);
+        }
+    }
+    return res;
 }
 
 impl<F: Field> Prover<F> for SpaceProver<F> {
@@ -53,15 +65,14 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
 
         let mut sum_0: F = F::ZERO;
         let mut sum_1: F = F::ZERO;
-
-        // iterate over the hypercube once, calculating a weight for the current number of challenges
-        for input_start in Hypercube::<F>::new(self.current_round) {
-            let weight = lagrange_polynomial(&input_start, &self.random_challenges).unwrap();
-            for input_end in Hypercube::<F>::new(self.num_variables - input_start.len()) {
+        for input_start in Bitcube::new(self.current_round) {
+            let mask: Vec<F> = to_field_elements(input_start.clone());
+            let weight: F = lagrange_polynomial(&mask, &self.random_challenges).unwrap();
+            for input_end in Bitcube::new(self.num_variables - input_start.len()) {
                 let point_eval = self.evaluations_per_input
                     [to_index([input_start.clone(), input_end.clone()].concat())];
-                let switch: bool = *input_end.first().unwrap() == F::ZERO;
-                match switch {
+                let update_switch: bool = *input_end.first().unwrap() == false;
+                match update_switch {
                     true => sum_0 += point_eval * weight,
                     false => sum_1 += point_eval * weight,
                 }
