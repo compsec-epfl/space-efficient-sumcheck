@@ -1,11 +1,9 @@
 use ark_ff::Field;
 use ark_poly::univariate::SparsePolynomial;
-use ark_std::{sync::Mutex, vec::Vec};
-use rayon::{iter::ParallelIterator, prelude::ParallelBridge};
 
-use crate::multilinear_extensions::cty_interpolation;
+use crate::multilinear_extensions::lagrange_polynomial;
+use crate::sumcheck::Hypercube;
 use crate::sumcheck::Prover;
-use crate::sumcheck::{Hypercube, HypercubeChunk};
 
 // the state of the space prover in the protocol
 pub struct SpaceProver<F: Field> {
@@ -32,6 +30,14 @@ impl<F: Field> SpaceProver<F> {
     }
 }
 
+fn to_index<F: Field>(point: Vec<F>) -> usize {
+    let mut index: usize = 0;
+    for f in point.iter() {
+        index = (index << 1) | if *f == F::ONE { 1 } else { 0 };
+    }
+    return index;
+}
+
 impl<F: Field> Prover<F> for SpaceProver<F> {
     // a next-message function using cty
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
@@ -45,33 +51,24 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
             self.random_challenges.push(verifier_message.unwrap());
         }
 
-        // Compute the sum of both evaluations using the cty
-        let sum_0_mutex = Mutex::new(F::ZERO);
-        let sum_1_mutex = Mutex::new(F::ZERO);
-        HypercubeChunk::<F>::new(self.num_free_variables())
-            .par_bridge()
-            .for_each(|hypercube: Hypercube<F>| {
-                let mut local_sum_0 = F::ZERO;
-                let mut local_sum_1 = F::ZERO;
-                for partial_point in hypercube {
-                    let point0 = [
-                        self.random_challenges.clone(),
-                        vec![F::ZERO],
-                        partial_point.clone(),
-                    ]
-                    .concat();
-                    let point1 =
-                        [self.random_challenges.clone(), vec![F::ONE], partial_point].concat();
-                    local_sum_0 += cty_interpolation(&self.evaluations_per_input, &point0);
-                    local_sum_1 += cty_interpolation(&self.evaluations_per_input, &point1);
+        let mut sum_0: F = F::ZERO;
+        let mut sum_1: F = F::ZERO;
+
+        // iterate over the hypercube once, calculating a weight for the current number of challenges
+        for input_start in Hypercube::<F>::new(self.current_round) {
+            let weight = lagrange_polynomial(&input_start, &self.random_challenges).unwrap();
+            for input_end in Hypercube::<F>::new(self.num_variables - input_start.len()) {
+                let point_eval = self.evaluations_per_input
+                    [to_index([input_start.clone(), input_end.clone()].concat())];
+                let switch: bool = *input_end.first().unwrap() == F::ZERO;
+                match switch {
+                    true => sum_0 += point_eval * weight,
+                    false => sum_1 += point_eval * weight,
                 }
-                *sum_0_mutex.lock().unwrap() += local_sum_0;
-                *sum_1_mutex.lock().unwrap() += local_sum_1;
-            });
+            }
+        }
 
         // form a polynomial that s.t. g_round(0) = sum_0, g_round(1) = sum_1
-        let sum_0 = *sum_0_mutex.lock().unwrap();
-        let sum_1 = *sum_1_mutex.lock().unwrap();
         let g: SparsePolynomial<F> =
             SparsePolynomial::<F>::from_coefficients_vec(vec![(0, sum_0), (1, -sum_0 + sum_1)]);
 

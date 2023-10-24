@@ -114,7 +114,8 @@ pub(crate) mod tests {
 
     #[test]
     fn basic_prover_init() {
-        let prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
+        let prover =
+            BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         assert_eq!(
             prover.total_rounds(),
             3,
@@ -136,7 +137,8 @@ pub(crate) mod tests {
         // 101 = 2
         // 111 = 7
         // sum g0(1) = 11
-        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
+        let mut prover =
+            BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         assert_eq!(
             g_round_0.evaluate(&TestField::ZERO),
@@ -159,7 +161,8 @@ pub(crate) mod tests {
         // 111 = 7
         // 110 = 0
         // sum g1(1) = 7
-        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
+        let mut prover =
+            BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         assert_eq!(
@@ -185,7 +188,8 @@ pub(crate) mod tests {
         // sum g(0) = 0
         // 111 = 7
         // sum g(1) = 7
-        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
+        let mut prover =
+            BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         let g_round_2 = prover.next_message(Some(TestField::ONE)).unwrap(); // x1 fixed to one
@@ -214,7 +218,8 @@ pub(crate) mod tests {
         // 3,1,1 = 38 = 0 mod 19
         // 3,1,0 = 31 = 12 mod 19
         // sum g1(1) = 12
-        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
+        let mut prover =
+            BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
         assert_eq!(
@@ -240,7 +245,8 @@ pub(crate) mod tests {
         // sum g(0) = 11
         // 3,4,1 = 138 = 1 mod 19
         // sum g(1) = 1
-        let mut prover = BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
+        let mut prover =
+            BasicProver::<TestField, TestPolynomial>::new(test_util::tiny_test_polynomial());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
         let g_round_2 = prover.next_message(Some(TestField::from(4))).unwrap(); // x1 fixed to 4

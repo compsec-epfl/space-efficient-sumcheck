@@ -1,35 +1,6 @@
 use ark_ff::Field;
-// use rayon::{
-//     iter::{IndexedParallelIterator, ParallelIterator},
-//     prelude::IntoParallelIterator,
-// };
 
-// https://github.com/montekki/thaler-study/blob/master/multilinear-extensions/src/lib.rs
-// ~ 100ns
-// FUNCTION lagrange_basis_poly_at(x: ARRAY of F, w: ARRAY of F) -> OPTIONAL F:
-//     IF LENGTH(x) ≠ LENGTH(w) THEN
-//         RETURN None
-//     END IF
-
-//     // Initialize accumulator to 1
-//     accumulator := 1
-
-//     // Iterate through the x and w arrays
-//     FOR i FROM 0 TO LENGTH(x) - 1 DO
-//         x_i := x[i]
-//         w_i := w[i]
-
-//         // Calculate basis term for current pair
-//         basis_term := (x_i * w_i) + ((1 - x_i) * (1 - w_i))
-
-//         // Update accumulator
-//         accumulator := accumulator * basis_term
-//     END FOR
-
-//     // Return the Lagrange basis polynomial wrapped in Some
-//     RETURN Some(accumulator)
-// END FUNCTION
-pub fn lagrange_basis_poly_at<F: Field>(x: &[F], w: &[F]) -> Option<F> {
+pub fn lagrange_polynomial<F: Field>(x: &[F], w: &[F]) -> Option<F> {
     if x.len() != w.len() {
         None
     } else {
@@ -42,83 +13,6 @@ pub fn lagrange_basis_poly_at<F: Field>(x: &[F], w: &[F]) -> Option<F> {
                 }),
         )
     }
-}
-
-// Evaluate multilinear extension of with an algorithm from CTY11
-// ~280µs for 15 variables
-// FUNCTION cty_interpolation(evals: ARRAY of F, r: ARRAY of F) -> F:
-//     // Initialize the result variable with the additive identity of the field.
-//     res := F::ZERO
-
-//     // Iterate over evaluations and construct the interpolated output
-//     FOR i FROM 0 TO LENGTH(evals) - 1 DO
-//         // Initialize the weight vector with zeros.
-//         w := NEW ARRAY of F with size LENGTH(r)
-
-//         // Construct the weight vector based on the current index i.
-//         FOR j FROM LENGTH(r) - 1 DOWNTO 0 DO
-//             // Calculate the bitmask for the j-th bit.
-//             bitmask := 2^j
-
-//             // Check if the j-th bit of the index i is set.
-//             IF (i AND bitmask) != 0 THEN
-//                 w[j] := F::ONE
-//             ELSE
-//                 w[j] := F::ZERO
-//             END IF
-//         END FOR
-
-//         // Compute the Lagrange basis polynomial using the weight vector w and input vector r.
-//         basis_poly := lagrange_basis_poly_at(r, w)
-
-//         // Multiply the current evaluation by the computed Lagrange basis polynomial and add it to the result.
-//         res := res + evals[i] * basis_poly
-//     END FOR
-
-//     // Return the final computed interpolated value.
-//     RETURN res
-// END FUNCTION
-pub fn cty_interpolation<F: Field>(evals: &[F], r: &[F]) -> F {
-    // evals
-    //     .into_par_iter()
-    //     .enumerate()
-    //     .map(|(i, &eval)| -> F {
-    //         let mut weight: F = F::ONE; // Initialize the weight to 1.
-
-    //         for (j, &r_j) in r.iter().rev().enumerate() {
-    //             // Check if the j-th bit of the index i is set.
-    //             if (i >> j) & 1 == 1 {
-    //                 weight *= r_j;
-    //             } else {
-    //                 weight *= F::ONE - r_j;
-    //             }
-    //         }
-
-    //         // Multiply the evaluation by the computed weight and add it to the result.
-    //         return eval * weight;
-    //     })
-    //     .collect::<Vec<F>>()
-    //     .iter()
-    //     .fold(F::ZERO, |acc, &x| acc + x)
-    let mut res: F = F::zero();
-
-    for (i, eval) in evals.iter().enumerate() {
-        let mut weight: F = F::one(); // Initialize the weight to 1.
-
-        for (j, &r_j) in r.iter().rev().enumerate() {
-            // Check if the j-th bit of the index i is set.
-            if (i >> j) & 1 == 1 {
-                weight *= r_j;
-            } else {
-                weight *= F::one() - r_j;
-            }
-        }
-
-        // Multiply the evaluation by the computed weight and add it to the result.
-        res += *eval * weight;
-    }
-
-    res
 }
 
 // Evaluate multilinear extension with an algorith from [`VSBW13`] Time efficient
@@ -219,21 +113,6 @@ mod tests {
             vec![1, 3, 0, 2, 4],
             vec![1, 0, 4, 3, 2],
         ];
-
-        for i in 0u32..5 {
-            let mut line = Vec::with_capacity(5);
-            for j in 0u32..5 {
-                let f_r = cty_interpolation(
-                    &evals,
-                    &[
-                        Fr::from_bigint(i.into()).unwrap(),
-                        Fr::from_bigint(j.into()).unwrap(),
-                    ],
-                );
-                line.push(f_r.into_bigint().as_ref()[0]);
-            }
-            assert_eq!(line, expected_result[i as usize], "at line {i}");
-        }
 
         for i in 0u32..5 {
             let mut line = Vec::with_capacity(5);

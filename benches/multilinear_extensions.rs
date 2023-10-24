@@ -10,7 +10,7 @@ use ark_poly::{
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use space_efficient_sumcheck::{
-    multilinear_extensions::{cty_interpolation, lagrange_basis_poly_at, vsbw_interpolation},
+    multilinear_extensions::{lagrange_polynomial, vsbw_interpolation},
     sumcheck::SumcheckMultivariatePolynomial,
 };
 
@@ -116,76 +116,46 @@ fn test_polynomial(num_terms: usize) -> TestPolynomial {
     return TestPolynomial::from_coefficients_vec(num_terms, test_terms(num_terms));
 }
 
-fn lagrange_basis_poly_at_benchmark(c: &mut Criterion) {
-    c.bench_function(
-        "lagrange_basis_poly_at",
-        |b: &mut criterion::Bencher<'_>| {
-            b.iter(|| {
-                let x: Vec<TestField> = vec![
-                    TestField::ZERO,
-                    TestField::ONE,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ONE,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                ];
-                let w: Vec<TestField> = vec![
-                    TestField::from(3),
-                    TestField::from(2),
-                    TestField::from(1),
-                    TestField::from(4),
-                    TestField::from(2),
-                    TestField::from(1),
-                    TestField::from(3),
-                    TestField::from(4),
-                    TestField::from(2),
-                    TestField::from(1),
-                    TestField::from(4),
-                    TestField::from(1),
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::from(3),
-                    TestField::from(3),
-                ];
-                lagrange_basis_poly_at(&x, &w);
-            });
-        },
-    );
-}
-
-fn cty_interpolation_benchmark(c: &mut Criterion) {
-    let polynomial = test_polynomial(15);
-    let evals = polynomial.to_evaluations();
-    let r: Vec<TestField> = vec![
-        TestField::from(3),
-        TestField::from(2),
-        TestField::from(1),
-        TestField::from(4),
-        TestField::from(2),
-        TestField::from(1),
-        TestField::from(3),
-        TestField::from(4),
-        TestField::from(2),
-        TestField::from(1),
-        TestField::from(4),
-        TestField::from(1),
-        TestField::ZERO,
-        TestField::ZERO,
-        TestField::from(3),
-    ];
-    c.bench_function("cty_interpolation", |b: &mut criterion::Bencher<'_>| {
+fn lagrange_polynomial_benchmark(c: &mut Criterion) {
+    c.bench_function("lagrange_polynomial", |b: &mut criterion::Bencher<'_>| {
         b.iter(|| {
-            cty_interpolation(&evals, &r);
+            let x: Vec<TestField> = vec![
+                TestField::ZERO,
+                TestField::ONE,
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::ONE,
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::ZERO,
+            ];
+            let w: Vec<TestField> = vec![
+                TestField::from(3),
+                TestField::from(2),
+                TestField::from(1),
+                TestField::from(4),
+                TestField::from(2),
+                TestField::from(1),
+                TestField::from(3),
+                TestField::from(4),
+                TestField::from(2),
+                TestField::from(1),
+                TestField::from(4),
+                TestField::from(1),
+                TestField::ZERO,
+                TestField::ZERO,
+                TestField::from(3),
+                TestField::from(3),
+            ];
+            lagrange_polynomial(&x, &w);
         });
     });
 }
@@ -219,8 +189,7 @@ fn vsbw_interpolation_benchmark(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    lagrange_basis_poly_at_benchmark,
-    cty_interpolation_benchmark,
+    lagrange_polynomial_benchmark,
     vsbw_interpolation_benchmark
 );
 criterion_main!(benches);
