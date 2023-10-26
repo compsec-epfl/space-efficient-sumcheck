@@ -1,7 +1,6 @@
 use ark_ff::Field;
 use ark_poly::univariate::SparsePolynomial;
 
-use crate::multilinear_extensions::lagrange_polynomial;
 use crate::sumcheck::Bitcube;
 use crate::sumcheck::Prover;
 
@@ -9,13 +8,27 @@ use crate::sumcheck::Prover;
 pub struct SpaceProver<F: Field> {
     pub claimed_evaluation: F, // the claimed evaluation of the multilinear polynomial
     pub evaluations_per_input: Vec<F>, // evaluated values of the multilinear polynomial for each input of the boolean hypercube
-    pub random_challenges: Vec<F>,     // random challenges for the protocol
+    pub verifier_messages: Vec<F>,     // random challenges for the protocol
     pub current_round: usize,          // current round of the protocol
     pub num_variables: usize,          // number of variables in the multilinear polynomial
 }
 
 impl<F: Field> SpaceProver<F> {
-    // create new time prover state
+    // class methods
+    pub fn lagrange_polynomial(x: &[F], w: &[F]) -> Option<F> {
+        if x.len() != w.len() {
+            None
+        } else {
+            Some(
+                x.to_vec()
+                    .iter()
+                    .zip(w.iter())
+                    .fold(F::ONE, |acc, (&x_i, &w_i)| {
+                        acc * (x_i * w_i + (F::ONE - x_i) * (F::ONE - w_i))
+                    }),
+            )
+        }
+    }
     pub fn new(num_variables: usize, evaluations_per_input: Vec<F>) -> Self {
         // compute the claim
         let claimed_evaluation = evaluations_per_input.iter().sum();
@@ -23,32 +36,60 @@ impl<F: Field> SpaceProver<F> {
         Self {
             claimed_evaluation,
             evaluations_per_input,
-            random_challenges: Vec::<F>::with_capacity(num_variables),
+            verifier_messages: Vec::<F>::with_capacity(num_variables),
             current_round: 0,
             num_variables,
         }
     }
     // instance methods
-}
-
-fn to_index(point: Vec<bool>) -> usize {
-    let mut index: usize = 0;
-    for bit in point.iter() {
-        index = (index << 1) | if *bit == true { 1 } else { 0 };
-    }
-    return index;
-}
-
-fn to_field_elements<F: Field>(point: Vec<bool>) -> Vec<F> {
-    let mut res: Vec<F> = Vec::with_capacity(point.len());
-    for bit in point.iter() {
-        if *bit == false {
-            res.push(F::ZERO);
-        } else {
-            res.push(F::ONE);
+    fn cty_evaluate(&self) -> (F, F) {
+        let mut sum_0: F = F::ZERO;
+        let mut sum_1: F = F::ZERO;
+        let bitmask: usize = 1 << self.num_free_variables() - 1;
+        // iterate over two vectors of bits
+        for input_start in Bitcube::new(self.current_round) {
+            // need a vec of field elements for each outer loop
+            let input_start_field_elements: Vec<F> = input_start
+                .iter()
+                .map(|bit: &bool| -> F {
+                    match *bit {
+                        false => F::ZERO,
+                        true => F::ONE,
+                    }
+                })
+                .collect();
+            // compute the lagrange_polynomial for each iteration with all available verifier messages
+            let weight: F = SpaceProver::lagrange_polynomial(
+                &input_start_field_elements,
+                &self.verifier_messages,
+            )
+            .unwrap();
+            for input_end in Bitcube::new(self.num_variables - input_start.len()) {
+                // convert the full bitvector into a scalar index and use this to grab the evaluation
+                let index: usize = [input_start.clone(), input_end.clone()]
+                    .concat()
+                    .iter()
+                    .fold((|| 0)(), |index: usize, bit: &bool| {
+                        (index << 1)
+                            | match *bit {
+                                false => 0,
+                                true => 1,
+                            }
+                    });
+                let evaluation: F = self.evaluations_per_input[index];
+                // decide which sum this belongs to
+                let is_set: bool = (index & bitmask) != 0;
+                match is_set {
+                    false => sum_0 += evaluation * weight,
+                    true => sum_1 += evaluation * weight,
+                }
+            }
         }
+        (sum_0, sum_1)
     }
-    return res;
+    fn num_free_variables(&self) -> usize {
+        self.num_variables - self.current_round
+    }
 }
 
 impl<F: Field> Prover<F> for SpaceProver<F> {
@@ -61,26 +102,13 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
             return None;
         }
 
-        // If it's not the first round, add the verifier message to random_challenges
+        // If it's not the first round, add the verifier message to verifier_messages
         if self.current_round != 0 {
-            self.random_challenges.push(verifier_message.unwrap());
+            self.verifier_messages.push(verifier_message.unwrap());
         }
 
-        let mut sum_0: F = F::ZERO;
-        let mut sum_1: F = F::ZERO;
-        for input_start in Bitcube::new(self.current_round) {
-            let mask: Vec<F> = to_field_elements(input_start.clone());
-            let weight: F = lagrange_polynomial(&mask, &self.random_challenges).unwrap();
-            for input_end in Bitcube::new(self.num_variables - input_start.len()) {
-                let point_eval = self.evaluations_per_input
-                    [to_index([input_start.clone(), input_end.clone()].concat())];
-                let update_switch: bool = *input_end.first().unwrap() == false;
-                match update_switch {
-                    true => sum_0 += point_eval * weight,
-                    false => sum_1 += point_eval * weight,
-                }
-            }
-        }
+        // evaluate using cty
+        let (sum_0, sum_1) = self.cty_evaluate();
 
         // form a polynomial that s.t. g_round(0) = sum_0, g_round(1) = sum_1
         let g: SparsePolynomial<F> =

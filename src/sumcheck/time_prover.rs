@@ -145,7 +145,8 @@ mod tests {
     #[test]
     fn init() {
         let test_evaluations = test_polynomial().to_evaluations();
-        let prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
+        let prover =
+            TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         assert_eq!(
             prover.total_rounds(),
             3,
@@ -156,7 +157,8 @@ mod tests {
     #[test]
     fn round_0() {
         let test_evaluations = test_polynomial().to_evaluations();
-        let mut prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
+        let mut prover =
+            TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         let g_round_0 = prover.next_message(None).unwrap();
         assert_eq!(
             g_round_0.evaluate(&TestField::ZERO),
@@ -173,7 +175,8 @@ mod tests {
     #[test]
     fn round_1() {
         let test_evaluations = test_polynomial().to_evaluations();
-        let mut prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
+        let mut prover =
+            TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         assert_eq!(
@@ -195,7 +198,8 @@ mod tests {
     #[test]
     fn round_2() {
         let test_evaluations = test_polynomial().to_evaluations();
-        let mut prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
+        let mut prover =
+            TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         let g_round_2 = prover.next_message(Some(TestField::ONE)).unwrap(); // x1 fixed to one
@@ -218,7 +222,8 @@ mod tests {
     #[test]
     fn outside_hypercube_round_1() {
         let test_evaluations = test_polynomial().to_evaluations();
-        let mut prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
+        let mut prover =
+            TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
         assert_eq!(
@@ -240,7 +245,8 @@ mod tests {
     #[test]
     fn outside_hypercube_round_2() {
         let test_evaluations = test_polynomial().to_evaluations();
-        let mut prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
+        let mut prover =
+            TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
         let g_round_2 = prover.next_message(Some(TestField::from(4))).unwrap(); // x1 fixed to 4

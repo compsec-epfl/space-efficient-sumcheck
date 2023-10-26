@@ -20,6 +20,3 @@ gnuplot = "0.0.39"
 harness = false
 name = "sumcheck"
 
-[[bench]]
-harness = false
-name = "multilinear_extensions"

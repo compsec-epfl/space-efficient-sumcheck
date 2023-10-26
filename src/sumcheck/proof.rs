@@ -21,31 +21,24 @@ impl<F: Field> Sumcheck<F> {
         // run the protocol
         let mut verifier_message: Option<F> = None;
         while let Some(message) = prover.next_message(verifier_message) {
-            // perfom checks
-            let round_evaluation: F = message.evaluate(&F::ZERO) + message.evaluate(&F::ONE);
-            let is_round_accepted: bool;
-            if round_evaluation == prover.claimed_evaluation() {
-                is_round_accepted = round_evaluation == prover.claimed_evaluation();
+            let round_evaluation = message.evaluate(&F::ZERO) + message.evaluate(&F::ONE);
+            let is_round_accepted = if round_evaluation == prover.claimed_evaluation() {
+                round_evaluation == prover.claimed_evaluation()
             } else {
-                // only add verifier message to transcript when not "None"
                 verifier_messages.push(verifier_message.unwrap());
-                is_round_accepted = round_evaluation
+                round_evaluation
                     == prover_messages
                         .last()
                         .unwrap()
-                        .evaluate(&verifier_message.unwrap());
-            }
+                        .evaluate(&verifier_messages.last().unwrap())
+            };
 
-            // always add prover message to transcript
             prover_messages.push(message);
-
-            // if round not accepted terminate the protocol
             if !is_round_accepted {
                 is_accepted = false;
                 break;
             }
 
-            // othewise sample a random field element and proceed
             verifier_message = Some(F::rand(rng));
         }
 

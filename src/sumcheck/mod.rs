@@ -8,7 +8,7 @@ pub mod experimental_prover;
 pub mod space_prover;
 pub mod time_prover;
 
-pub use hypercube::{Bitcube, Hypercube, HypercubeChunk};
+pub use hypercube::{Bitcube, Hypercube};
 pub use polynomial::SumcheckMultivariatePolynomial;
 pub use proof::Sumcheck;
 pub use prover::Prover;
