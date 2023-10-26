@@ -2,68 +2,82 @@ use ark_ff::Field;
 use ark_poly::univariate::SparsePolynomial;
 use ark_std::vec::Vec;
 
-use crate::multilinear_extensions::vsbw_interpolation;
-use crate::sumcheck::Hypercube;
 use crate::sumcheck::Prover;
-use crate::sumcheck::SumcheckMultivariatePolynomial;
 
 // the state of the time prover in the protocol
-pub struct TimeProver<F: Field, P: SumcheckMultivariatePolynomial<F>> {
-    pub multilinear_polynomial: P, // a polynomial that will be treated as multilinear
-    pub claimed_evaluation: F,     // the claimed evaluation of the multilinear polynomial
-    pub evaluations_per_input: Vec<F>, // evaluated values of the multilinear polynomial for each input
-    pub random_challenges: Vec<F>,     // random challenges for the protocol
-    pub current_round: usize,          // current round of the protocol
-    pub num_variables: usize,          // number of variables in the multilinear polynomial
+pub struct TimeProver<F: Field> {
+    pub claimed_evaluation: F,
+    pub current_round: usize,
+    pub evaluations: Vec<F>,
+    pub num_variables: usize,
+    pub verifier_messages: Vec<F>,
 }
 
-impl<F: Field, P: SumcheckMultivariatePolynomial<F>> TimeProver<F, P> {
-    // create new time prover state
-    pub fn new(multilinear_polynomial: P) -> Self {
-        let num_variables = multilinear_polynomial.num_vars();
-        // compute the input-output pairs
-        let evaluations_per_input = multilinear_polynomial.to_evaluations();
-        // compute the claim
-        let claimed_evaluation = evaluations_per_input.iter().sum();
-        // return ExperimentalProver instance
+impl<F: Field> TimeProver<F> {
+    // class methods
+    pub fn new(evaluations: Vec<F>, claimed_evaluation: F) -> Self {
+        // abort if length not a power of two
+        assert_eq!(
+            evaluations.len() != 0 && evaluations.len().count_ones() == 1,
+            true
+        );
+        // return the TimeProver instance
+        let num_variables: usize = (evaluations.len() as f64).log2() as usize;
         Self {
-            multilinear_polynomial,
             claimed_evaluation,
-            evaluations_per_input,
-            random_challenges: Vec::<F>::with_capacity(num_variables),
             current_round: 0,
+            evaluations,
             num_variables,
+            verifier_messages: Vec::<F>::with_capacity(num_variables),
         }
+    }
+    // instance methods
+    fn num_free_variables(&self) -> usize {
+        self.num_variables - self.current_round
+    }
+    fn vsbw_evaluate(&self) -> (F, F) {
+        let mut sum_0 = F::ZERO;
+        let mut sum_1 = F::ZERO;
+        let bitmask: usize = 1 << self.num_free_variables() - 1;
+        for i in 0..self.evaluations.len() {
+            let is_set: bool = (i & bitmask) != 0;
+            match is_set {
+                false => sum_0 += self.evaluations[i],
+                true => sum_1 += self.evaluations[i],
+            }
+        }
+        (sum_0, sum_1)
+    }
+    fn vsbw_reduce_evaluations(&mut self, verifier_message: F) {
+        let half_size: usize = self.evaluations.len() / 2;
+        let setbit: usize = 1 << self.num_free_variables(); // we use this to index the second half of the last round's evaluations e.g 001 AND 101
+        for i0 in 0..half_size {
+            let i1 = i0 | setbit;
+            self.evaluations[i0] = self.evaluations[i0] * (F::ONE - verifier_message)
+                + self.evaluations[i1] * verifier_message;
+        }
+        self.evaluations.truncate(half_size);
     }
 }
 
-impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for TimeProver<F, P> {
-    // a next-message function using vsbw
+impl<F: Field> Prover<F> for TimeProver<F> {
+    fn claimed_evaluation(&self) -> F {
+        self.claimed_evaluation
+    }
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
         // Ensure the current round is within bounds
         if self.current_round >= self.total_rounds() {
             return None;
         }
 
-        // If it's not the first round, add the verifier message to random_challenges
+        // If it's not the first round, reduce the evaluations table
         if self.current_round != 0 {
-            self.random_challenges.push(verifier_message.unwrap());
+            // update the evaluations table by absorbing leftmost variable assigned to verifier_message
+            self.vsbw_reduce_evaluations(verifier_message.unwrap())
         }
 
-        // Compute the sum of both evaluations using the vsbw in chunks
-        let mut sum_0 = F::ZERO;
-        let mut sum_1 = F::ZERO;
-        for partial_point in Hypercube::<F>::new(self.num_free_variables()) {
-            let point0 = [
-                self.random_challenges.clone(),
-                vec![F::ZERO],
-                partial_point.clone(),
-            ]
-            .concat();
-            let point1 = [self.random_challenges.clone(), vec![F::ONE], partial_point].concat();
-            sum_0 += vsbw_interpolation(&self.evaluations_per_input, &point0);
-            sum_1 += vsbw_interpolation(&self.evaluations_per_input, &point1);
-        }
+        // evaluate using vsbw
+        let (sum_0, sum_1) = self.vsbw_evaluate();
 
         // Form a polynomial s.t. g(0) = sum_0 and g(1) = sum_1
         let g: SparsePolynomial<F> =
@@ -71,20 +85,12 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for TimeProver<F,
 
         // Increment the round counter
         self.current_round += 1;
+
         // Return the computed polynomial
         return Some(g);
     }
     fn total_rounds(&self) -> usize {
         self.num_variables
-    }
-    fn num_free_variables(&self) -> usize {
-        if self.num_variables == self.random_challenges.len() {
-            return 0;
-        }
-        return self.num_variables - self.random_challenges.len() - 1;
-    }
-    fn claimed_evaluation(&self) -> F {
-        self.claimed_evaluation
     }
 }
 
@@ -100,6 +106,8 @@ mod tests {
         multivariate::{self, SparseTerm, Term},
         DenseMVPolynomial, Polynomial,
     };
+
+    use crate::sumcheck::polynomial::SumcheckMultivariatePolynomial;
 
     #[derive(MontConfig)]
     #[modulus = "19"]
@@ -136,7 +144,8 @@ mod tests {
 
     #[test]
     fn init() {
-        let prover = TimeProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let test_evaluations = test_polynomial().to_evaluations();
+        let prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         assert_eq!(
             prover.total_rounds(),
             3,
@@ -146,7 +155,8 @@ mod tests {
 
     #[test]
     fn round_0() {
-        let mut prover = TimeProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let test_evaluations = test_polynomial().to_evaluations();
+        let mut prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         let g_round_0 = prover.next_message(None).unwrap();
         assert_eq!(
             g_round_0.evaluate(&TestField::ZERO),
@@ -162,7 +172,8 @@ mod tests {
 
     #[test]
     fn round_1() {
-        let mut prover = TimeProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let test_evaluations = test_polynomial().to_evaluations();
+        let mut prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         assert_eq!(
@@ -183,7 +194,8 @@ mod tests {
 
     #[test]
     fn round_2() {
-        let mut prover = TimeProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let test_evaluations = test_polynomial().to_evaluations();
+        let mut prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
         let g_round_2 = prover.next_message(Some(TestField::ONE)).unwrap(); // x1 fixed to one
@@ -205,7 +217,8 @@ mod tests {
 
     #[test]
     fn outside_hypercube_round_1() {
-        let mut prover = TimeProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let test_evaluations = test_polynomial().to_evaluations();
+        let mut prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         let g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
         assert_eq!(
@@ -226,7 +239,8 @@ mod tests {
 
     #[test]
     fn outside_hypercube_round_2() {
-        let mut prover = TimeProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let test_evaluations = test_polynomial().to_evaluations();
+        let mut prover = TimeProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
         let _g_round_0 = prover.next_message(None).unwrap();
         let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
         let g_round_2 = prover.next_message(Some(TestField::from(4))).unwrap(); // x1 fixed to 4

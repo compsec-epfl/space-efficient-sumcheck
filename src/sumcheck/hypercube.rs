@@ -138,7 +138,6 @@ impl Iterator for Bitcube {
     }
 }
 
-
 impl<F: Field> Iterator for Hypercube<F> {
     type Item = Vec<F>;
     fn next(&mut self) -> Option<Self::Item> {

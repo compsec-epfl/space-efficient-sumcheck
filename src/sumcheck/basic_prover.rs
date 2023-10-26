@@ -53,12 +53,6 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for BasicProver<F
     fn total_rounds(&self) -> usize {
         self.num_variables
     }
-    fn num_free_variables(&self) -> usize {
-        if self.num_variables == self.random_challenges.len() {
-            return 0;
-        }
-        return self.num_variables - self.random_challenges.len() - 1;
-    }
     fn claimed_evaluation(&self) -> F {
         self.claimed_evaluation
     }

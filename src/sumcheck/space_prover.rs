@@ -2,7 +2,7 @@ use ark_ff::Field;
 use ark_poly::univariate::SparsePolynomial;
 
 use crate::multilinear_extensions::lagrange_polynomial;
-use crate::sumcheck::{Bitcube, Hypercube};
+use crate::sumcheck::Bitcube;
 use crate::sumcheck::Prover;
 
 // the state of the space prover in the protocol
@@ -28,6 +28,7 @@ impl<F: Field> SpaceProver<F> {
             num_variables,
         }
     }
+    // instance methods
 }
 
 fn to_index(point: Vec<bool>) -> usize {
@@ -51,7 +52,9 @@ fn to_field_elements<F: Field>(point: Vec<bool>) -> Vec<F> {
 }
 
 impl<F: Field> Prover<F> for SpaceProver<F> {
-    // a next-message function using cty
+    fn claimed_evaluation(&self) -> F {
+        self.claimed_evaluation
+    }
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
         // Ensure the current round is within bounds
         if self.current_round >= self.total_rounds() {
@@ -90,15 +93,6 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
     }
     fn total_rounds(&self) -> usize {
         self.num_variables
-    }
-    fn num_free_variables(&self) -> usize {
-        if self.num_variables == self.random_challenges.len() {
-            return 0;
-        }
-        return self.num_variables - self.random_challenges.len() - 1;
-    }
-    fn claimed_evaluation(&self) -> F {
-        self.claimed_evaluation
     }
 }
 

@@ -39,6 +39,12 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> ExperimentalProver<F, P> {
             num_variables,
         }
     }
+    fn num_free_variables(&self) -> usize {
+        if self.num_variables == self.random_challenges.len() {
+            return 0;
+        }
+        return self.num_variables - self.random_challenges.len() - 1;
+    }
     fn bits_to_index(bits: &[F]) -> usize {
         let mut index: usize = 0;
 
@@ -120,12 +126,6 @@ impl<F: Field, P: SumcheckMultivariatePolynomial<F>> Prover<F> for ExperimentalP
     }
     fn total_rounds(&self) -> usize {
         self.num_variables
-    }
-    fn num_free_variables(&self) -> usize {
-        if self.num_variables == self.random_challenges.len() {
-            return 0;
-        }
-        return self.num_variables - self.random_challenges.len() - 1;
     }
     fn claimed_evaluation(&self) -> F {
         self.claimed_evaluation
