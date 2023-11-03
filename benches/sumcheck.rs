@@ -106,6 +106,54 @@ fn test_terms(num_terms: usize) -> Vec<(ark_ff::Fp<MontBackend<FrConfig, 1>, 1>,
             TestField::from(18),
             multivariate::SparseTerm::new(vec![(3, 1), (18, 1)]),
         ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(2, 1), (19, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(3, 1), (20, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(2, 1), (21, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(3, 1), (22, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(2, 1), (23, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(3, 1), (24, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(2, 1), (25, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(3, 1), (26, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(2, 1), (27, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(3, 1), (28, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(2, 1), (29, 1)]),
+        ),
+        (
+            TestField::from(18),
+            multivariate::SparseTerm::new(vec![(3, 1), (30, 1)]),
+        ),
     ];
     return terms[0..num_terms].to_vec();
 }
@@ -117,7 +165,7 @@ fn test_polynomial(num_terms: usize) -> TestPolynomial {
 fn sumcheck_benchmark(c: &mut Criterion) {
     let mut rng = ark_std::test_rng();
 
-    let polynomial = test_polynomial(18);
+    let polynomial = test_polynomial(31);
     let evaluations = polynomial.to_evaluations();
     let claimed_evaluation = evaluations.iter().sum();
     c.bench_function("sumcheck_prove", |b: &mut criterion::Bencher<'_>| {

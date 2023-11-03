@@ -7,6 +7,7 @@ pub mod basic_prover;
 pub mod experimental_prover;
 pub mod space_prover;
 pub mod time_prover;
+pub mod tradeoff_prover;
 
 pub use hypercube::{Bitcube, Hypercube};
 pub use polynomial::SumcheckMultivariatePolynomial;
@@ -17,3 +18,4 @@ pub use basic_prover::BasicProver;
 pub use experimental_prover::ExperimentalProver;
 pub use space_prover::SpaceProver;
 pub use time_prover::TimeProver;
+pub use tradeoff_prover::TradeoffProver;
