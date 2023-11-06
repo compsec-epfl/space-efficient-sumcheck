@@ -6,11 +6,11 @@ use crate::sumcheck::Prover;
 
 // the state of the space prover in the protocol
 pub struct SpaceProver<F: Field> {
-    pub claimed_evaluation: F, // the claimed evaluation of the multilinear polynomial
-    pub evaluations_per_input: Vec<F>, // evaluated values of the multilinear polynomial for each input of the boolean hypercube
-    pub verifier_messages: Vec<F>,     // random challenges for the protocol
-    pub current_round: usize,          // current round of the protocol
-    pub num_variables: usize,          // number of variables in the multilinear polynomial
+    pub claimed_evaluation: F,
+    pub current_round: usize,
+    pub evaluations: Vec<F>,
+    pub num_variables: usize,
+    pub verifier_messages: Vec<F>,
 }
 
 impl<F: Field> SpaceProver<F> {
@@ -29,13 +29,18 @@ impl<F: Field> SpaceProver<F> {
             )
         }
     }
-    pub fn new(num_variables: usize, evaluations_per_input: Vec<F>) -> Self {
-        // compute the claim
-        let claimed_evaluation = evaluations_per_input.iter().sum();
-        // return ExperimentalProver instance
+    pub fn new(evaluations: Vec<F>) -> Self {
+        // abort if length not a power of two
+        assert_eq!(
+            evaluations.len() != 0 && evaluations.len().count_ones() == 1,
+            true
+        );
+        // return the TimeProver instance
+        let claimed_evaluation: F = evaluations.iter().sum();
+        let num_variables: usize = evaluations.len().ilog2() as usize;
         Self {
             claimed_evaluation,
-            evaluations_per_input,
+            evaluations,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             current_round: 0,
             num_variables,
@@ -76,7 +81,7 @@ impl<F: Field> SpaceProver<F> {
                                 true => 1,
                             }
                     });
-                let evaluation: F = self.evaluations_per_input[index];
+                let evaluation: F = self.evaluations[index];
                 // decide which sum this belongs to
                 let is_set: bool = (index & bitmask) != 0;
                 match is_set {
@@ -126,172 +131,14 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use ark_ff::{
-        fields::Fp64,
-        fields::{MontBackend, MontConfig},
-    };
-    use ark_poly::{
-        multivariate::{self, SparseTerm, Term},
-        DenseMVPolynomial, Polynomial,
+    use super::SpaceProver;
+    use crate::sumcheck::unit_test_helpers::{
+        run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
     };
 
-    use crate::sumcheck::SumcheckMultivariatePolynomial;
-
-    #[derive(MontConfig)]
-    #[modulus = "19"]
-    #[generator = "2"]
-    struct FrConfig;
-
-    type TestField = Fp64<MontBackend<FrConfig, 1>>;
-    type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
-    fn test_polynomial() -> TestPolynomial {
-        // 4*x_1*x_2 + 7*x_2*x_3 + 2*x_1 + 13*x_2
-        return TestPolynomial::from_coefficients_slice(
-            3,
-            &[
-                (
-                    TestField::from(4),
-                    multivariate::SparseTerm::new(vec![(0, 1), (1, 1)]),
-                ),
-                (
-                    TestField::from(7),
-                    multivariate::SparseTerm::new(vec![(1, 1), (2, 1)]),
-                ),
-                (
-                    TestField::from(2),
-                    multivariate::SparseTerm::new(vec![(0, 1)]),
-                ),
-                (
-                    TestField::from(13),
-                    multivariate::SparseTerm::new(vec![(1, 1)]),
-                ),
-            ],
-        );
-    }
-
     #[test]
-    fn init() {
-        let polynomial = test_polynomial();
-        let prover =
-            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
-        assert_eq!(
-            prover.total_rounds(),
-            3,
-            "should set the number of variables correctly"
-        );
-    }
-
-    #[test]
-    fn round_0() {
-        let polynomial = test_polynomial();
-        let mut prover =
-            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
-        let g_round_0 = prover.next_message(None).unwrap();
-        assert_eq!(
-            g_round_0.evaluate(&TestField::ZERO),
-            TestField::from(14),
-            "g0 should evaluate correctly for input 0"
-        );
-        assert_eq!(
-            g_round_0.evaluate(&TestField::ONE),
-            TestField::from(11),
-            "g0 should evaluate correctly for input 1"
-        );
-    }
-
-    #[test]
-    fn round_1() {
-        let polynomial = test_polynomial();
-        let mut prover =
-            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
-        let g_round_0 = prover.next_message(None).unwrap();
-        let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
-        assert_eq!(
-            g_round_0.evaluate(&TestField::ONE),
-            g_round_1.evaluate(&TestField::ZERO) + g_round_1.evaluate(&TestField::ONE)
-        );
-        assert_eq!(
-            g_round_1.evaluate(&TestField::ZERO),
-            TestField::from(4),
-            "g1 should evaluate correctly for input 0"
-        );
-        assert_eq!(
-            g_round_1.evaluate(&TestField::ONE),
-            TestField::from(7),
-            "g1 should evaluate correctly for input 1"
-        );
-    }
-
-    #[test]
-    fn round_2() {
-        let polynomial = test_polynomial();
-        let mut prover =
-            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
-        let _g_round_0 = prover.next_message(None).unwrap();
-        let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
-        let g_round_2 = prover.next_message(Some(TestField::ONE)).unwrap(); // x1 fixed to one
-        assert_eq!(
-            g_round_1.evaluate(&TestField::ONE),
-            g_round_2.evaluate(&TestField::ZERO) + g_round_2.evaluate(&TestField::ONE)
-        );
-        assert_eq!(
-            g_round_2.evaluate(&TestField::ZERO),
-            TestField::from(0),
-            "g2 should evaluate correctly for input 0"
-        );
-        assert_eq!(
-            g_round_2.evaluate(&TestField::ONE),
-            TestField::from(7),
-            "g2 should evaluate correctly for input 1"
-        );
-    }
-
-    #[test]
-    fn outside_hypercube_round_1() {
-        let polynomial = test_polynomial();
-        let mut prover =
-            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
-        let g_round_0 = prover.next_message(None).unwrap();
-        let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
-        assert_eq!(
-            g_round_0.evaluate(&TestField::from(3)),
-            g_round_1.evaluate(&TestField::ZERO) + g_round_1.evaluate(&TestField::ONE)
-        );
-        assert_eq!(
-            g_round_1.evaluate(&TestField::ZERO),
-            TestField::from(12),
-            "g1 should evaluate correctly for input 0"
-        );
-        assert_eq!(
-            g_round_1.evaluate(&TestField::ONE),
-            TestField::from(12),
-            "g1 should evaluate correctly for input 1"
-        );
-    }
-
-    #[test]
-    fn outside_hypercube_round_2() {
-        let polynomial = test_polynomial();
-        let mut prover =
-            SpaceProver::<TestField>::new(polynomial.num_vars, polynomial.to_evaluations());
-        let _g_round_0 = prover.next_message(None).unwrap();
-        let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
-        let g_round_2 = prover.next_message(Some(TestField::from(4))).unwrap(); // x1 fixed to 4
-        assert_eq!(
-            g_round_1.evaluate(&TestField::from(4)),
-            g_round_2.evaluate(&TestField::ZERO) + g_round_2.evaluate(&TestField::ONE)
-        );
-        assert_eq!(
-            g_round_2.evaluate(&TestField::ZERO),
-            TestField::from(11),
-            "g2 should evaluate correctly for input 0"
-        );
-        assert_eq!(
-            g_round_2.evaluate(&TestField::ONE),
-            TestField::from(1),
-            "g2 should evaluate correctly for input 1"
-        );
+    fn sumcheck() {
+        run_boolean_sumcheck_test(SpaceProver::new(test_polynomial()));
+        run_basic_sumcheck_test(SpaceProver::new(test_polynomial()));
     }
 }

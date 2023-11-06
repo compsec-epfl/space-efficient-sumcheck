@@ -53,55 +53,13 @@ impl<F: Field> Sumcheck<F> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use ark_ff::{
-        fields::Fp64,
-        fields::{MontBackend, MontConfig},
-    };
-    use ark_poly::{
-        multivariate::{self, SparseTerm, Term},
-        DenseMVPolynomial,
-    };
-
-    use crate::sumcheck::BasicProver;
-
-    #[derive(MontConfig)]
-    #[modulus = "19"]
-    #[generator = "2"]
-    struct FrConfig;
-
-    type TestField = Fp64<MontBackend<FrConfig, 1>>;
-    type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
-
-    fn test_polynomial() -> TestPolynomial {
-        // 4*x_1*x_2 + 7*x_2*x_3 + 2*x_1 + 13*x_2
-        return TestPolynomial::from_coefficients_slice(
-            3,
-            &[
-                (
-                    TestField::from(4),
-                    multivariate::SparseTerm::new(vec![(0, 1), (1, 1)]),
-                ),
-                (
-                    TestField::from(7),
-                    multivariate::SparseTerm::new(vec![(1, 1), (2, 1)]),
-                ),
-                (
-                    TestField::from(2),
-                    multivariate::SparseTerm::new(vec![(0, 1)]),
-                ),
-                (
-                    TestField::from(13),
-                    multivariate::SparseTerm::new(vec![(1, 1)]),
-                ),
-            ],
-        );
-    }
+    use super::Sumcheck;
+    use crate::sumcheck::unit_test_helpers::{test_polynomial, TestField};
+    use crate::sumcheck::TimeProver;
 
     #[test]
     fn basic() {
-        let prover = BasicProver::<TestField, TestPolynomial>::new(test_polynomial());
+        let prover = TimeProver::<TestField>::new(test_polynomial());
         let rng = &mut ark_std::test_rng();
         let transcript = Sumcheck::<TestField>::prove(prover, rng);
         assert_eq!(transcript.is_accepted, true);

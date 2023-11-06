@@ -2,16 +2,18 @@ use ark_ff::Field;
 use ark_poly::univariate::SparsePolynomial;
 use ark_std::vec::Vec;
 
-use crate::sumcheck::Prover;
 use crate::sumcheck::Hypercube;
+use crate::sumcheck::Prover;
 
 // the state of the tradeoff prover in the protocol
 pub struct TradeoffProver<F: Field> {
     pub claimed_evaluation: F,
     pub current_round: usize,
     pub evaluations: Vec<F>,
+    pub num_stages: usize,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
+    pub stage_size: usize,
 }
 
 impl<F: Field> TradeoffProver<F> {
@@ -46,20 +48,24 @@ impl<F: Field> TradeoffProver<F> {
 
         index
     }
-    pub fn new(evaluations: Vec<F>, claimed_evaluation: F) -> Self {
+    pub fn new(evaluations: Vec<F>, num_stages: usize) -> Self {
         // abort if length not a power of two
         assert_eq!(
             evaluations.len() != 0 && evaluations.len().count_ones() == 1,
             true
         );
         // return the TradeoffProver instance
+        let claimed_evaluation: F = evaluations.iter().sum();
         let num_variables: usize = (evaluations.len() as f64).log2() as usize;
+        let stage_size: usize = num_variables / num_stages;
         Self {
             claimed_evaluation,
             current_round: 0,
             evaluations,
+            num_stages,
             num_variables,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
+            stage_size,
         }
     }
 }
@@ -82,21 +88,22 @@ impl<F: Field> Prover<F> for TradeoffProver<F> {
 
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
-        let k = 3;
-        let l = self.num_variables / k;
-        let s = self.current_round / l;
-        let mut precomputed: Vec<F> = vec![F::ZERO; 2_usize.pow(l as u32)];
-        for b1 in Hypercube::<F>::new(s*l) {
-            let weight: F = TradeoffProver::lagrange_polynomial(
-                &b1,
-                &self.verifier_messages[0..b1.len()],
-            )
-            .unwrap();
-            for b2 in Hypercube::<F>::new(l) {
+        let current_stage = self.current_round / self.stage_size;
+        let mut precomputed: Vec<F> = vec![F::ZERO; 2_usize.pow(self.stage_size as u32)];
+        for b1 in Hypercube::<F>::new(current_stage * self.stage_size) {
+            let weight: F =
+                TradeoffProver::lagrange_polynomial(&b1, &self.verifier_messages[0..b1.len()])
+                    .unwrap();
+            for b2 in Hypercube::<F>::new(self.stage_size) {
                 let b2_index = TradeoffProver::field_elements_to_index(&b2);
-                for b3 in Hypercube::<F>::new((k-s-1)*l) {
-                    let f_index = TradeoffProver::field_elements_to_index(&[b1.clone(), b2.clone(), b3.clone()].concat());
-                    precomputed[b2_index] = precomputed[b2_index] + weight * self.evaluations[f_index];
+                for b3 in
+                    Hypercube::<F>::new((self.num_stages - current_stage - 1) * self.stage_size)
+                {
+                    let f_index = TradeoffProver::field_elements_to_index(
+                        &[b1.clone(), b2.clone(), b3.clone()].concat(),
+                    );
+                    precomputed[b2_index] =
+                        precomputed[b2_index] + weight * self.evaluations[f_index];
                 }
             }
         }
@@ -110,18 +117,21 @@ impl<F: Field> Prover<F> for TradeoffProver<F> {
         }
 
         // compute the sum
-        let j_prime = self.current_round - (s * l);
+        let j_prime = self.current_round - (current_stage * self.stage_size);
         for b2_prime in Hypercube::new(j_prime) {
-            let weight: F = TradeoffProver::lagrange_polynomial(
-                &b2_prime,
-                &self.verifier_messages[0..j_prime],
-            )
-            .unwrap();
-            for b2_prime_prime in Hypercube::<F>::new(l - j_prime) {
+            let weight: F =
+                TradeoffProver::lagrange_polynomial(&b2_prime, &self.verifier_messages[0..j_prime])
+                    .unwrap();
+            for b2_prime_prime in Hypercube::<F>::new(self.stage_size - j_prime) {
                 let bitmask: usize = 1 << b2_prime_prime.len() - 1;
-                let b2_prime_prime_index: usize = TradeoffProver::field_elements_to_index(&[b2_prime.clone(), b2_prime_prime.clone()].concat());
+                let b2_prime_prime_index: usize = TradeoffProver::field_elements_to_index(
+                    &[b2_prime.clone(), b2_prime_prime.clone()].concat(),
+                );
                 let is_set: bool = (b2_prime_prime_index & bitmask) != 0;
-                println!("prime prime index: {}, bitmask: {}, is_set: {}", b2_prime_prime_index, bitmask, is_set);
+                println!(
+                    "prime prime index: {}, bitmask: {}, is_set: {}",
+                    b2_prime_prime_index, bitmask, is_set
+                );
                 match is_set {
                     false => sum_0 += precomputed[b2_prime_prime_index] * weight,
                     true => sum_1 += precomputed[b2_prime_prime_index] * weight,
@@ -146,173 +156,16 @@ impl<F: Field> Prover<F> for TradeoffProver<F> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use ark_ff::{
-        fields::Fp64,
-        fields::{MontBackend, MontConfig},
-    };
-    use ark_poly::{
-        multivariate::{self, SparseTerm, Term},
-        DenseMVPolynomial, Polynomial,
+    use super::TradeoffProver;
+    use crate::sumcheck::unit_test_helpers::{
+        run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
     };
 
-    use crate::sumcheck::polynomial::SumcheckMultivariatePolynomial;
-
-    #[derive(MontConfig)]
-    #[modulus = "19"]
-    #[generator = "2"]
-    struct FrConfig;
-
-    type TestField = Fp64<MontBackend<FrConfig, 1>>;
-    type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
-
-    fn test_polynomial() -> TestPolynomial {
-        // 4*x_1*x_2 + 7*x_2*x_3 + 2*x_1 + 13*x_2
-        return TestPolynomial::from_coefficients_slice(
-            3,
-            &[
-                (
-                    TestField::from(4),
-                    multivariate::SparseTerm::new(vec![(0, 1), (1, 1)]),
-                ),
-                (
-                    TestField::from(7),
-                    multivariate::SparseTerm::new(vec![(1, 1), (2, 1)]),
-                ),
-                (
-                    TestField::from(2),
-                    multivariate::SparseTerm::new(vec![(0, 1)]),
-                ),
-                (
-                    TestField::from(13),
-                    multivariate::SparseTerm::new(vec![(1, 1)]),
-                ),
-            ],
-        );
-    }
-
     #[test]
-    fn init() {
-        let test_evaluations = test_polynomial().to_evaluations();
-        let prover =
-            TradeoffProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
-        assert_eq!(
-            prover.total_rounds(),
-            3,
-            "should set the number of variables correctly"
-        );
-    }
-
-    #[test]
-    fn round_0() {
-        let test_evaluations = test_polynomial().to_evaluations();
-        let mut prover =
-            TradeoffProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
-        let g_round_0 = prover.next_message(None).unwrap();
-        assert_eq!(
-            g_round_0.evaluate(&TestField::ZERO),
-            TestField::from(14),
-            "g0 should evaluate correctly for input 0"
-        );
-        assert_eq!(
-            g_round_0.evaluate(&TestField::ONE),
-            TestField::from(11),
-            "g0 should evaluate correctly for input 1"
-        );
-    }
-
-    #[test]
-    fn round_1() {
-        let test_evaluations = test_polynomial().to_evaluations();
-        let mut prover =
-            TradeoffProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
-        let g_round_0 = prover.next_message(None).unwrap();
-        let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
-        assert_eq!(
-            g_round_0.evaluate(&TestField::ONE),
-            g_round_1.evaluate(&TestField::ZERO) + g_round_1.evaluate(&TestField::ONE)
-        );
-        assert_eq!(
-            g_round_1.evaluate(&TestField::ZERO),
-            TestField::from(4),
-            "g1 should evaluate correctly for input 0"
-        );
-        assert_eq!(
-            g_round_1.evaluate(&TestField::ONE),
-            TestField::from(7),
-            "g1 should evaluate correctly for input 1"
-        );
-    }
-
-    #[test]
-    fn round_2() {
-        let test_evaluations = test_polynomial().to_evaluations();
-        let mut prover =
-            TradeoffProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
-        let _g_round_0 = prover.next_message(None).unwrap();
-        let g_round_1 = prover.next_message(Some(TestField::ONE)).unwrap(); // x0 fixed to one
-        let g_round_2 = prover.next_message(Some(TestField::ONE)).unwrap(); // x1 fixed to one
-        assert_eq!(
-            g_round_1.evaluate(&TestField::ONE),
-            g_round_2.evaluate(&TestField::ZERO) + g_round_2.evaluate(&TestField::ONE)
-        );
-        assert_eq!(
-            g_round_2.evaluate(&TestField::ZERO),
-            TestField::from(0),
-            "g2 should evaluate correctly for input 0"
-        );
-        assert_eq!(
-            g_round_2.evaluate(&TestField::ONE),
-            TestField::from(7),
-            "g2 should evaluate correctly for input 1"
-        );
-    }
-
-    #[test]
-    fn outside_hypercube_round_1() {
-        let test_evaluations = test_polynomial().to_evaluations();
-        let mut prover =
-            TradeoffProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
-        let g_round_0 = prover.next_message(None).unwrap();
-        let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
-        assert_eq!(
-            g_round_0.evaluate(&TestField::from(3)),
-            g_round_1.evaluate(&TestField::ZERO) + g_round_1.evaluate(&TestField::ONE)
-        );
-        assert_eq!(
-            g_round_1.evaluate(&TestField::ZERO),
-            TestField::from(12),
-            "g1 should evaluate correctly for input 0"
-        );
-        assert_eq!(
-            g_round_1.evaluate(&TestField::ONE),
-            TestField::from(12),
-            "g1 should evaluate correctly for input 1"
-        );
-    }
-
-    #[test]
-    fn outside_hypercube_round_2() {
-        let test_evaluations = test_polynomial().to_evaluations();
-        let mut prover =
-            TradeoffProver::<TestField>::new(test_evaluations.clone(), test_evaluations.iter().sum());
-        let _g_round_0 = prover.next_message(None).unwrap();
-        let g_round_1 = prover.next_message(Some(TestField::from(3))).unwrap(); // x0 fixed to 3
-        let g_round_2 = prover.next_message(Some(TestField::from(4))).unwrap(); // x1 fixed to 4
-        assert_eq!(
-            g_round_1.evaluate(&TestField::from(4)),
-            g_round_2.evaluate(&TestField::ZERO) + g_round_2.evaluate(&TestField::ONE)
-        );
-        assert_eq!(
-            g_round_2.evaluate(&TestField::ZERO),
-            TestField::from(11),
-            "g2 should evaluate correctly for input 0"
-        );
-        assert_eq!(
-            g_round_2.evaluate(&TestField::ONE),
-            TestField::from(1),
-            "g2 should evaluate correctly for input 1"
-        );
+    fn sumcheck() {
+        run_boolean_sumcheck_test(TradeoffProver::new(test_polynomial(), 1));
+        run_basic_sumcheck_test(TradeoffProver::new(test_polynomial(), 1));
+        run_boolean_sumcheck_test(TradeoffProver::new(test_polynomial(), 3));
+        run_basic_sumcheck_test(TradeoffProver::new(test_polynomial(), 3));
     }
 }
