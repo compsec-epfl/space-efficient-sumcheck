@@ -1,19 +1,18 @@
 use ark_ff::Field;
-use ark_poly::{univariate::SparsePolynomial, Polynomial};
 use ark_std::{rand::Rng, vec::Vec};
 
 use crate::sumcheck::Prover;
 
 #[derive(Debug)]
 pub struct Sumcheck<F: Field> {
-    pub prover_messages: Vec<SparsePolynomial<F>>,
+    pub prover_messages: Vec<(F, F)>,
     pub verifier_messages: Vec<F>,
     pub is_accepted: bool,
 }
 
 impl<F: Field> Sumcheck<F> {
     pub fn prove<P: Prover<F>, R: Rng>(mut prover: P, rng: &mut R) -> Self {
-        let mut prover_messages: Vec<SparsePolynomial<F>> =
+        let mut prover_messages: Vec<(F, F)> =
             Vec::with_capacity(prover.total_rounds());
         let mut verifier_messages: Vec<F> = Vec::with_capacity(prover.total_rounds());
         let mut is_accepted = true;
@@ -21,16 +20,16 @@ impl<F: Field> Sumcheck<F> {
         // run the protocol
         let mut verifier_message: Option<F> = None;
         while let Some(message) = prover.next_message(verifier_message) {
-            let round_evaluation = message.evaluate(&F::ZERO) + message.evaluate(&F::ONE);
+            let round_evaluation = message.0 + message.1;
             let is_round_accepted = if round_evaluation == prover.claimed_evaluation() {
                 round_evaluation == prover.claimed_evaluation()
             } else {
                 verifier_messages.push(verifier_message.unwrap());
+                let last_message = prover_messages
+                .last()
+                .unwrap();
                 round_evaluation
-                    == prover_messages
-                        .last()
-                        .unwrap()
-                        .evaluate(&verifier_messages.last().unwrap())
+                    == last_message.0 - (last_message.0 - last_message.1) * verifier_message.unwrap()
             };
 
             prover_messages.push(message);

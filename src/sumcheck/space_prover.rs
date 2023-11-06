@@ -1,5 +1,4 @@
 use ark_ff::Field;
-use ark_poly::univariate::SparsePolynomial;
 
 use crate::sumcheck::Bitcube;
 use crate::sumcheck::Prover;
@@ -101,7 +100,7 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
     fn claimed_evaluation(&self) -> F {
         self.claimed_evaluation
     }
-    fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
+    fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F)> {
         // Ensure the current round is within bounds
         if self.current_round >= self.total_rounds() {
             return None;
@@ -113,16 +112,12 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
         }
 
         // evaluate using cty
-        let (sum_0, sum_1) = self.cty_evaluate();
-
-        // form a polynomial that s.t. g_round(0) = sum_0, g_round(1) = sum_1
-        let g: SparsePolynomial<F> =
-            SparsePolynomial::<F>::from_coefficients_vec(vec![(0, sum_0), (1, -sum_0 + sum_1)]);
+        let evals: (F, F) = self.cty_evaluate();
 
         // don't forget to increment the round
         self.current_round += 1;
 
-        return Some(g);
+        return Some(evals);
     }
     fn total_rounds(&self) -> usize {
         self.num_variables

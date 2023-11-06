@@ -1,5 +1,4 @@
 use ark_ff::Field;
-use ark_poly::univariate::SparsePolynomial;
 use ark_std::vec::Vec;
 
 use crate::sumcheck::Prover;
@@ -61,7 +60,7 @@ impl<F: Field> ExperimentalProver<F> {
 
 impl<F: Field> Prover<F> for ExperimentalProver<F> {
     // a next-message function using vsbw
-    fn next_message(&mut self, verifier_message: Option<F>) -> Option<SparsePolynomial<F>> {
+    fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F)> {
         // Ensure the current round is within bounds
         if self.current_round >= self.total_rounds() {
             return None;
@@ -110,15 +109,11 @@ impl<F: Field> Prover<F> for ExperimentalProver<F> {
             };
         let sum_1 = self.range_sums[sum_1_end_index] - self.range_sums[sum_1_start_index];
 
-        // Form a polynomial s.t. g(0) = sum_0 and g(1) = sum_1
-        let g: SparsePolynomial<F> =
-            SparsePolynomial::from_coefficients_vec(vec![(0, sum_0), (1, sum_1 - sum_0)]);
-
         // Increment the round counter
         self.current_round += 1;
 
         // Return the computed polynomial
-        Some(g)
+        Some((sum_0, sum_1))
     }
     fn total_rounds(&self) -> usize {
         self.num_variables

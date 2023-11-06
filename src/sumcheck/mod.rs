@@ -25,7 +25,7 @@ pub mod unit_test_helpers {
     };
     use ark_poly::{
         multivariate::{self, SparseTerm, Term},
-        univariate, DenseMVPolynomial, Polynomial,
+        univariate, DenseMVPolynomial,
     };
 
     use super::{Hypercube, Prover};
@@ -159,14 +159,14 @@ pub mod unit_test_helpers {
         // 101 = 2
         // 111 = 7
         // sum g0(1) = 11
-        let g_round_0 = prover.next_message(None).unwrap();
+        let round_0 = prover.next_message(None).unwrap();
         assert_eq!(
-            g_round_0.evaluate(&F::ZERO),
+            round_0.0,
             F::from(14),
             "g0 should evaluate correctly for input 0"
         );
         assert_eq!(
-            g_round_0.evaluate(&F::ONE),
+            round_0.1,
             F::from(11),
             "g0 should evaluate correctly for input 1"
         );
@@ -177,18 +177,18 @@ pub mod unit_test_helpers {
         // 111 = 7
         // 110 = 0
         // sum g1(1) = 7
-        let g_round_1 = prover.next_message(Some(F::ONE)).unwrap(); // x0 fixed to one
+        let round_1 = prover.next_message(Some(F::ONE)).unwrap(); // x0 fixed to one
         assert_eq!(
-            g_round_0.evaluate(&F::ONE),
-            g_round_1.evaluate(&F::ZERO) + g_round_1.evaluate(&F::ONE)
+            round_0.1,
+            round_1.0 + round_1.1
         );
         assert_eq!(
-            g_round_1.evaluate(&F::ZERO),
+            round_1.0,
             F::from(4),
             "g1 should evaluate correctly for input 0"
         );
         assert_eq!(
-            g_round_1.evaluate(&F::ONE),
+            round_1.1,
             F::from(7),
             "g1 should evaluate correctly for input 1"
         );
@@ -197,18 +197,18 @@ pub mod unit_test_helpers {
         // sum g(0) = 0
         // 111 = 7
         // sum g(1) = 7
-        let g_round_2 = prover.next_message(Some(F::ONE)).unwrap(); // x1 fixed to one
+        let round_2 = prover.next_message(Some(F::ONE)).unwrap(); // x1 fixed to one
         assert_eq!(
-            g_round_1.evaluate(&F::ONE),
-            g_round_2.evaluate(&F::ZERO) + g_round_2.evaluate(&F::ONE)
+            round_1.1,
+            round_2.0 + round_2.1
         );
         assert_eq!(
-            g_round_2.evaluate(&F::ZERO),
+            round_2.0,
             F::from(0),
             "g2 should evaluate correctly for input 0"
         );
         assert_eq!(
-            g_round_2.evaluate(&F::ONE),
+            round_2.1,
             F::from(7),
             "g2 should evaluate correctly for input 1"
         );
@@ -224,19 +224,19 @@ pub mod unit_test_helpers {
         // 3,1,1 = 38 = 0 mod 19
         // 3,1,0 = 31 = 12 mod 19
         // sum g1(1) = 12
-        let g_round_0 = prover.next_message(None).unwrap();
-        let g_round_1 = prover.next_message(Some(F::from(3))).unwrap(); // x0 fixed to 3
+        let round_0 = prover.next_message(None).unwrap();
+        let round_1 = prover.next_message(Some(F::from(3))).unwrap(); // x0 fixed to 3
         assert_eq!(
-            g_round_0.evaluate(&F::from(3)),
-            g_round_1.evaluate(&F::ZERO) + g_round_1.evaluate(&F::ONE)
+            round_0.0 - (round_0.0 - round_0.1) * F::from(3),
+            round_1.0 + round_1.1
         );
         assert_eq!(
-            g_round_1.evaluate(&F::ZERO),
+            round_1.0,
             F::from(12),
             "g1 should evaluate correctly for input 0"
         );
         assert_eq!(
-            g_round_1.evaluate(&F::ONE),
+            round_1.1,
             F::from(12),
             "g1 should evaluate correctly for input 1"
         );
@@ -245,18 +245,18 @@ pub mod unit_test_helpers {
         // sum g(0) = 11
         // 3,4,1 = 138 = 1 mod 19
         // sum g(1) = 1
-        let g_round_2 = prover.next_message(Some(F::from(4))).unwrap(); // x1 fixed to 4
+        let round_2 = prover.next_message(Some(F::from(4))).unwrap(); // x1 fixed to 4
         assert_eq!(
-            g_round_1.evaluate(&F::from(4)),
-            g_round_2.evaluate(&F::ZERO) + g_round_2.evaluate(&F::ONE)
+            round_1.0 - (round_1.0 - round_1.1) * F::from(4),
+            round_2.0 + round_2.1
         );
         assert_eq!(
-            g_round_2.evaluate(&F::ZERO),
+            round_2.0,
             F::from(11),
             "g2 should evaluate correctly for input 0"
         );
         assert_eq!(
-            g_round_2.evaluate(&F::ONE),
+            round_2.1,
             F::from(1),
             "g2 should evaluate correctly for input 1"
         );
