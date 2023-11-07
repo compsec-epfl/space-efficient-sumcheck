@@ -1,7 +1,8 @@
 use ark_ff::Field;
 
-use crate::sumcheck::Bitcube;
-use crate::sumcheck::Prover;
+use crate::interpolation::lagrange_polynomial;
+use crate::Hypercube;
+use crate::Prover;
 
 // the state of the space prover in the protocol
 pub struct SpaceProver<F: Field> {
@@ -13,30 +14,15 @@ pub struct SpaceProver<F: Field> {
 }
 
 impl<F: Field> SpaceProver<F> {
-    // class methods
-    pub fn lagrange_polynomial(x: &[F], w: &[F]) -> Option<F> {
-        if x.len() != w.len() {
-            None
-        } else {
-            Some(
-                x.to_vec()
-                    .iter()
-                    .zip(w.iter())
-                    .fold(F::ONE, |acc, (&x_i, &w_i)| {
-                        acc * (x_i * w_i + (F::ONE - x_i) * (F::ONE - w_i))
-                    }),
-            )
-        }
-    }
     pub fn new(evaluations: Vec<F>) -> Self {
         // abort if length not a power of two
         assert_eq!(
             evaluations.len() != 0 && evaluations.len().count_ones() == 1,
             true
         );
-        // return the TimeProver instance
         let claimed_evaluation: F = evaluations.iter().sum();
         let num_variables: usize = evaluations.len().ilog2() as usize;
+        // return the TimeProver instance
         Self {
             claimed_evaluation,
             evaluations,
@@ -50,42 +36,17 @@ impl<F: Field> SpaceProver<F> {
         let mut sum_0: F = F::ZERO;
         let mut sum_1: F = F::ZERO;
         let bitmask: usize = 1 << self.num_free_variables() - 1;
-        // iterate over two vectors of bits
-        for input_start in Bitcube::new(self.current_round) {
-            // need a vec of field elements for each outer loop
-            let input_start_field_elements: Vec<F> = input_start
-                .iter()
-                .map(|bit: &bool| -> F {
-                    match *bit {
-                        false => F::ZERO,
-                        true => F::ONE,
-                    }
-                })
-                .collect();
-            // compute the lagrange_polynomial for each iteration with all available verifier messages
-            let weight: F = SpaceProver::lagrange_polynomial(
-                &input_start_field_elements,
-                &self.verifier_messages,
-            )
-            .unwrap();
-            for input_end in Bitcube::new(self.num_variables - input_start.len()) {
-                // convert the full bitvector into a scalar index and use this to grab the evaluation
-                let index: usize = [input_start.clone(), input_end.clone()]
-                    .concat()
-                    .iter()
-                    .fold((|| 0)(), |index: usize, bit: &bool| {
-                        (index << 1)
-                            | match *bit {
-                                false => 0,
-                                true => 1,
-                            }
-                    });
-                let evaluation: F = self.evaluations[index];
-                // decide which sum this belongs to
-                let is_set: bool = (index & bitmask) != 0;
+        // iterate in two loops
+        let num_vars_outer_loop = self.current_round;
+        let num_vars_inner_loop = self.num_variables - num_vars_outer_loop;
+        for (index_outer, outer) in Hypercube::<F>::new(num_vars_outer_loop).enumerate() {
+            let weight: F = lagrange_polynomial(&outer, &self.verifier_messages).unwrap();
+            for index_inner in 0..2_usize.pow(num_vars_inner_loop as u32) {
+                let evaluation_index = index_outer << num_vars_inner_loop | index_inner;
+                let is_set: bool = (evaluation_index & bitmask) != 0;
                 match is_set {
-                    false => sum_0 += evaluation * weight,
-                    true => sum_1 += evaluation * weight,
+                    false => sum_0 += self.evaluations[evaluation_index] * weight,
+                    true => sum_1 += self.evaluations[evaluation_index] * weight,
                 }
             }
         }
@@ -127,7 +88,7 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
 #[cfg(test)]
 mod tests {
     use super::SpaceProver;
-    use crate::sumcheck::unit_test_helpers::{
+    use crate::unit_test_helpers::{
         run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
     };
 

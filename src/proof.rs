@@ -1,7 +1,7 @@
 use ark_ff::Field;
 use ark_std::{rand::Rng, vec::Vec};
 
-use crate::sumcheck::Prover;
+use crate::Prover;
 
 #[derive(Debug)]
 pub struct Sumcheck<F: Field> {
@@ -12,8 +12,7 @@ pub struct Sumcheck<F: Field> {
 
 impl<F: Field> Sumcheck<F> {
     pub fn prove<P: Prover<F>, R: Rng>(mut prover: P, rng: &mut R) -> Self {
-        let mut prover_messages: Vec<(F, F)> =
-            Vec::with_capacity(prover.total_rounds());
+        let mut prover_messages: Vec<(F, F)> = Vec::with_capacity(prover.total_rounds());
         let mut verifier_messages: Vec<F> = Vec::with_capacity(prover.total_rounds());
         let mut is_accepted = true;
 
@@ -25,11 +24,10 @@ impl<F: Field> Sumcheck<F> {
                 round_evaluation == prover.claimed_evaluation()
             } else {
                 verifier_messages.push(verifier_message.unwrap());
-                let last_message = prover_messages
-                .last()
-                .unwrap();
+                let last_message = prover_messages.last().unwrap();
                 round_evaluation
-                    == last_message.0 - (last_message.0 - last_message.1) * verifier_message.unwrap()
+                    == last_message.0
+                        - (last_message.0 - last_message.1) * verifier_message.unwrap()
             };
 
             prover_messages.push(message);
@@ -53,8 +51,8 @@ impl<F: Field> Sumcheck<F> {
 #[cfg(test)]
 mod tests {
     use super::Sumcheck;
-    use crate::sumcheck::unit_test_helpers::{test_polynomial, TestField};
-    use crate::sumcheck::TimeProver;
+    use crate::unit_test_helpers::{test_polynomial, TestField};
+    use crate::TimeProver;
 
     #[test]
     fn basic() {

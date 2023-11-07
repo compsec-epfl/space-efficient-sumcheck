@@ -2,12 +2,6 @@ use std::{cmp, marker::PhantomData};
 
 use ark_ff::Field;
 
-pub struct Bitcube {
-    num_variables: usize,
-    current_member: usize,
-    stop_member: usize, // we stop iterating when we reach this number (exclusive)
-}
-
 pub struct Hypercube<F: Field> {
     num_variables: usize,
     current_member: usize,
@@ -19,17 +13,6 @@ pub struct HypercubeChunk<F: Field> {
     chunk_size: usize,
     current_member: usize,
     _f: PhantomData<F>,
-}
-
-impl<F: Field> Clone for Hypercube<F> {
-    fn clone(&self) -> Self {
-        Hypercube {
-            num_variables: self.num_variables,
-            current_member: self.current_member,
-            stop_member: self.stop_member,
-            _f: PhantomData,
-        }
-    }
 }
 
 impl<F: Field> Hypercube<F> {
@@ -48,24 +31,6 @@ impl<F: Field> Hypercube<F> {
             current_member,
             stop_member,
             _f: PhantomData,
-        }
-    }
-}
-
-impl Bitcube {
-    pub fn new(num_variables: usize) -> Self {
-        let stop_member = 2usize.pow(num_variables as u32);
-        Self {
-            num_variables,
-            current_member: 0,
-            stop_member,
-        }
-    }
-    pub fn new_from_range(num_variables: usize, current_member: usize, stop_member: usize) -> Self {
-        Self {
-            num_variables,
-            current_member,
-            stop_member,
         }
     }
 }
@@ -110,31 +75,6 @@ impl<F: Field> HypercubeChunk<F> {
             current_member: 0,
             _f: PhantomData,
         }
-    }
-}
-
-impl Iterator for Bitcube {
-    type Item = Vec<bool>;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current_member >= self.stop_member {
-            return None;
-        } else if self.num_variables == 0 {
-            self.current_member += 1;
-            return Some(vec![]);
-        }
-
-        let point_binary_str = format!(
-            "{:0width$b}",
-            self.current_member,
-            width = self.num_variables
-        );
-        let point: Vec<bool> = point_binary_str
-            .chars()
-            .map(|c| if c == '0' { false } else { true })
-            .collect();
-
-        self.current_member += 1;
-        Some(point)
     }
 }
 

@@ -1,7 +1,7 @@
 use ark_std;
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use space_efficient_sumcheck::sumcheck::{Sumcheck, TimeProver};
+use space_efficient_sumcheck::{Sumcheck, TimeProver};
 
 use ark_ff::{
     fields::Fp64,
