@@ -19,23 +19,28 @@ impl<F: Field> Sumcheck<F> {
         // run the protocol
         let mut verifier_message: Option<F> = None;
         while let Some(message) = prover.next_message(verifier_message) {
-            let round_evaluation = message.0 + message.1;
-            let is_round_accepted = if round_evaluation == prover.claimed_evaluation() {
-                round_evaluation == prover.claimed_evaluation()
-            } else {
-                verifier_messages.push(verifier_message.unwrap());
-                let last_message = prover_messages.last().unwrap();
-                round_evaluation
-                    == last_message.0
-                        - (last_message.0 - last_message.1) * verifier_message.unwrap()
+            // handle the current round
+            let round_sum = message.0 + message.1;
+            let is_round_accepted = match verifier_message {
+                // if first round compare to claimed_sum
+                None => round_sum == prover.claimed_sum(),
+                // else compute f(prev_verifier_msg) = prev_sum_0 - (prev_sum_0 - prev_sum_1) * prev_verifier_msg == round_sum
+                Some(prev_verifier_message) => {
+                    verifier_messages.push(prev_verifier_message); // this can only be done when != None
+                    let prev_prover_message = prover_messages.last().unwrap();
+                    round_sum
+                        == prev_prover_message.0
+                            - (prev_prover_message.0 - prev_prover_message.1)
+                                * prev_verifier_message
+                }
             };
 
+            // handle how to proceed
             prover_messages.push(message);
             if !is_round_accepted {
                 is_accepted = false;
                 break;
             }
-
             verifier_message = Some(F::rand(rng));
         }
 
@@ -51,8 +56,8 @@ impl<F: Field> Sumcheck<F> {
 #[cfg(test)]
 mod tests {
     use super::Sumcheck;
-    use crate::provers::unit_test_helpers::{test_polynomial, TestField};
     use crate::provers::time_prover::TimeProver;
+    use crate::provers::unit_test_helpers::{test_polynomial, TestField};
 
     #[test]
     fn basic() {

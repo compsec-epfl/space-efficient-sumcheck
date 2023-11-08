@@ -6,7 +6,7 @@ use crate::provers::interpolation::lagrange_polynomial;
 
 // the state of the space prover in the protocol
 pub struct SpaceProver<F: Field> {
-    pub claimed_evaluation: F,
+    pub claimed_sum: F,
     pub current_round: usize,
     pub evaluations: Vec<F>,
     pub num_variables: usize,
@@ -20,11 +20,11 @@ impl<F: Field> SpaceProver<F> {
             evaluations.len() != 0 && evaluations.len().count_ones() == 1,
             true
         );
-        let claimed_evaluation: F = evaluations.iter().sum();
+        let claimed_sum: F = evaluations.iter().sum();
         let num_variables: usize = evaluations.len().ilog2() as usize;
         // return the TimeProver instance
         Self {
-            claimed_evaluation,
+            claimed_sum,
             evaluations,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             current_round: 0,
@@ -58,8 +58,8 @@ impl<F: Field> SpaceProver<F> {
 }
 
 impl<F: Field> Prover<F> for SpaceProver<F> {
-    fn claimed_evaluation(&self) -> F {
-        self.claimed_evaluation
+    fn claimed_sum(&self) -> F {
+        self.claimed_sum
     }
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F)> {
         // Ensure the current round is within bounds

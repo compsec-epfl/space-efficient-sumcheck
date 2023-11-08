@@ -5,7 +5,7 @@ use super::Prover;
 
 // the state of the time prover in the protocol
 pub struct TimeProver<F: Field> {
-    pub claimed_evaluation: F,
+    pub claimed_sum: F,
     pub current_round: usize,
     pub evaluations: Vec<F>,
     pub num_variables: usize,
@@ -20,10 +20,10 @@ impl<F: Field> TimeProver<F> {
             true
         );
         // return the TimeProver instance
-        let claimed_evaluation: F = evaluations.iter().sum();
+        let claimed_sum: F = evaluations.iter().sum();
         let num_variables: usize = evaluations.len().ilog2() as usize;
         Self {
-            claimed_evaluation,
+            claimed_sum,
             current_round: 0,
             evaluations,
             num_variables,
@@ -59,8 +59,8 @@ impl<F: Field> TimeProver<F> {
 }
 
 impl<F: Field> Prover<F> for TimeProver<F> {
-    fn claimed_evaluation(&self) -> F {
-        self.claimed_evaluation
+    fn claimed_sum(&self) -> F {
+        self.claimed_sum
     }
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F)> {
         // Ensure the current round is within bounds

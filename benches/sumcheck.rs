@@ -1,7 +1,7 @@
 use ark_std;
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use space_efficient_sumcheck::{Sumcheck, TimeProver};
+use space_efficient_sumcheck::{provers::time_prover::TimeProver, Sumcheck};
 
 use ark_ff::{
     fields::Fp64,
@@ -11,14 +11,6 @@ use ark_poly::{
     multivariate::{self, SparseTerm, Term},
     DenseMVPolynomial,
 };
-
-#[derive(MontConfig)]
-#[modulus = "19"]
-#[generator = "2"]
-struct FrConfig;
-
-type TestField = Fp64<MontBackend<FrConfig, 1>>;
-type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
 
 fn test_terms(num_terms: usize) -> Vec<(ark_ff::Fp<MontBackend<FrConfig, 1>, 1>, SparseTerm)> {
     let terms: Vec<(ark_ff::Fp<MontBackend<FrConfig, 1>, 1>, SparseTerm)> = vec![

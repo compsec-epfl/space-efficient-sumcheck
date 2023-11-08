@@ -7,17 +7,13 @@ use crate::provers::interpolation::lagrange_polynomial;
 
 // the state of the tradeoff prover in the protocol
 pub struct TradeoffProver<F: Field> {
-    pub claimed_evaluation: F,
+    pub claimed_sum: F,
     pub current_round: usize,
     pub evaluations: Vec<F>,
     pub num_stages: usize,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
     pub stage_size: usize,
-}
-
-fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
-    (num << shift_amount) | (1 << shift_amount) - 1
 }
 
 impl<F: Field> TradeoffProver<F> {
@@ -27,12 +23,12 @@ impl<F: Field> TradeoffProver<F> {
             evaluations.len() != 0 && evaluations.len().count_ones() == 1,
             true
         );
-        let claimed_evaluation: F = evaluations.iter().sum();
+        let claimed_sum: F = evaluations.iter().sum();
         let num_variables: usize = evaluations.len().ilog2() as usize;
         let stage_size: usize = num_variables / num_stages;
         // return the TradeoffProver instance
         Self {
-            claimed_evaluation,
+            claimed_sum,
             current_round: 0,
             evaluations,
             num_stages,
@@ -49,6 +45,9 @@ impl<F: Field> TradeoffProver<F> {
             partial_sums.push(running_sum);
         }
         return partial_sums;
+    }
+    fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
+        (num << shift_amount) | (1 << shift_amount) - 1
     }
     fn current_stage(&self) -> usize {
         self.current_round / self.stage_size
@@ -82,29 +81,32 @@ impl<F: Field> TradeoffProver<F> {
         for (index_b2_prime, b2_prime) in Hypercube::new(num_vars_b2_prime).enumerate() {
             let weight: F =
                 lagrange_polynomial(&b2_prime, &self.verifier_messages[0..b2_prime.len()]).unwrap();
-            if weight == F::ZERO {
-                continue;
-            };
-
-            let start_0: usize = (index_b2_prime << 1) << inner_index_shift;
-            let end_0: usize = shift_and_one_fill(index_b2_prime << 1, inner_index_shift);
-            let start_1: usize = (shift_and_one_fill(index_b2_prime, 1) << inner_index_shift) - 1;
-            let end_1: usize =
-                shift_and_one_fill(shift_and_one_fill(index_b2_prime, 1), inner_index_shift);
-            sum_0 += if start_0 == 0 {
-                partial_sums[end_0] * weight
-            } else {
-                (partial_sums[end_0] - partial_sums[start_0 - 1]) * weight
-            };
-            sum_1 += (partial_sums[end_1] - partial_sums[start_1]) * weight;
+            if weight != F::ZERO {
+                let start_0: usize = (index_b2_prime << 1) << inner_index_shift;
+                let end_0: usize =
+                    TradeoffProver::<F>::shift_and_one_fill(index_b2_prime << 1, inner_index_shift);
+                let start_1: usize = (TradeoffProver::<F>::shift_and_one_fill(index_b2_prime, 1)
+                    << inner_index_shift)
+                    - 1;
+                let end_1: usize = TradeoffProver::<F>::shift_and_one_fill(
+                    TradeoffProver::<F>::shift_and_one_fill(index_b2_prime, 1),
+                    inner_index_shift,
+                );
+                sum_0 += if start_0 == 0 {
+                    partial_sums[end_0] * weight
+                } else {
+                    (partial_sums[end_0] - partial_sums[start_0 - 1]) * weight
+                };
+                sum_1 += (partial_sums[end_1] - partial_sums[start_1]) * weight;
+            }
         }
         return (sum_0, sum_1);
     }
 }
 
 impl<F: Field> Prover<F> for TradeoffProver<F> {
-    fn claimed_evaluation(&self) -> F {
-        self.claimed_evaluation
+    fn claimed_sum(&self) -> F {
+        self.claimed_sum
     }
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F)> {
         // Ensure the current round is within bounds
