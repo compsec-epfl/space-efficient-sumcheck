@@ -2,6 +2,8 @@ use ark_std;
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use space_efficient_sumcheck::{provers::time_prover::TimeProver, Sumcheck};
+use space_efficient_sumcheck::provers::unit_test_helpers::TestField;
+
 
 use ark_ff::{
     fields::Fp64,

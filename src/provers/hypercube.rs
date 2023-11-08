@@ -128,17 +128,7 @@ impl<F: Field> Iterator for HypercubeChunk<F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ark_ff::{
-        fields::Fp64,
-        fields::{MontBackend, MontConfig},
-    };
-
-    #[derive(MontConfig)]
-    #[modulus = "19"]
-    #[generator = "2"]
-    struct FrConfig;
-
-    type TestField = Fp64<MontBackend<FrConfig, 1>>;
+    use crate::provers::unit_test_helpers::TestField;
 
     #[test]
     fn small_n() {
