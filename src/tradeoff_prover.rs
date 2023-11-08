@@ -16,6 +16,10 @@ pub struct TradeoffProver<F: Field> {
     pub stage_size: usize,
 }
 
+fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
+    (num << shift_amount) | (1 << shift_amount) - 1
+}
+
 impl<F: Field> TradeoffProver<F> {
     pub fn new(evaluations: Vec<F>, num_stages: usize) -> Self {
         // abort if length not a power of two
@@ -36,6 +40,15 @@ impl<F: Field> TradeoffProver<F> {
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             stage_size,
         }
+    }
+    fn compute_partial_sums(precomputed: Vec<F>) -> Vec<F> {
+        let mut partial_sums: Vec<F> = Vec::<F>::with_capacity(precomputed.len());
+        let mut running_sum = F::ZERO;
+        for eval in &precomputed {
+            running_sum += eval;
+            partial_sums.push(running_sum);
+        }
+        return partial_sums;
     }
     fn current_stage(&self) -> usize {
         self.current_round / self.stage_size
@@ -60,26 +73,30 @@ impl<F: Field> TradeoffProver<F> {
         }
         return precomputed;
     }
-    fn evaluate(&self, precomputed: Vec<F>) -> (F, F) {
+    fn evaluate(&self, partial_sums: Vec<F>) -> (F, F) {
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
         let num_vars_b1 = self.current_stage() * self.stage_size;
         let num_vars_b2_prime = self.current_round - num_vars_b1;
-        let num_vars_b2_prime_prime = self.stage_size - num_vars_b2_prime;
-        let bitmask: usize = 1 << num_vars_b2_prime_prime - 1;
+        let inner_index_shift = self.stage_size - num_vars_b2_prime - 1;
         for (index_b2_prime, b2_prime) in Hypercube::new(num_vars_b2_prime).enumerate() {
             let weight: F =
                 lagrange_polynomial(&b2_prime, &self.verifier_messages[0..b2_prime.len()]).unwrap();
+            if weight == F::ZERO {
+                continue;
+            };
 
-            for index_b2_prime_prime in 0..2_usize.pow(num_vars_b2_prime_prime as u32) {
-                let precomputed_index =
-                    index_b2_prime << num_vars_b2_prime_prime | index_b2_prime_prime;
-                let is_set: bool = (index_b2_prime_prime & bitmask) != 0;
-                match is_set {
-                    false => sum_0 += precomputed[precomputed_index] * weight,
-                    true => sum_1 += precomputed[precomputed_index] * weight,
-                }
-            }
+            let start_0: usize = (index_b2_prime << 1) << inner_index_shift;
+            let end_0: usize = shift_and_one_fill(index_b2_prime << 1, inner_index_shift);
+            let start_1: usize = (shift_and_one_fill(index_b2_prime, 1) << inner_index_shift) - 1;
+            let end_1: usize =
+                shift_and_one_fill(shift_and_one_fill(index_b2_prime, 1), inner_index_shift);
+            sum_0 += if start_0 == 0 {
+                partial_sums[end_0] * weight
+            } else {
+                (partial_sums[end_0] - partial_sums[start_0 - 1]) * weight
+            };
+            sum_1 += (partial_sums[end_1] - partial_sums[start_1]) * weight;
         }
         return (sum_0, sum_1);
     }
@@ -101,18 +118,10 @@ impl<F: Field> Prover<F> for TradeoffProver<F> {
             self.verifier_messages.push(verifier_message.unwrap());
         }
 
-        let precomputed: Vec<F> = self.precompute_stage_evaluations();
-
-        // // compute the range sum lookup over array of b2 values
-        // let mut partial_sums: Vec<F> = Vec::<F>::with_capacity(precomputed.len());
-        // let mut running_sum = F::ZERO;
-        // for eval in &precomputed {
-        //     running_sum += eval;
-        //     partial_sums.push(running_sum);
-        // }
-
         // compute the sum
-        let evals: (F, F) = self.evaluate(precomputed);
+        let evals: (F, F) = self.evaluate(TradeoffProver::compute_partial_sums(
+            self.precompute_stage_evaluations(),
+        ));
 
         // Increment the round counter
         self.current_round += 1;
