@@ -1,7 +1,7 @@
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
-use crate::Prover;
+use super::Prover;
 
 // the state of the time prover in the protocol
 pub struct TimeProver<F: Field> {
@@ -91,7 +91,7 @@ impl<F: Field> Prover<F> for TimeProver<F> {
 #[cfg(test)]
 mod tests {
     use super::TimeProver;
-    use crate::unit_test_helpers::{
+    use crate::provers::unit_test_helpers::{
         run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
     };
 

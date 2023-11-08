@@ -1,7 +1,7 @@
 use ark_ff::Field;
 use ark_std::{rand::Rng, vec::Vec};
 
-use crate::Prover;
+use crate::provers::Prover;
 
 #[derive(Debug)]
 pub struct Sumcheck<F: Field> {
@@ -51,8 +51,8 @@ impl<F: Field> Sumcheck<F> {
 #[cfg(test)]
 mod tests {
     use super::Sumcheck;
-    use crate::unit_test_helpers::{test_polynomial, TestField};
-    use crate::TimeProver;
+    use crate::provers::unit_test_helpers::{test_polynomial, TestField};
+    use crate::provers::time_prover::TimeProver;
 
     #[test]
     fn basic() {
