@@ -56,8 +56,10 @@ impl<F: Field> Sumcheck<F> {
 #[cfg(test)]
 mod tests {
     use super::Sumcheck;
-    use crate::provers::time_prover::TimeProver;
-    use crate::provers::unit_test_helpers::{test_polynomial, TestField};
+    use crate::provers::{
+        test_utilities::{test_polynomial, TestField},
+        TimeProver,
+    };
 
     #[test]
     fn basic() {
