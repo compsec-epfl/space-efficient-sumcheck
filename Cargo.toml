@@ -13,10 +13,14 @@ ark-std ="0.4.0"
 rayon = "1.5"
 
 [dev-dependencies]
+ark-test-curves = {version = "^0.4.0", features = ["bls12_381_curve", "ed_on_bls12_381"]}
 criterion = "0.3"
 gnuplot = "0.0.39"
 
 [[bench]]
 harness = false
 name = "sumcheck"
+
+[profile.bench]
+debug = true
 
