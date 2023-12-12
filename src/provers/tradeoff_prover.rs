@@ -119,7 +119,7 @@ impl<F: Field> Prover<F> for TradeoffProver<F> {
         }
 
         // compute the sum
-        let evals: (F, F) = self.evaluate(TradeoffProver::compute_partial_sums(
+        let sums: (F, F) = self.evaluate(TradeoffProver::compute_partial_sums(
             self.precompute_stage_evaluations(),
         ));
 
@@ -127,7 +127,7 @@ impl<F: Field> Prover<F> for TradeoffProver<F> {
         self.current_round += 1;
 
         // Return the computed polynomial
-        return Some(evals);
+        return Some(sums);
     }
     fn total_rounds(&self) -> usize {
         self.num_variables

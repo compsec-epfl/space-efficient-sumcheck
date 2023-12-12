@@ -3,6 +3,7 @@ pub mod test_helpers; // expose to use in benches etc
 
 mod hypercube;
 mod interpolation;
+mod evaluation_stream;
 
 mod prover;
 pub mod space_prover;

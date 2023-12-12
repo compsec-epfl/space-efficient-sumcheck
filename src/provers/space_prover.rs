@@ -1,29 +1,28 @@
 use ark_ff::Field;
 
-use crate::provers::{interpolation::lagrange_polynomial, hypercube::Hypercube, Prover};
+use crate::provers::{
+    evaluation_stream::EvaluationStream,
+    hypercube::Hypercube,
+    interpolation::lagrange_polynomial,
+    Prover
+};
 
 // the state of the space prover in the protocol
-pub struct SpaceProver<F: Field> {
+pub struct SpaceProver<'a, F: Field> {
     pub claimed_sum: F,
     pub current_round: usize,
-    pub evaluations: Vec<F>,
+    pub evaluation_stream: Box<&'a dyn EvaluationStream<F>>,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
 }
 
-impl<F: Field> SpaceProver<F> {
-    pub fn new(evaluations: Vec<F>) -> Self {
-        // abort if length not a power of two
-        assert_eq!(
-            evaluations.len() != 0 && evaluations.len().count_ones() == 1,
-            true
-        );
-        let claimed_sum: F = evaluations.iter().sum();
-        let num_variables: usize = evaluations.len().ilog2() as usize;
-        // return the TimeProver instance
+impl<'a, F: Field> SpaceProver<'a, F> {
+    pub fn new(evaluation_stream: Box<&'a dyn EvaluationStream<F>>) -> Self {
+        let claimed_sum = evaluation_stream.get_claimed_sum();
+        let num_variables = evaluation_stream.get_num_variables();
         Self {
             claimed_sum,
-            evaluations,
+            evaluation_stream,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             current_round: 0,
             num_variables,
@@ -43,8 +42,8 @@ impl<F: Field> SpaceProver<F> {
                 let evaluation_index = index_outer << num_vars_inner_loop | index_inner;
                 let is_set: bool = (evaluation_index & bitmask) != 0;
                 match is_set {
-                    false => sum_0 += self.evaluations[evaluation_index] * weight,
-                    true => sum_1 += self.evaluations[evaluation_index] * weight,
+                    false => sum_0 += self.evaluation_stream.get_evaluation_from_index(evaluation_index) * weight,
+                    true => sum_1 += self.evaluation_stream.get_evaluation_from_index(evaluation_index) * weight,
                 }
             }
         }
@@ -55,10 +54,11 @@ impl<F: Field> SpaceProver<F> {
     }
 }
 
-impl<F: Field> Prover<F> for SpaceProver<F> {
+impl<'a, F: Field> Prover<F> for SpaceProver<'a, F> {
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
+
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F)> {
         // Ensure the current round is within bounds
         if self.current_round >= self.total_rounds() {
@@ -71,13 +71,14 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
         }
 
         // evaluate using cty
-        let evals: (F, F) = self.cty_evaluate();
+        let sums: (F, F) = self.cty_evaluate();
 
         // don't forget to increment the round
         self.current_round += 1;
 
-        return Some(evals);
+        Some(sums)
     }
+
     fn total_rounds(&self) -> usize {
         self.num_variables
     }
@@ -86,13 +87,14 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
 #[cfg(test)]
 mod tests {
     use crate::provers::{
-        test_helpers::{run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial},
+        test_helpers::{run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial, BasicEvaluationStream},
         SpaceProver,
     };
 
     #[test]
     fn sumcheck() {
-        run_boolean_sumcheck_test(SpaceProver::new(test_polynomial()));
-        run_basic_sumcheck_test(SpaceProver::new(test_polynomial()));
+        let evaluation_stream = BasicEvaluationStream::new(test_polynomial());
+        run_boolean_sumcheck_test(SpaceProver::new(Box::new(&evaluation_stream)));
+        run_basic_sumcheck_test(SpaceProver::new(Box::new(&evaluation_stream)));
     }
 }

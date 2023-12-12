@@ -1,4 +1,4 @@
-use crate::provers::{hypercube::Hypercube, prover::Prover};
+use crate::provers::{hypercube::Hypercube, prover::Prover, evaluation_stream::EvaluationStream};
 use ark_ff::{
     fields::{Fp64, MontBackend, MontConfig},
     Field, Zero,
@@ -7,7 +7,6 @@ use ark_poly::{
     multivariate::{self, SparseTerm, Term},
     univariate, DenseMVPolynomial,
 };
-
 
 #[derive(MontConfig)]
 #[modulus = "19"]
@@ -225,5 +224,55 @@ impl<F: Field> TestHelperPolynomial<F> for multivariate::SparsePolynomial<F, Spa
         Hypercube::<F>::new(DenseMVPolynomial::<F>::num_vars(self))
             .map(|point: Vec<F>| TestHelperPolynomial::<F>::evaluate(self, &point).unwrap())
             .collect()
+    }
+}
+
+pub struct BasicEvaluationStream<F: Field> {
+    pub evaluations: Vec<F>,
+    pub num_variables: usize,
+}
+
+impl<F: Field> BasicEvaluationStream<F> {
+    pub fn new(evaluations: Vec<F>) -> Self {
+        // abort if length not a power of two
+        assert_eq!(
+            evaluations.len() != 0 && evaluations.len().count_ones() == 1,
+            true
+        );
+        // return the BasicEvaluationStream instance
+        let num_variables: usize = evaluations.len().ilog2() as usize;
+        Self {
+            evaluations,
+            num_variables,
+        }
+    }
+    pub fn vec_of_field_to_usize(vec: Vec<F>) -> usize {
+        // Reverse the vector to start from the least significant bit
+        let reversed_vec: Vec<F> = vec.into_iter().rev().collect();
+    
+        // Calculate the decimal value
+        let decimal_value: usize = reversed_vec
+            .iter()
+            .enumerate()
+            .filter(|(_, &bit)| bit == F::ONE)
+            .map(|(i, _)| 2usize.pow(i as u32))
+            .sum();
+    
+        decimal_value
+    }
+}
+
+impl<F: Field> EvaluationStream<F> for BasicEvaluationStream<F> {
+    fn get_claimed_sum(&self) -> F {
+        self.evaluations.iter().sum()
+    }
+    fn get_evaluation(&self, point: Vec<F>) -> F {
+        self.evaluations[BasicEvaluationStream::vec_of_field_to_usize(point)]
+    }
+    fn get_evaluation_from_index(&self, point: usize) -> F {
+        self.evaluations[point]
+    }
+    fn get_num_variables(&self) -> usize {
+        self.evaluations.len().ilog2() as usize
     }
 }

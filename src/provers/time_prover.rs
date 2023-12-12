@@ -75,13 +75,13 @@ impl<F: Field> Prover<F> for TimeProver<F> {
         }
 
         // evaluate using vsbw
-        let evals = self.vsbw_evaluate();
+        let sums = self.vsbw_evaluate();
 
         // Increment the round counter
         self.current_round += 1;
 
         // Return the computed polynomial
-        return Some(evals);
+        return Some(sums);
     }
     fn total_rounds(&self) -> usize {
         self.num_variables
