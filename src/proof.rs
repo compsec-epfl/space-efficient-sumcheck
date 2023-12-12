@@ -22,11 +22,11 @@ impl<F: Field> Sumcheck<F> {
             // handle the current round
             let round_sum = message.0 + message.1;
             let is_round_accepted = match verifier_message {
-                // if first round compare to claimed_sum
+                // if first round, compare to claimed_sum
                 None => round_sum == prover.claimed_sum(),
                 // else compute f(prev_verifier_msg) = prev_sum_0 - (prev_sum_0 - prev_sum_1) * prev_verifier_msg == round_sum
                 Some(prev_verifier_message) => {
-                    verifier_messages.push(prev_verifier_message); // this can only be done when != None
+                    verifier_messages.push(prev_verifier_message); // do this when != None
                     let prev_prover_message = prover_messages.last().unwrap();
                     round_sum
                         == prev_prover_message.0
@@ -57,7 +57,7 @@ impl<F: Field> Sumcheck<F> {
 mod tests {
     use super::Sumcheck;
     use crate::provers::{
-        test_utilities::{test_polynomial, TestField},
+        test_helpers::{test_polynomial, TestField},
         TimeProver,
     };
 

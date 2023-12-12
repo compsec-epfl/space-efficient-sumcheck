@@ -1,15 +1,15 @@
+#[doc(hidden)]
+pub mod test_helpers; // expose to use in benches etc
+
 mod hypercube;
 mod interpolation;
-mod prover;
-mod space_prover;
-mod tests;
-mod time_prover;
-mod tradeoff_prover;
 
-pub use hypercube::Hypercube;
-pub use interpolation::lagrange_polynomial;
+mod prover;
+pub mod space_prover;
+pub mod time_prover;
+pub mod tradeoff_prover;
+
 pub use prover::Prover;
 pub use space_prover::SpaceProver;
-pub use tests::test_utilities;
 pub use time_prover::TimeProver;
 pub use tradeoff_prover::TradeoffProver;

@@ -1,20 +1,25 @@
-use ark_std;
-use criterion::{criterion_group, criterion_main, Criterion};
+use std::thread;
+use std::time::Duration;
 use ark_poly::{
     multivariate::{self, SparseTerm, Term},
     DenseMVPolynomial,
 };
+use ark_std;
 use ark_test_curves::bls12_381::Fr as BenchField;
 
 use space_efficient_sumcheck::{
     provers::{
-        test_utilities::TestHelperPolynomial,
-        SpaceProver,
-        TimeProver,
-        TradeoffProver,
+        test_helpers::TestHelperPolynomial, SpaceProver, TimeProver, TradeoffProver,
     },
     Sumcheck,
 };
+
+// bench specific stuff
+use jemalloc_ctl::{epoch, stats};
+use criterion::{criterion_group, criterion_main, Criterion};
+
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 pub type BenchPolynomial = multivariate::SparsePolynomial<BenchField, SparseTerm>;
 
@@ -160,17 +165,40 @@ fn test_polynomial(num_terms: usize) -> BenchPolynomial {
     return BenchPolynomial::from_coefficients_vec(num_terms, test_terms(num_terms));
 }
 
+// fn run_bench<F: Field + std::convert::From<i32>, P: Prover<F>>(c: &mut Criterion) {
+//     let mut rng = ark_std::test_rng();
+
+//     let polynomial = test_polynomial(8);
+//     let evaluations = polynomial.to_evaluations();
+//     epoch::advance().unwrap();
+//     c.bench_function("tradeoff_prover", |b: &mut criterion::Bencher<'_>| {
+//         b.iter(|| {
+//             let prover = P::new(evaluations.clone(), 4);
+//             Sumcheck::prove(prover, &mut rng);
+//         });
+//     });
+//     let allocated = stats::allocated::read().unwrap();
+//     let resident = stats::resident::read().unwrap();
+//     println!("{} bytes allocated/{} bytes resident", allocated, resident);
+//     thread::sleep(Duration::from_secs(10));
+// }
+
 fn time_prover_benchmark(c: &mut Criterion) {
     let mut rng = ark_std::test_rng();
 
-    let polynomial = test_polynomial(24);
+    let polynomial = test_polynomial(26);
     let evaluations = polynomial.to_evaluations();
+    epoch::advance().unwrap();
     c.bench_function("time_prover", |b: &mut criterion::Bencher<'_>| {
         b.iter(|| {
             let prover = TimeProver::<BenchField>::new(evaluations.clone());
             Sumcheck::prove(prover, &mut rng);
         });
     });
+    let allocated = stats::allocated::read().unwrap();
+    let resident = stats::resident::read().unwrap();
+    println!("{} bytes allocated/{} bytes resident", allocated, resident);
+    thread::sleep(Duration::from_secs(10));
 }
 
 fn space_prover_benchmark(c: &mut Criterion) {
@@ -178,26 +206,42 @@ fn space_prover_benchmark(c: &mut Criterion) {
 
     let polynomial = test_polynomial(22);
     let evaluations = polynomial.to_evaluations();
+    epoch::advance().unwrap();
     c.bench_function("space_prover", |b: &mut criterion::Bencher<'_>| {
         b.iter(|| {
             let prover = SpaceProver::<BenchField>::new(evaluations.clone());
             Sumcheck::prove(prover, &mut rng);
         });
     });
+    let allocated = stats::allocated::read().unwrap();
+    let resident = stats::resident::read().unwrap();
+    println!("{} bytes allocated/{} bytes resident", allocated, resident);
+    thread::sleep(Duration::from_secs(10));
 }
 
 fn tradeoff_prover_benchmark(c: &mut Criterion) {
     let mut rng = ark_std::test_rng();
 
-    let polynomial = test_polynomial(22);
+    let polynomial = test_polynomial(8);
     let evaluations = polynomial.to_evaluations();
+    epoch::advance().unwrap();
     c.bench_function("tradeoff_prover", |b: &mut criterion::Bencher<'_>| {
         b.iter(|| {
-            let prover = TradeoffProver::<BenchField>::new(evaluations.clone(), 10);
+            let prover = TradeoffProver::<BenchField>::new(evaluations.clone(), 4);
             Sumcheck::prove(prover, &mut rng);
         });
     });
+    let allocated = stats::allocated::read().unwrap();
+    let resident = stats::resident::read().unwrap();
+    println!("{} bytes allocated/{} bytes resident", allocated, resident);
+    thread::sleep(Duration::from_secs(10));
 }
 
-criterion_group!(benches, space_prover_benchmark, time_prover_benchmark, tradeoff_prover_benchmark);
+criterion_group! {
+    name = benches;
+    // This can be any expression that returns a `Criterion` object.
+    config = Criterion::default().sample_size(10);
+    targets = tradeoff_prover_benchmark
+}
+// criterion_group!(benches, tradeoff_prover_benchmark);
 criterion_main!(benches);

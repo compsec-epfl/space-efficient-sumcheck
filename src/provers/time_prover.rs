@@ -91,7 +91,7 @@ impl<F: Field> Prover<F> for TimeProver<F> {
 #[cfg(test)]
 mod tests {
     use crate::provers::{
-        test_utilities::{run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial},
+        test_helpers::{run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial},
         TimeProver,
     };
 

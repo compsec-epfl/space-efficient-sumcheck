@@ -1,6 +1,6 @@
 use ark_ff::Field;
 
-use crate::provers::{interpolation::lagrange_polynomial, Hypercube, Prover};
+use crate::provers::{interpolation::lagrange_polynomial, hypercube::Hypercube, Prover};
 
 // the state of the space prover in the protocol
 pub struct SpaceProver<F: Field> {
@@ -86,7 +86,7 @@ impl<F: Field> Prover<F> for SpaceProver<F> {
 #[cfg(test)]
 mod tests {
     use crate::provers::{
-        test_utilities::{run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial},
+        test_helpers::{run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial},
         SpaceProver,
     };
 

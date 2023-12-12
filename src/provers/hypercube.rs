@@ -18,14 +18,6 @@ impl<F: Field> Hypercube<F> {
             _f: PhantomData,
         }
     }
-    pub fn new_from_range(num_variables: usize, current_member: usize, stop_member: usize) -> Self {
-        Self {
-            num_variables,
-            current_member,
-            stop_member,
-            _f: PhantomData,
-        }
-    }
 }
 
 impl<F: Field> Iterator for Hypercube<F> {
@@ -56,7 +48,7 @@ impl<F: Field> Iterator for Hypercube<F> {
 #[cfg(test)]
 mod tests {
     use super::Field;
-    use crate::provers::{test_utilities::TestField, Hypercube};
+    use crate::provers::{test_helpers::TestField, hypercube::Hypercube};
 
     #[test]
     fn basic() {

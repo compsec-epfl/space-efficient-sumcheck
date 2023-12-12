@@ -16,6 +16,8 @@ rayon = "1.5"
 ark-test-curves = {version = "^0.4.0", features = ["bls12_381_curve", "ed_on_bls12_381"]}
 criterion = "0.3"
 gnuplot = "0.0.39"
+jemalloc-ctl = "0.3"
+jemallocator = "0.3"
 
 [[bench]]
 harness = false

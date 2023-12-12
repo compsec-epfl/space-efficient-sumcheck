@@ -1,7 +1,7 @@
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
-use crate::provers::{lagrange_polynomial, Hypercube, Prover};
+use crate::provers::{interpolation::lagrange_polynomial, hypercube::Hypercube, Prover};
 
 // the state of the tradeoff prover in the protocol
 pub struct TradeoffProver<F: Field> {
@@ -137,7 +137,7 @@ impl<F: Field> Prover<F> for TradeoffProver<F> {
 #[cfg(test)]
 mod tests {
     use crate::provers::{
-        test_utilities::{run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial},
+        test_helpers::{run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial},
         TradeoffProver,
     };
 
