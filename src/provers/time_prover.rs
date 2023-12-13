@@ -19,7 +19,7 @@ impl<'a, F: Field> TimeProver<'a, F> {
         let num_variables = evaluation_stream.get_num_variables();
         let hypercube_len = 2usize.pow(num_variables.try_into().unwrap());
         let mut evaluations: Vec<F> = Vec::with_capacity(hypercube_len);
-        for i in 0..2usize.pow(num_variables.try_into().unwrap()) {
+        for i in 0..hypercube_len {
             evaluations.push(evaluation_stream.get_evaluation_from_index(i));
         }
         Self {

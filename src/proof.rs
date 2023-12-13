@@ -57,13 +57,15 @@ impl<F: Field> Sumcheck<F> {
 mod tests {
     use super::Sumcheck;
     use crate::provers::{
-        test_helpers::{test_polynomial, TestField},
+        test_helpers::{test_polynomial, BasicEvaluationStream, TestField},
         TradeoffProver,
     };
 
     #[test]
     fn basic() {
-        let prover = TradeoffProver::<TestField>::new(test_polynomial(), 3);
+        let evaluation_stream: BasicEvaluationStream<TestField> =
+            BasicEvaluationStream::new(test_polynomial());
+        let prover = TradeoffProver::<TestField>::new(Box::new(&evaluation_stream), 3);
         let rng = &mut ark_std::test_rng();
         let transcript = Sumcheck::<TestField>::prove(prover, rng);
         assert_eq!(transcript.is_accepted, true);

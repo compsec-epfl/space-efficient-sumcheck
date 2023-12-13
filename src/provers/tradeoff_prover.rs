@@ -1,34 +1,32 @@
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
-use crate::provers::{hypercube::Hypercube, interpolation::lagrange_polynomial, Prover};
+use crate::provers::{
+    evaluation_stream::EvaluationStream, hypercube::Hypercube, interpolation::lagrange_polynomial,
+    Prover,
+};
 
 // the state of the tradeoff prover in the protocol
-pub struct TradeoffProver<F: Field> {
+pub struct TradeoffProver<'a, F: Field> {
     pub claimed_sum: F,
     pub current_round: usize,
-    pub evaluations: Vec<F>,
+    pub evaluation_stream: Box<&'a dyn EvaluationStream<F>>,
     pub num_stages: usize,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
     pub stage_size: usize,
 }
 
-impl<F: Field> TradeoffProver<F> {
-    pub fn new(evaluations: Vec<F>, num_stages: usize) -> Self {
-        // abort if length not a power of two
-        assert_eq!(
-            evaluations.len() != 0 && evaluations.len().count_ones() == 1,
-            true
-        );
-        let claimed_sum: F = evaluations.iter().sum();
-        let num_variables: usize = evaluations.len().ilog2() as usize;
+impl<'a, F: Field> TradeoffProver<'a, F> {
+    pub fn new(evaluation_stream: Box<&'a dyn EvaluationStream<F>>, num_stages: usize) -> Self {
+        let claimed_sum = evaluation_stream.get_claimed_sum();
+        let num_variables = evaluation_stream.get_num_variables();
         let stage_size: usize = num_variables / num_stages;
         // return the TradeoffProver instance
         Self {
             claimed_sum,
             current_round: 0,
-            evaluations,
+            evaluation_stream,
             num_stages,
             num_variables,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
@@ -63,8 +61,11 @@ impl<F: Field> TradeoffProver<F> {
                 for index_b3 in 0..2_usize.pow(num_vars_b3 as u32) {
                     let evaluations_index =
                         index_b1 << num_vars_b2 + num_vars_b3 | index_b2 << num_vars_b3 | index_b3;
-                    precomputed[index_b2] =
-                        precomputed[index_b2] + weight * self.evaluations[evaluations_index];
+                    precomputed[index_b2] = precomputed[index_b2]
+                        + weight
+                            * self
+                                .evaluation_stream
+                                .get_evaluation_from_index(evaluations_index);
                 }
             }
         }
@@ -102,7 +103,7 @@ impl<F: Field> TradeoffProver<F> {
     }
 }
 
-impl<F: Field> Prover<F> for TradeoffProver<F> {
+impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
@@ -137,15 +138,20 @@ impl<F: Field> Prover<F> for TradeoffProver<F> {
 #[cfg(test)]
 mod tests {
     use crate::provers::{
-        test_helpers::{run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial},
+        test_helpers::{
+            run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
+            BasicEvaluationStream, TestField,
+        },
         TradeoffProver,
     };
 
     #[test]
     fn sumcheck() {
-        run_boolean_sumcheck_test(TradeoffProver::new(test_polynomial(), 1));
-        run_basic_sumcheck_test(TradeoffProver::new(test_polynomial(), 1));
-        run_boolean_sumcheck_test(TradeoffProver::new(test_polynomial(), 3));
-        run_basic_sumcheck_test(TradeoffProver::new(test_polynomial(), 3));
+        let evaluation_stream: BasicEvaluationStream<TestField> =
+            BasicEvaluationStream::new(test_polynomial());
+        run_boolean_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
+        run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
+        run_boolean_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
+        run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
     }
 }
