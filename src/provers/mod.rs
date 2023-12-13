@@ -1,11 +1,11 @@
 #[doc(hidden)]
 pub mod test_helpers; // expose to use in benches etc
 
-mod evaluation_stream;
 mod hypercube;
 mod interpolation;
-
 mod prover;
+
+pub mod evaluation_stream;
 pub mod space_prover;
 pub mod time_prover;
 pub mod tradeoff_prover;
