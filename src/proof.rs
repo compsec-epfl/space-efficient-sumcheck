@@ -11,7 +11,7 @@ pub struct Sumcheck<F: Field> {
 }
 
 impl<F: Field> Sumcheck<F> {
-    pub fn prove<P: Prover<F>, R: Rng>(mut prover: P, rng: &mut R) -> Self {
+    pub fn prove<P: Prover<F>, R: Rng>(prover: &mut P, rng: &mut R) -> Self {
         let mut prover_messages: Vec<(F, F)> = Vec::with_capacity(prover.total_rounds());
         let mut verifier_messages: Vec<F> = Vec::with_capacity(prover.total_rounds());
         let mut is_accepted = true;
@@ -65,9 +65,9 @@ mod tests {
     fn basic() {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
-        let prover = TradeoffProver::<TestField>::new(Box::new(&evaluation_stream), 3);
+        let mut prover = TradeoffProver::<TestField>::new(Box::new(&evaluation_stream), 3);
         let rng = &mut ark_std::test_rng();
-        let transcript = Sumcheck::<TestField>::prove(prover, rng);
+        let transcript = Sumcheck::<TestField>::prove(&mut prover, rng);
         assert_eq!(transcript.is_accepted, true);
     }
 }
