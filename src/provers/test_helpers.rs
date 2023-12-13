@@ -1,4 +1,4 @@
-use crate::provers::{hypercube::Hypercube, prover::Prover, evaluation_stream::EvaluationStream};
+use crate::provers::{evaluation_stream::EvaluationStream, hypercube::Hypercube, prover::Prover};
 use ark_ff::{
     fields::{Fp64, MontBackend, MontConfig},
     Field, Zero,
@@ -42,9 +42,7 @@ pub fn test_polynomial() -> Vec<TestField> {
     .to_evaluations();
 }
 
-pub fn run_boolean_sumcheck_test<F: Field + std::convert::From<i32>, P: Prover<F>>(
-    mut prover: P,
-) {
+pub fn run_boolean_sumcheck_test<F: Field + std::convert::From<i32>, P: Prover<F>>(mut prover: P) {
     // ZEROTH ROUND
     // all variables free
     // 000 = 0
@@ -106,9 +104,7 @@ pub fn run_boolean_sumcheck_test<F: Field + std::convert::From<i32>, P: Prover<F
     );
 }
 
-pub fn run_basic_sumcheck_test<F: Field + std::convert::From<i32>, P: Prover<F>>(
-    mut prover: P,
-) {
+pub fn run_basic_sumcheck_test<F: Field + std::convert::From<i32>, P: Prover<F>>(mut prover: P) {
     // FIRST ROUND x0 fixed to 3
     // 3,0,1 = 6
     // 3,0,0 = 6
@@ -249,7 +245,7 @@ impl<F: Field> BasicEvaluationStream<F> {
     pub fn vec_of_field_to_usize(vec: Vec<F>) -> usize {
         // Reverse the vector to start from the least significant bit
         let reversed_vec: Vec<F> = vec.into_iter().rev().collect();
-    
+
         // Calculate the decimal value
         let decimal_value: usize = reversed_vec
             .iter()
@@ -257,7 +253,7 @@ impl<F: Field> BasicEvaluationStream<F> {
             .filter(|(_, &bit)| bit == F::ONE)
             .map(|(i, _)| 2usize.pow(i as u32))
             .sum();
-    
+
         decimal_value
     }
 }

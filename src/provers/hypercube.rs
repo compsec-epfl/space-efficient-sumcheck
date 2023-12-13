@@ -48,7 +48,7 @@ impl<F: Field> Iterator for Hypercube<F> {
 #[cfg(test)]
 mod tests {
     use super::Field;
-    use crate::provers::{test_helpers::TestField, hypercube::Hypercube};
+    use crate::provers::{hypercube::Hypercube, test_helpers::TestField};
 
     #[test]
     fn basic() {

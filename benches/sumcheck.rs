@@ -1,22 +1,20 @@
-use std::thread;
-use std::time::Duration;
 use ark_poly::{
     multivariate::{self, SparseTerm, Term},
     DenseMVPolynomial,
 };
 use ark_std;
 use ark_test_curves::bls12_381::Fr as BenchField;
+use std::thread;
+use std::time::Duration;
 
 use space_efficient_sumcheck::{
-    provers::{
-        test_helpers::TestHelperPolynomial, SpaceProver, TimeProver, TradeoffProver,
-    },
+    provers::{test_helpers::TestHelperPolynomial, SpaceProver, TimeProver, TradeoffProver},
     Sumcheck,
 };
 
 // bench specific stuff
-use jemalloc_ctl::{epoch, stats};
 use criterion::{criterion_group, criterion_main, Criterion};
+use jemalloc_ctl::{epoch, stats};
 
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;

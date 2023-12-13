@@ -1,10 +1,8 @@
 use ark_ff::Field;
 
 use crate::provers::{
-    evaluation_stream::EvaluationStream,
-    hypercube::Hypercube,
-    interpolation::lagrange_polynomial,
-    Prover
+    evaluation_stream::EvaluationStream, hypercube::Hypercube, interpolation::lagrange_polynomial,
+    Prover,
 };
 
 // the state of the space prover in the protocol
@@ -23,7 +21,7 @@ impl<'a, F: Field> SpaceProver<'a, F> {
         Self {
             claimed_sum,
             evaluation_stream,
-            verifier_messages: Vec::<F>::with_capacity(num_variables),
+            verifier_messages: Vec::<F>::with_capacity(num_variables), // TODO: could be halfed somehow
             current_round: 0,
             num_variables,
         }
@@ -42,8 +40,18 @@ impl<'a, F: Field> SpaceProver<'a, F> {
                 let evaluation_index = index_outer << num_vars_inner_loop | index_inner;
                 let is_set: bool = (evaluation_index & bitmask) != 0;
                 match is_set {
-                    false => sum_0 += self.evaluation_stream.get_evaluation_from_index(evaluation_index) * weight,
-                    true => sum_1 += self.evaluation_stream.get_evaluation_from_index(evaluation_index) * weight,
+                    false => {
+                        sum_0 += self
+                            .evaluation_stream
+                            .get_evaluation_from_index(evaluation_index)
+                            * weight
+                    }
+                    true => {
+                        sum_1 += self
+                            .evaluation_stream
+                            .get_evaluation_from_index(evaluation_index)
+                            * weight
+                    }
                 }
             }
         }
@@ -87,13 +95,17 @@ impl<'a, F: Field> Prover<F> for SpaceProver<'a, F> {
 #[cfg(test)]
 mod tests {
     use crate::provers::{
-        test_helpers::{run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial, BasicEvaluationStream},
+        test_helpers::{
+            run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
+            BasicEvaluationStream, TestField,
+        },
         SpaceProver,
     };
 
     #[test]
     fn sumcheck() {
-        let evaluation_stream = BasicEvaluationStream::new(test_polynomial());
+        let evaluation_stream: BasicEvaluationStream<TestField> =
+            BasicEvaluationStream::new(test_polynomial());
         run_boolean_sumcheck_test(SpaceProver::new(Box::new(&evaluation_stream)));
         run_basic_sumcheck_test(SpaceProver::new(Box::new(&evaluation_stream)));
     }

@@ -1,7 +1,7 @@
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
-use crate::provers::{interpolation::lagrange_polynomial, hypercube::Hypercube, Prover};
+use crate::provers::{hypercube::Hypercube, interpolation::lagrange_polynomial, Prover};
 
 // the state of the tradeoff prover in the protocol
 pub struct TradeoffProver<F: Field> {
