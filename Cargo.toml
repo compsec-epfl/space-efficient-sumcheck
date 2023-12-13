@@ -3,7 +3,26 @@ name = "space-efficient-sumcheck"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-ark-ff = "0.4"
+ark-ec = "0.4.0"
+ark-ff = "0.4.0"
+ark-poly = "0.4.0"
+ark-relations = "0.4.0"
+ark-serialize = {version = "0.4.0", features = ["derive"]}
+ark-std ="0.4.0"
+rayon = "1.5"
+
+[dev-dependencies]
+ark-test-curves = {version = "^0.4.0", features = ["bls12_381_curve", "ed_on_bls12_381"]}
+criterion = "0.3"
+gnuplot = "0.0.39"
+jemalloc-ctl = "0.3"
+jemallocator = "0.3"
+
+[[bench]]
+harness = false
+name = "sumcheck"
+
+[profile.bench]
+debug = true
+

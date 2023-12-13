@@ -1,9 +1,4 @@
-pub mod streaming_sumcheck;
-pub mod linear_space_sumcheck;
-pub mod blended_sumcheck;
+pub mod proof;
+pub mod provers;
 
-use ark_ff::Field;
-
-pub trait SumcheckProver<F: Field> {
-    type SumcheckParameters;
-}
+pub use crate::proof::Sumcheck;
