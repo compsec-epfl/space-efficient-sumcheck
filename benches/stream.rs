@@ -2,24 +2,24 @@ use ark_ff::Field;
 use ark_test_curves::bls12_381::Fr as BenchField;
 
 use space_efficient_sumcheck::{
-    provers::{evaluation_stream::EvaluationStream, SpaceProver, TimeProver, TradeoffProver},
+    provers::{
+        evaluation_stream::EvaluationStream, Prover, SpaceProver, TimeProver, TradeoffProver,
+    },
     Sumcheck,
 };
 
-// bench specific stuff
-use std::thread;
-use std::time::Duration;
 use criterion::{criterion_group, criterion_main, Criterion};
 use jemalloc_ctl::{epoch, stats};
+use std::{thread, time::Duration};
 
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
+// BenchEvaluationStream just returns the field value of the index and uses constant memory
 pub struct BenchEvaluationStream<F: Field> {
     pub num_variables: usize,
     pub claimed_sum: F,
 }
-
 impl<F: Field> BenchEvaluationStream<F> {
     pub fn new(num_variables: usize) -> Self {
         let hypercube_len = 2usize.pow(num_variables.try_into().unwrap());
@@ -47,7 +47,6 @@ impl<F: Field> BenchEvaluationStream<F> {
         decimal_value
     }
 }
-
 impl<F: Field> EvaluationStream<F> for BenchEvaluationStream<F> {
     fn get_claimed_sum(&self) -> F {
         self.claimed_sum
@@ -64,33 +63,12 @@ impl<F: Field> EvaluationStream<F> for BenchEvaluationStream<F> {
     }
 }
 
-// fn run_bench<F: Field + std::convert::From<i32>, P: Prover<F>>(c: &mut Criterion) {
-//     let mut rng = ark_std::test_rng();
-
-//     let polynomial = test_polynomial(8);
-//     let evaluations = polynomial.to_evaluations();
-//     epoch::advance().unwrap();
-//     c.bench_function("tradeoff_prover", |b: &mut criterion::Bencher<'_>| {
-//         b.iter(|| {
-//             let prover = P::new(evaluations.clone(), 4);
-//             Sumcheck::prove(prover, &mut rng);
-//         });
-//     });
-//     let allocated = stats::allocated::read().unwrap();
-//     let resident = stats::resident::read().unwrap();
-//     println!("{} bytes allocated/{} bytes resident", allocated, resident);
-//     thread::sleep(Duration::from_secs(10));
-// }
-
-fn time_prover_benchmark(c: &mut Criterion) {
+fn run_bench<F: Field, P: Prover<F>>(c: &mut Criterion, mut prover: P, label: String) {
     let mut rng = ark_std::test_rng();
-
-    let stream: BenchEvaluationStream<BenchField> = BenchEvaluationStream::new(10);
     epoch::advance().unwrap();
-    c.bench_function("time_prover", |b: &mut criterion::Bencher<'_>| {
+    c.bench_function(&label, |b: &mut criterion::Bencher<'_>| {
         b.iter(|| {
-            let prover = TimeProver::<BenchField>::new(Box::new(&stream));
-            Sumcheck::prove(prover, &mut rng);
+            Sumcheck::prove(&mut prover, &mut rng);
         });
     });
     let allocated = stats::allocated::read().unwrap();
@@ -99,43 +77,58 @@ fn time_prover_benchmark(c: &mut Criterion) {
     thread::sleep(Duration::from_secs(10));
 }
 
-fn space_prover_benchmark(c: &mut Criterion) {
-    let mut rng = ark_std::test_rng();
-
-    let stream: BenchEvaluationStream<BenchField> = BenchEvaluationStream::new(10);
-    epoch::advance().unwrap();
-    c.bench_function("space_prover", |b: &mut criterion::Bencher<'_>| {
-        b.iter(|| {
+fn all_benches(c: &mut Criterion) {
+    let max = 16;
+    // vsbw
+    for num_variables in 15..=max {
+        let stream: BenchEvaluationStream<BenchField> = BenchEvaluationStream::new(num_variables);
+        let prover = TimeProver::<BenchField>::new(Box::new(&stream));
+        run_bench(
+            c,
+            prover,
+            String::from("vsbw") + &format!("-{}", num_variables),
+        );
+    }
+    // tradeoff k=2
+    for num_variables in 15..=max {
+        let stream: BenchEvaluationStream<BenchField> = BenchEvaluationStream::new(num_variables);
+        let prover = TradeoffProver::<BenchField>::new(Box::new(&stream), 2);
+        if num_variables % 2 == 0 {
+            run_bench(
+                c,
+                prover,
+                String::from("tradoff2") + &format!("-{}", num_variables),
+            );
+        }
+    }
+    // tradeoff k=3
+    for num_variables in 15..=max {
+        let stream: BenchEvaluationStream<BenchField> = BenchEvaluationStream::new(num_variables);
+        let prover = TradeoffProver::<BenchField>::new(Box::new(&stream), 3);
+        if num_variables % 3 == 0 {
+            run_bench(
+                c,
+                prover,
+                String::from("tradeoff3") + &format!("-{}", num_variables),
+            );
+        }
+        // cty
+        for num_variables in 15..=max {
+            let stream: BenchEvaluationStream<BenchField> =
+                BenchEvaluationStream::new(num_variables);
             let prover = SpaceProver::<BenchField>::new(Box::new(&stream));
-            Sumcheck::prove(prover, &mut rng);
-        });
-    });
-    let allocated = stats::allocated::read().unwrap();
-    let resident = stats::resident::read().unwrap();
-    println!("{} bytes allocated/{} bytes resident", allocated, resident);
-    thread::sleep(Duration::from_secs(10));
-}
-
-fn tradeoff_prover_benchmark(c: &mut Criterion) {
-    let mut rng = ark_std::test_rng();
-
-    let stream: BenchEvaluationStream<BenchField> = BenchEvaluationStream::new(10);
-    epoch::advance().unwrap();
-    c.bench_function("tradeoff_prover", |b: &mut criterion::Bencher<'_>| {
-        b.iter(|| {
-            let prover = TradeoffProver::<BenchField>::new(Box::new(&stream), 4);
-            Sumcheck::prove(prover, &mut rng);
-        });
-    });
-    let allocated = stats::allocated::read().unwrap();
-    let resident = stats::resident::read().unwrap();
-    println!("{} bytes allocated/{} bytes resident", allocated, resident);
-    thread::sleep(Duration::from_secs(10));
+            run_bench(
+                c,
+                prover,
+                String::from("cty") + &format!("-{}", num_variables),
+            );
+        }
+    }
 }
 
 criterion_group! {
     name = benches;
     config = Criterion::default().sample_size(10);
-    targets = tradeoff_prover_benchmark, space_prover_benchmark, time_prover_benchmark
+    targets = all_benches
 }
 criterion_main!(benches);
