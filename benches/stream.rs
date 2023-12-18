@@ -1,5 +1,8 @@
-use ark_ff::{Field, fields::{Fp64, Fp128, MontBackend, MontConfig}};
 use ark_bn254::Fr as BN254Field;
+use ark_ff::{
+    fields::{Fp128, Fp64, MontBackend, MontConfig},
+    Field,
+};
 
 use space_efficient_sumcheck::{
     provers::{
@@ -22,7 +25,7 @@ pub struct FieldConfig64;
 pub type Field64 = Fp64<MontBackend<FieldConfig64, 1>>;
 
 #[derive(MontConfig)]
-#[modulus = "143244528689204659050391023439224324689"] // q = 143244528689204659050391023439224324689 
+#[modulus = "143244528689204659050391023439224324689"] // q = 143244528689204659050391023439224324689
 #[generator = "2"]
 pub struct FieldConfig128;
 pub type Field128 = Fp128<MontBackend<FieldConfig128, 2>>;
@@ -75,24 +78,30 @@ impl<F: Field> EvaluationStream<F> for BenchEvaluationStream<F> {
     }
 }
 
-fn run_bench<F: Field, P: Prover<F>>(_c: &mut Criterion, mut prover: P, label: String) {
+fn run_bench<F: Field, P: Prover<F>>(
+    _c: &mut Criterion,
+    mut prover: P,
+    label: String,
+    num_variables: usize,
+) {
     let mut rng = ark_std::test_rng();
     epoch::advance().unwrap();
     let start_time = Instant::now();
     Sumcheck::prove(&mut prover, &mut rng);
-    // Record the end time
     let end_time = Instant::now();
-
-    // Calculate the elapsed time
     let elapsed_time = end_time - start_time;
-
-    let allocated = stats::allocated::read().unwrap();
-    let resident = stats::resident::read().unwrap();
-    println!("{}, {:?}, {}, {}", label, elapsed_time.as_secs_f64(), allocated, resident);
+    let bytes_allocated = stats::allocated::read().unwrap();
+    println!(
+        "{}, {}, {}, {}",
+        label,
+        num_variables,
+        elapsed_time.as_millis(),
+        bytes_allocated
+    );
 }
 
 fn vsbw_benches(c: &mut Criterion) {
-    let max = 30;
+    let max = 31;
     // 64 bit field
     for num_variables in 15..=max {
         let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
@@ -101,6 +110,7 @@ fn vsbw_benches(c: &mut Criterion) {
             c,
             prover,
             String::from("vsbw-fp64") + &format!("-{}", num_variables),
+            num_variables,
         );
     }
     // 128 bit field
@@ -111,6 +121,7 @@ fn vsbw_benches(c: &mut Criterion) {
             c,
             prover,
             String::from("vsbw-fp128") + &format!("-{}", num_variables),
+            num_variables,
         );
     }
     // bn254
@@ -121,21 +132,22 @@ fn vsbw_benches(c: &mut Criterion) {
             c,
             prover,
             String::from("vsbw-bn254") + &format!("-{}", num_variables),
+            num_variables,
         );
     }
 }
 
 fn cty_benches(c: &mut Criterion) {
-    let max = 22;
+    let max = 27;
     // 64 bit field
     for num_variables in 15..=max {
-        let stream: BenchEvaluationStream<Field64> =
-            BenchEvaluationStream::new(num_variables);
+        let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
         let prover = SpaceProver::<Field64>::new(Box::new(&stream));
         run_bench(
             c,
             prover,
             String::from("cty-fp64") + &format!("-{}", num_variables),
+            num_variables,
         );
     }
     // 128 bit field
@@ -146,6 +158,7 @@ fn cty_benches(c: &mut Criterion) {
             c,
             prover,
             String::from("cty-fp128") + &format!("-{}", num_variables),
+            num_variables,
         );
     }
     // bn254
@@ -156,22 +169,23 @@ fn cty_benches(c: &mut Criterion) {
             c,
             prover,
             String::from("cty-bn254") + &format!("-{}", num_variables),
+            num_variables,
         );
     }
 }
 
 fn tradeoff_k2_benches(c: &mut Criterion) {
-    let max = 30;
+    let max = 31;
     // 64 bit field
     for num_variables in 15..=max {
         if num_variables % 2 == 0 {
-            let stream: BenchEvaluationStream<Field64> =
-                BenchEvaluationStream::new(num_variables);
+            let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
             let prover = TradeoffProver::<Field64>::new(Box::new(&stream), 2);
             run_bench(
                 c,
                 prover,
                 String::from("tradeoffk2-fp64") + &format!("-{}", num_variables),
+                num_variables,
             );
         }
     }
@@ -184,6 +198,7 @@ fn tradeoff_k2_benches(c: &mut Criterion) {
                 c,
                 prover,
                 String::from("tradeoffk2-fp128") + &format!("-{}", num_variables),
+                num_variables,
             );
         }
     }
@@ -196,23 +211,24 @@ fn tradeoff_k2_benches(c: &mut Criterion) {
                 c,
                 prover,
                 String::from("tradeoffk2-bn254") + &format!("-{}", num_variables),
+                num_variables,
             );
         }
     }
 }
 
 fn tradeoff_k3_benches(c: &mut Criterion) {
-    let max = 30;
+    let max = 31;
     // 64 bit field
     for num_variables in 15..=max {
         if num_variables % 3 == 0 {
-            let stream: BenchEvaluationStream<Field64> =
-                BenchEvaluationStream::new(num_variables);
+            let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
             let prover = TradeoffProver::<Field64>::new(Box::new(&stream), 2);
             run_bench(
                 c,
                 prover,
                 String::from("tradeoffk3-fp64") + &format!("-{}", num_variables),
+                num_variables,
             );
         }
     }
@@ -225,6 +241,7 @@ fn tradeoff_k3_benches(c: &mut Criterion) {
                 c,
                 prover,
                 String::from("tradeoffk3-fp128") + &format!("-{}", num_variables),
+                num_variables,
             );
         }
     }
@@ -237,6 +254,7 @@ fn tradeoff_k3_benches(c: &mut Criterion) {
                 c,
                 prover,
                 String::from("tradeoffk3-bn254") + &format!("-{}", num_variables),
+                num_variables,
             );
         }
     }
@@ -245,6 +263,6 @@ fn tradeoff_k3_benches(c: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default().sample_size(10);
-    targets = tradeoff_k2_benches, tradeoff_k3_benches
+    targets = vsbw_benches, cty_benches, tradeoff_k2_benches, tradeoff_k3_benches
 }
 criterion_main!(benches);
