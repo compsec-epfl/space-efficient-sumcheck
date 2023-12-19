@@ -110,9 +110,7 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
         }
 
         // compute the sum
-        let sums: (F, F) = self.compute_round(TradeoffProver::compute_partial_sums(
-            self.sum_update(),
-        ));
+        let sums: (F, F) = self.compute_round(self.sum_update());
 
         // Increment the round counter
         self.current_round += 1;
