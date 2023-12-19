@@ -42,62 +42,52 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         }
         return partial_sums;
     }
-    fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
-        (num << shift_amount) | (1 << shift_amount) - 1
+    fn lag_init(l: usize, r: &Vec<F>) -> F {
+        F::ONE
+    }
+    fn lag_next(st: F) -> (F, F)  {
+        (F::ONE, F::ONE)
     }
     fn current_stage(&self) -> usize {
         self.current_round / self.stage_size
     }
-    fn precompute_stage_evaluations(&self) -> Vec<F> {
-        // define the ranges like so
-        let num_vars_b1: usize = self.current_stage() * self.stage_size;
-        let num_vars_b2: usize = self.stage_size;
-        let num_vars_b3: usize = (self.num_stages - self.current_stage() - 1) * self.stage_size;
-        // precompute the evaluations
-        let mut precomputed: Vec<F> = vec![F::ZERO; 2_usize.pow(num_vars_b2 as u32)];
-        for (index_b1, b1) in Hypercube::<F>::new(num_vars_b1).enumerate() {
-            let weight: F = lagrange_polynomial(&b1, &self.verifier_messages[0..b1.len()]).unwrap();
-            for index_b2 in 0..2_usize.pow(num_vars_b2 as u32) {
-                for index_b3 in 0..2_usize.pow(num_vars_b3 as u32) {
-                    let evaluations_index =
-                        index_b1 << num_vars_b2 + num_vars_b3 | index_b2 << num_vars_b3 | index_b3;
-                    precomputed[index_b2] = precomputed[index_b2]
-                        + weight
-                            * self
-                                .evaluation_stream
-                                .get_evaluation_from_index(evaluations_index);
+    // sumUpdatef(r1):
+    fn sum_update(&self) -> Vec<F> {
+        // 0. declare these ranges for convenience
+        let b1_num_vars: usize = self.current_stage() * self.stage_size; // := (s-1)l because we are zero-indexed
+        let b2_num_vars: usize = self.stage_size; // := l
+        let b3_num_vars: usize = self.num_variables - b1_num_vars - b2_num_vars; // := (k-s)l because we are zero-indexed
+        // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
+        let mut sum: Vec<F> = vec![F::ZERO; Hypercube::<F>::pow2(self.stage_size)];
+        // 2. Initialize st := LagInit((s - l)l, r)
+        let mut st: F = Self::lag_init(b1_num_vars, &self.verifier_messages);
+        let mut lag_poly = F::ONE;
+        // 3. For each b1 ∈ {0,1}^(s-1)l
+        for (b1_index, b1) in Hypercube::<F>::new(b1_num_vars).enumerate() {
+            // (a) Compute (LagPoly, st) := LagNext(st)
+            (lag_poly, st) = Self::lag_next(st);
+            // For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
+            for b2_index in 0..Hypercube::<F>::pow2(b2_num_vars) {
+                for b3_index in 0..Hypercube::<F>::pow2(b3_num_vars) {
+                    let index = b1_index << (b2_num_vars + b3_num_vars) | b2_index << b3_num_vars | b3_index;
+                    sum[b2_index] = sum[b2_index] + lag_poly * self
+                        .evaluation_stream
+                        .get_evaluation_from_index(index);
                 }
             }
         }
-        return precomputed;
+        return sum;
     }
-    fn evaluate(&self, partial_sums: Vec<F>) -> (F, F) {
+    fn compute_round(&self, sums: Vec<F>) -> (F, F) {
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
-        let num_vars_b1 = self.current_stage() * self.stage_size;
-        let num_vars_b2_prime = self.current_round - num_vars_b1;
-        let inner_index_shift = self.stage_size - num_vars_b2_prime - 1;
-        for (index_b2_prime, b2_prime) in Hypercube::new(num_vars_b2_prime).enumerate() {
-            let weight: F =
-                lagrange_polynomial(&b2_prime, &self.verifier_messages[0..b2_prime.len()]).unwrap();
-            if weight != F::ZERO {
-                let start_0: usize = (index_b2_prime << 1) << inner_index_shift;
-                let end_0: usize =
-                    TradeoffProver::<F>::shift_and_one_fill(index_b2_prime << 1, inner_index_shift);
-                let start_1: usize = (TradeoffProver::<F>::shift_and_one_fill(index_b2_prime, 1)
-                    << inner_index_shift)
-                    - 1;
-                let end_1: usize = TradeoffProver::<F>::shift_and_one_fill(
-                    TradeoffProver::<F>::shift_and_one_fill(index_b2_prime, 1),
-                    inner_index_shift,
-                );
-                sum_0 += if start_0 == 0 {
-                    partial_sums[end_0] * weight
-                } else {
-                    (partial_sums[end_0] - partial_sums[start_0 - 1]) * weight
-                };
-                sum_1 += (partial_sums[end_1] - partial_sums[start_1]) * weight;
-            }
+        let j_prime = self.current_round - (self.current_stage() * self.stage_size); // := j-(s-1)l
+        for (b2_index, b2) in Hypercube::new(self.stage_size).enumerate() {
+            let b2_start: &[F] = &b2[0..j_prime];
+            let r2_start: &[F] = &self.verifier_messages[0..j_prime];
+            let lag_poly: F = lagrange_polynomial(&b2_start, &r2_start).unwrap();
+            // TODO: how do I know which sum this belongs to?
+            sum_0 += lag_poly * sums[b2_index];
         }
         return (sum_0, sum_1);
     }
@@ -120,8 +110,8 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
         }
 
         // compute the sum
-        let sums: (F, F) = self.evaluate(TradeoffProver::compute_partial_sums(
-            self.precompute_stage_evaluations(),
+        let sums: (F, F) = self.compute_round(TradeoffProver::compute_partial_sums(
+            self.sum_update(),
         ));
 
         // Increment the round counter
