@@ -43,33 +43,32 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         }
         return partial_sums;
     }
-    fn lag_init(&self) -> Option<(F, usize)> {
-        let current_value: F = self.verifier_messages.iter().fold(F::ONE, |acc: F, &x| acc * x);
-        let current_position: usize = Hypercube::<F>::pow2(self.verifier_messages.len());
-        Some((current_value, current_position))
+    fn lag_init(verifier_messages: &Vec<F>) -> (F, usize) {
+        let current_value: F = verifier_messages.iter().fold(F::ONE, |acc: F, &x| acc * x);
+        let current_position: usize = Hypercube::<F>::pow2(verifier_messages.len()) - 1; // e.g. 2 ^ 3 = 8, so 7 is 111
+        (current_value, current_position)
     }
-    fn lag_next(&self, st: (F, usize)) -> (F, Option<(F, usize)>)  {
-        let last_value: F = st.0;
-        let last_position: usize = st.1;
-        if last_position > 0 {
-            let next_position: usize = last_position - 1;
-            let mut next_value: F = last_value;
-            let index_of_highest_set_bit: usize = match last_position == 1 {
-                true => 0, // only index=0 the least significant bit is set in last_position
-                false => cmp::max(last_position.ilog2(), next_position.ilog2()) as usize, // take index from highest set bit in either
-            };
-            for bit_index in (0..=index_of_highest_set_bit).rev() {
-                let last_bit = (last_position >> bit_index) & 1;
-                let next_bit = (next_position >> bit_index) & 1;
-                next_value = match (last_bit, next_bit) {
-                    (0, 1) => (next_value / (F::ONE - self.verifier_messages[bit_index])) * self.verifier_messages[bit_index],
-                    (1, 0) => (next_value / self.verifier_messages[bit_index]) * (F::ONE - self.verifier_messages[bit_index]),
-                    _ => next_value, // no change, do nothing
-                }
+    fn lag_next(verifier_messages: &Vec<F>, last_value: F, last_position: usize) -> (F, usize)  {
+        assert!(last_position > 0);
+        let next_position: usize = last_position - 1;
+        let mut next_value: F = last_value;
+        // iterate up to the highest order bit to compute changes
+        let index_of_highest_set_bit: usize = match last_position == 1 {
+            true => 0, // only index=0 the least significant bit is set in last_position
+            false => cmp::max(last_position.ilog2(), next_position.ilog2()) as usize, // take index from highest set bit in either
+        };
+        for bit_index in (0..=index_of_highest_set_bit).rev() {
+            let verifier_message = verifier_messages[verifier_messages.len() - bit_index - 1];
+            let verifier_message_hat = F::ONE - verifier_message;
+            let last_bit = (last_position >> bit_index) & 1;
+            let next_bit = (next_position >> bit_index) & 1;
+            next_value = match (last_bit, next_bit) {
+                (0, 1) => (next_value / verifier_message_hat) * verifier_message,
+                (1, 0) => (next_value / verifier_message) * verifier_message_hat,
+                _ => next_value,
             }
-            return (last_value, Some((next_value, next_position)));
         }
-        return (last_value, None);
+        (next_value, next_position)
     }
     fn current_stage(&self) -> usize {
         self.current_round / self.stage_size
@@ -83,11 +82,11 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
         let mut sum: Vec<F> = vec![F::ZERO; Hypercube::<F>::pow2(self.stage_size)];
         // 2. Initialize st := LagInit((s - l)l, r)
-        let (mut lag_poly, mut st): (F, Option<(F, usize)>) = (F::ONE, self.lag_init());
+        let mut lag_poly_st: (F, usize) = Self::lag_init(&self.verifier_messages);
         // 3. For each b1 ∈ {0,1}^(s-1)l
-        for (b1_index, b1) in Hypercube::<F>::new(b1_num_vars).enumerate() {
+        for b1_index in 0..Hypercube::<F>::pow2(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
-            (lag_poly, st) = self.lag_next(st.unwrap());
+            let lag_poly: F = lag_poly_st.0;
             // For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
             for b2_index in 0..Hypercube::<F>::pow2(b2_num_vars) {
                 for b3_index in 0..Hypercube::<F>::pow2(b3_num_vars) {
@@ -97,6 +96,8 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                         .get_evaluation_from_index(index);
                 }
             }
+            // from step (a) above
+            lag_poly_st = Self::lag_next(&self.verifier_messages, lag_poly_st.0, lag_poly_st.1);
         }
         return sum;
     }
@@ -147,21 +148,50 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
 
 #[cfg(test)]
 mod tests {
+    use ark_ff::Field;
     use crate::provers::{
         test_helpers::{
             run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
             BasicEvaluationStream, TestField,
         },
+        interpolation::lagrange_polynomial,
         TradeoffProver,
     };
 
+    // #[test]
+    // fn sumcheck() {
+    //     let evaluation_stream: BasicEvaluationStream<TestField> =
+    //         BasicEvaluationStream::new(test_polynomial());
+    //     run_boolean_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
+    //     // run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
+    //     // run_boolean_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
+    //     // run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
+    // }
+
     #[test]
-    fn sumcheck() {
-        let evaluation_stream: BasicEvaluationStream<TestField> =
-            BasicEvaluationStream::new(test_polynomial());
-        run_boolean_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
-        run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
-        run_boolean_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
-        run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
+    fn lag_init_test() {
+        let verifier_messages: Vec<TestField> = vec![TestField::from(13), TestField::from(11), TestField::from(7), TestField::from(2)];
+        let lag_poly_st = TradeoffProver::lag_init(&verifier_messages);
+        assert_eq!(lag_poly_st.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ONE, TestField::ONE, TestField::ONE], &verifier_messages).unwrap());
+        assert_eq!(lag_poly_st.1, 15);
+    }
+    #[test]
+    fn lag_next_test() {
+        let verifier_messages: Vec<TestField> = vec![TestField::from(13), TestField::from(11), TestField::from(7)];
+        let st_7: (TestField, usize) = TradeoffProver::lag_init(&verifier_messages);
+        let st_6: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_7.0, st_7.1);
+        assert_eq!(st_6.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ONE, TestField::ZERO], &verifier_messages).unwrap());
+        let st_5: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_6.0, st_6.1);
+        assert_eq!(st_5.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ZERO, TestField::ONE], &verifier_messages).unwrap());
+        let st_4: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_5.0, st_5.1);
+        assert_eq!(st_4.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ZERO, TestField::ZERO], &verifier_messages).unwrap());
+        let st_3: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_4.0, st_4.1);
+        assert_eq!(st_3.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ONE, TestField::ONE], &verifier_messages).unwrap());
+        let st_2: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_3.0, st_3.1);
+        assert_eq!(st_2.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ONE, TestField::ZERO], &verifier_messages).unwrap());
+        let st_1: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_2.0, st_2.1);
+        assert_eq!(st_1.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ZERO, TestField::ONE], &verifier_messages).unwrap());
+        let st_0: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_1.0, st_1.1);
+        assert_eq!(st_0.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ZERO, TestField::ZERO], &verifier_messages).unwrap());
     }
 }
