@@ -44,18 +44,18 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         return partial_sums;
     }
     fn lag_init(verifier_messages: &Vec<F>) -> (F, usize) {
-        let current_value: F = verifier_messages.iter().fold(F::ONE, |acc: F, &x| acc * x);
-        let current_position: usize = Hypercube::<F>::pow2(verifier_messages.len()) - 1; // e.g. 2 ^ 3 = 8, so 7 is 111
+        let current_value: F = verifier_messages.iter().fold(F::ONE, |acc: F, &x| acc * (F::ONE - x));
+        let current_position: usize = 0;
         (current_value, current_position)
     }
     fn lag_next(verifier_messages: &Vec<F>, last_value: F, last_position: usize) -> (F, usize)  {
-        assert!(last_position > 0);
-        let next_position: usize = last_position - 1;
+        assert!(last_position < Hypercube::<F>::pow2(verifier_messages.len()) - 1); // e.g. 2 ^ 3 = 8, so 7 is 111
+        let next_position: usize = last_position + 1;
         let mut next_value: F = last_value;
         // iterate up to the highest order bit to compute changes
-        let index_of_highest_set_bit: usize = match last_position == 1 {
-            true => 0, // only index=0 the least significant bit is set in last_position
-            false => cmp::max(last_position.ilog2(), next_position.ilog2()) as usize, // take index from highest set bit in either
+        let index_of_highest_set_bit: usize = match last_position == 0 {
+            false => cmp::max(last_position.ilog2(), next_position.ilog2()) as usize,
+            true => 0, // argument of integer logarithm must be positive
         };
         for bit_index in (0..=index_of_highest_set_bit).rev() {
             let verifier_message = verifier_messages[verifier_messages.len() - bit_index - 1];
@@ -86,18 +86,19 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // 3. For each b1 ∈ {0,1}^(s-1)l
         for b1_index in 0..Hypercube::<F>::pow2(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
-            let lag_poly: F = lag_poly_st.0;
-            // For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
+            lag_poly_st = match b1_index == 0 {
+                true => lag_poly_st,
+                false => Self::lag_next(&self.verifier_messages, lag_poly_st.0, lag_poly_st.1),
+            };
+            // (b) For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
             for b2_index in 0..Hypercube::<F>::pow2(b2_num_vars) {
                 for b3_index in 0..Hypercube::<F>::pow2(b3_num_vars) {
                     let index = b1_index << (b2_num_vars + b3_num_vars) | b2_index << b3_num_vars | b3_index;
-                    sum[b2_index] = sum[b2_index] + lag_poly * self
+                    sum[b2_index] = sum[b2_index] + lag_poly_st.0 * self
                         .evaluation_stream
                         .get_evaluation_from_index(index);
                 }
             }
-            // from step (a) above
-            lag_poly_st = Self::lag_next(&self.verifier_messages, lag_poly_st.0, lag_poly_st.1);
         }
         return sum;
     }
@@ -109,8 +110,10 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             let b2_start: &[F] = &b2[0..j_prime];
             let r2_start: &[F] = &self.verifier_messages[0..j_prime];
             let lag_poly: F = lagrange_polynomial(&b2_start, &r2_start).unwrap();
-            // TODO: how do I know which sum this belongs to?
-            sum_0 += lag_poly * sums[b2_index];
+            match b2[0] == F::ZERO {
+                true => sum_0 += lag_poly * sums[b2_index],
+                false => sum_1 += lag_poly * sums[b2_index],
+            }
         }
         return (sum_0, sum_1);
     }
@@ -158,40 +161,41 @@ mod tests {
         TradeoffProver,
     };
 
-    // #[test]
-    // fn sumcheck() {
-    //     let evaluation_stream: BasicEvaluationStream<TestField> =
-    //         BasicEvaluationStream::new(test_polynomial());
-    //     run_boolean_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
-    //     // run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
-    //     // run_boolean_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
-    //     // run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
-    // }
+    #[test]
+    fn sumcheck() {
+        let evaluation_stream: BasicEvaluationStream<TestField> =
+            BasicEvaluationStream::new(test_polynomial());
+        // run_boolean_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
+        run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
+        // run_boolean_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
+        // run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
+    }
 
     #[test]
     fn lag_init_test() {
         let verifier_messages: Vec<TestField> = vec![TestField::from(13), TestField::from(11), TestField::from(7), TestField::from(2)];
-        let lag_poly_st = TradeoffProver::lag_init(&verifier_messages);
-        assert_eq!(lag_poly_st.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ONE, TestField::ONE, TestField::ONE], &verifier_messages).unwrap());
-        assert_eq!(lag_poly_st.1, 15);
+        let lag_poly_st: (TestField, usize) = TradeoffProver::lag_init(&verifier_messages);
+        assert_eq!(lag_poly_st.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ZERO, TestField::ZERO, TestField::ZERO], &verifier_messages).unwrap());
+        assert_eq!(lag_poly_st.1, 0);
     }
+
     #[test]
     fn lag_next_test() {
         let verifier_messages: Vec<TestField> = vec![TestField::from(13), TestField::from(11), TestField::from(7)];
-        let st_7: (TestField, usize) = TradeoffProver::lag_init(&verifier_messages);
-        let st_6: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_7.0, st_7.1);
-        assert_eq!(st_6.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ONE, TestField::ZERO], &verifier_messages).unwrap());
-        let st_5: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_6.0, st_6.1);
-        assert_eq!(st_5.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ZERO, TestField::ONE], &verifier_messages).unwrap());
-        let st_4: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_5.0, st_5.1);
-        assert_eq!(st_4.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ZERO, TestField::ZERO], &verifier_messages).unwrap());
-        let st_3: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_4.0, st_4.1);
-        assert_eq!(st_3.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ONE, TestField::ONE], &verifier_messages).unwrap());
-        let st_2: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_3.0, st_3.1);
-        assert_eq!(st_2.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ONE, TestField::ZERO], &verifier_messages).unwrap());
-        let st_1: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_2.0, st_2.1);
+        let st_0: (TestField, usize) = TradeoffProver::lag_init(&verifier_messages);
+        let st_1: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_0.0, st_0.1);
         assert_eq!(st_1.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ZERO, TestField::ONE], &verifier_messages).unwrap());
-        let st_0: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_1.0, st_1.1);
-        assert_eq!(st_0.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ZERO, TestField::ZERO], &verifier_messages).unwrap());
+        let st_2: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_1.0, st_1.1);
+        assert_eq!(st_2.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ONE, TestField::ZERO], &verifier_messages).unwrap());
+        let st_3: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_2.0, st_2.1);
+        assert_eq!(st_3.0, lagrange_polynomial(&vec![TestField::ZERO, TestField::ONE, TestField::ONE], &verifier_messages).unwrap());
+        let st_4: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_3.0, st_3.1);
+        assert_eq!(st_4.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ZERO, TestField::ZERO], &verifier_messages).unwrap());
+        let st_5: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_4.0, st_4.1);
+        assert_eq!(st_5.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ZERO, TestField::ONE], &verifier_messages).unwrap());
+        let st_6: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_5.0, st_5.1);
+        assert_eq!(st_6.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ONE, TestField::ZERO], &verifier_messages).unwrap());
+        let st_7: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_1.0, st_1.1);
+        assert_eq!(st_7.0, lagrange_polynomial(&vec![TestField::ONE, TestField::ONE, TestField::ONE], &verifier_messages).unwrap());
     }
 }

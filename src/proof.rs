@@ -41,7 +41,13 @@ impl<F: Field> Sumcheck<F> {
                 is_accepted = false;
                 break;
             }
-            verifier_message = Some(F::rand(rng));
+
+            // TODO: (z-tech) want to implement capability for F::ONE and F::ZERO
+            let mut random_message: F = F::rand(rng);
+            while random_message == F::ONE || random_message == F::ZERO {
+                random_message = F::rand(rng);
+            }
+            verifier_message = Some(random_message);
         }
 
         // done.
@@ -58,14 +64,14 @@ mod tests {
     use super::Sumcheck;
     use crate::provers::{
         test_helpers::{test_polynomial, BasicEvaluationStream, TestField},
-        TradeoffProver,
+        TimeProver,
     };
 
     #[test]
     fn basic() {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
-        let mut prover = TradeoffProver::<TestField>::new(Box::new(&evaluation_stream), 3);
+        let mut prover = TimeProver::<TestField>::new(Box::new(&evaluation_stream));
         let rng = &mut ark_std::test_rng();
         let transcript = Sumcheck::<TestField>::prove(&mut prover, rng);
         assert_eq!(transcript.is_accepted, true);
