@@ -1,3 +1,4 @@
+use std::cmp;
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
@@ -42,11 +43,33 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         }
         return partial_sums;
     }
-    fn lag_init(l: usize, r: &Vec<F>) -> F {
-        F::ONE
+    fn lag_init(&self) -> Option<(F, usize)> {
+        let current_value: F = self.verifier_messages.iter().fold(F::ONE, |acc: F, &x| acc * x);
+        let current_position: usize = Hypercube::<F>::pow2(self.verifier_messages.len());
+        Some((current_value, current_position))
     }
-    fn lag_next(st: F) -> (F, F)  {
-        (F::ONE, F::ONE)
+    fn lag_next(&self, st: (F, usize)) -> (F, Option<(F, usize)>)  {
+        let last_value: F = st.0;
+        let last_position: usize = st.1;
+        if last_position > 0 {
+            let next_position: usize = last_position - 1;
+            let mut next_value: F = last_value;
+            let index_of_highest_set_bit: usize = match last_position == 1 {
+                true => 0, // only index=0 the least significant bit is set in last_position
+                false => cmp::max(last_position.ilog2(), next_position.ilog2()) as usize, // take index from highest set bit in either
+            };
+            for bit_index in (0..=index_of_highest_set_bit).rev() {
+                let last_bit = (last_position >> bit_index) & 1;
+                let next_bit = (next_position >> bit_index) & 1;
+                next_value = match (last_bit, next_bit) {
+                    (0, 1) => (next_value / (F::ONE - self.verifier_messages[bit_index])) * self.verifier_messages[bit_index],
+                    (1, 0) => (next_value / self.verifier_messages[bit_index]) * (F::ONE - self.verifier_messages[bit_index]),
+                    _ => next_value, // no change, do nothing
+                }
+            }
+            return (last_value, Some((next_value, next_position)));
+        }
+        return (last_value, None);
     }
     fn current_stage(&self) -> usize {
         self.current_round / self.stage_size
@@ -60,12 +83,11 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
         let mut sum: Vec<F> = vec![F::ZERO; Hypercube::<F>::pow2(self.stage_size)];
         // 2. Initialize st := LagInit((s - l)l, r)
-        let mut st: F = Self::lag_init(b1_num_vars, &self.verifier_messages);
-        let mut lag_poly = F::ONE;
+        let (mut lag_poly, mut st): (F, Option<(F, usize)>) = (F::ONE, self.lag_init());
         // 3. For each b1 ∈ {0,1}^(s-1)l
         for (b1_index, b1) in Hypercube::<F>::new(b1_num_vars).enumerate() {
             // (a) Compute (LagPoly, st) := LagNext(st)
-            (lag_poly, st) = Self::lag_next(st);
+            (lag_poly, st) = self.lag_next(st.unwrap());
             // For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
             for b2_index in 0..Hypercube::<F>::pow2(b2_num_vars) {
                 for b3_index in 0..Hypercube::<F>::pow2(b3_num_vars) {
