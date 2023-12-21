@@ -52,10 +52,20 @@ fn run_bench<F: Field, P: Prover<F>>(
     );
 }
 
-fn vsbw_benches(c: &mut Criterion) {
-    let max = 31;
+fn warm_up(c: &mut Criterion) {
+    let max = 22;
     // 64 bit field
     for num_variables in 15..=max {
+        let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
+        let prover = SpaceProver::<Field64>::new(Box::new(&stream));
+        run_bench(c, prover, "warm_up".to_owned(), num_variables);
+    }
+}
+
+fn vsbw_benches(c: &mut Criterion) {
+    let max = 30;
+    // 64 bit field
+    for num_variables in 30..=max {
         let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
         let prover = TimeProver::<Field64>::new(Box::new(&stream));
         run_bench(
@@ -66,7 +76,7 @@ fn vsbw_benches(c: &mut Criterion) {
         );
     }
     // 128 bit field
-    for num_variables in 15..=max {
+    for num_variables in 30..=max {
         let stream: BenchEvaluationStream<Field128> = BenchEvaluationStream::new(num_variables);
         let prover = TimeProver::<Field128>::new(Box::new(&stream));
         run_bench(
@@ -77,7 +87,7 @@ fn vsbw_benches(c: &mut Criterion) {
         );
     }
     // bn254
-    for num_variables in 15..=max {
+    for num_variables in 30..=max {
         let stream: BenchEvaluationStream<BN254Field> = BenchEvaluationStream::new(num_variables);
         let prover = TimeProver::<BN254Field>::new(Box::new(&stream));
         run_bench(
@@ -90,7 +100,7 @@ fn vsbw_benches(c: &mut Criterion) {
 }
 
 fn cty_benches(c: &mut Criterion) {
-    let max = 27;
+    let max = 28;
     // 64 bit field
     for num_variables in 15..=max {
         let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
@@ -127,7 +137,7 @@ fn cty_benches(c: &mut Criterion) {
 }
 
 fn tradeoff_k2_benches(c: &mut Criterion) {
-    let max = 31;
+    let max = 30;
     // 64 bit field
     for num_variables in 15..=max {
         if num_variables % 2 == 0 {
@@ -170,12 +180,12 @@ fn tradeoff_k2_benches(c: &mut Criterion) {
 }
 
 fn tradeoff_k3_benches(c: &mut Criterion) {
-    let max = 31;
+    let max = 30;
     // 64 bit field
     for num_variables in 15..=max {
         if num_variables % 3 == 0 {
             let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
-            let prover = TradeoffProver::<Field64>::new(Box::new(&stream), 2);
+            let prover = TradeoffProver::<Field64>::new(Box::new(&stream), 3);
             run_bench(
                 c,
                 prover,
@@ -188,7 +198,7 @@ fn tradeoff_k3_benches(c: &mut Criterion) {
     for num_variables in 15..=max {
         if num_variables % 3 == 0 {
             let stream: BenchEvaluationStream<Field128> = BenchEvaluationStream::new(num_variables);
-            let prover = TradeoffProver::<Field128>::new(Box::new(&stream), 2);
+            let prover = TradeoffProver::<Field128>::new(Box::new(&stream), 3);
             run_bench(
                 c,
                 prover,
@@ -201,7 +211,7 @@ fn tradeoff_k3_benches(c: &mut Criterion) {
     for num_variables in 15..=max {
         if num_variables % 3 == 0 {
             let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
-            let prover = TradeoffProver::<Field64>::new(Box::new(&stream), 2);
+            let prover = TradeoffProver::<Field64>::new(Box::new(&stream), 3);
             run_bench(
                 c,
                 prover,
@@ -212,9 +222,52 @@ fn tradeoff_k3_benches(c: &mut Criterion) {
     }
 }
 
+fn tradeoff_k4_benches(c: &mut Criterion) {
+    let max = 30;
+    // 64 bit field
+    for num_variables in 15..=max {
+        if num_variables % 4 == 0 {
+            let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
+            let prover = TradeoffProver::<Field64>::new(Box::new(&stream), 4);
+            run_bench(
+                c,
+                prover,
+                String::from("tradeoffk4-fp64") + &format!("-{}", num_variables),
+                num_variables,
+            );
+        }
+    }
+    // 128 bit field
+    for num_variables in 15..=max {
+        if num_variables % 4 == 0 {
+            let stream: BenchEvaluationStream<Field128> = BenchEvaluationStream::new(num_variables);
+            let prover = TradeoffProver::<Field128>::new(Box::new(&stream), 4);
+            run_bench(
+                c,
+                prover,
+                String::from("tradeoffk4-fp128") + &format!("-{}", num_variables),
+                num_variables,
+            );
+        }
+    }
+    // bn254
+    for num_variables in 15..=max {
+        if num_variables % 4 == 0 {
+            let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
+            let prover = TradeoffProver::<Field64>::new(Box::new(&stream), 4);
+            run_bench(
+                c,
+                prover,
+                String::from("tradeoffk4-bn254") + &format!("-{}", num_variables),
+                num_variables,
+            );
+        }
+    }
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default().sample_size(10);
-    targets = tradeoff_k2_benches, tradeoff_k3_benches
+    targets = warm_up, tradeoff_k2_benches, tradeoff_k3_benches, tradeoff_k4_benches, vsbw_benches, cty_benches
 }
 criterion_main!(benches);
