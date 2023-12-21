@@ -18,6 +18,9 @@ impl<F: Field> Hypercube<F> {
             _f: PhantomData,
         }
     }
+    pub fn pow2(num_variables: usize) -> usize {
+        2usize.pow(num_variables as u32)
+    }
 }
 
 impl<F: Field> Iterator for Hypercube<F> {
