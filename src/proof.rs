@@ -63,17 +63,24 @@ impl<F: Field> Sumcheck<F> {
 mod tests {
     use super::Sumcheck;
     use crate::provers::{
-        test_helpers::{test_polynomial, BasicEvaluationStream, TestField},
-        TimeProver,
+        test_helpers::{BenchEvaluationStream, TestField},
+        TimeProver, TradeoffProver,
     };
 
     #[test]
-    fn basic() {
-        let evaluation_stream: BasicEvaluationStream<TestField> =
-            BasicEvaluationStream::new(test_polynomial());
-        let mut prover = TimeProver::<TestField>::new(Box::new(&evaluation_stream));
-        let rng = &mut ark_std::test_rng();
-        let transcript = Sumcheck::<TestField>::prove(&mut prover, rng);
-        assert_eq!(transcript.is_accepted, true);
+    fn algorithm_consistency() {
+        let evaluation_stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new(16);
+        let rng_1 = &mut ark_std::test_rng();
+        let rng_2 = &mut ark_std::test_rng();
+        let mut tradeoff_k4_prover =
+            TradeoffProver::<TestField>::new(Box::new(&evaluation_stream), 4);
+        let time_transcript = Sumcheck::<TestField>::prove(&mut tradeoff_k4_prover, rng_1);
+        let mut time_prover = TimeProver::<TestField>::new(Box::new(&evaluation_stream));
+        let tradeoff_k4_transcript = Sumcheck::<TestField>::prove(&mut time_prover, rng_2);
+        assert!(tradeoff_k4_transcript.is_accepted == true);
+        assert_eq!(
+            time_transcript.prover_messages,
+            tradeoff_k4_transcript.prover_messages
+        );
     }
 }
