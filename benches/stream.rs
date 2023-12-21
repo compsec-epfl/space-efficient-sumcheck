@@ -237,7 +237,7 @@ fn tradeoff_k4_benches(c: &mut Criterion) {
             run_bench(
                 c,
                 prover,
-                String::from("tradeoffk3-fp64") + &format!("-{}", num_variables),
+                String::from("tradeoffk4-fp64") + &format!("-{}", num_variables),
                 num_variables,
             );
         }
@@ -250,7 +250,7 @@ fn tradeoff_k4_benches(c: &mut Criterion) {
             run_bench(
                 c,
                 prover,
-                String::from("tradeoffk3-fp128") + &format!("-{}", num_variables),
+                String::from("tradeoffk4-fp128") + &format!("-{}", num_variables),
                 num_variables,
             );
         }
@@ -263,7 +263,7 @@ fn tradeoff_k4_benches(c: &mut Criterion) {
             run_bench(
                 c,
                 prover,
-                String::from("tradeoffk3-bn254") + &format!("-{}", num_variables),
+                String::from("tradeoffk4-bn254") + &format!("-{}", num_variables),
                 num_variables,
             );
         }
