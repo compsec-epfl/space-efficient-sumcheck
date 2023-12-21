@@ -52,6 +52,21 @@ fn run_bench<F: Field, P: Prover<F>>(
     );
 }
 
+fn warm_up(c: &mut Criterion) {
+    let max = 22;
+    // 64 bit field
+    for num_variables in 15..=max {
+        let stream: BenchEvaluationStream<Field64> = BenchEvaluationStream::new(num_variables);
+        let prover = SpaceProver::<Field64>::new(Box::new(&stream));
+        run_bench(
+            c,
+            prover,
+            "warm_up".to_owned(),
+            num_variables,
+        );
+    }
+}
+
 fn vsbw_benches(c: &mut Criterion) {
     let max = 30;
     // 64 bit field
@@ -258,6 +273,6 @@ fn tradeoff_k4_benches(c: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default().sample_size(10);
-    targets = tradeoff_k3_benches, tradeoff_k4_benches
+    targets = warm_up, tradeoff_k3_benches, tradeoff_k4_benches, tradeoff_k2_benches
 }
 criterion_main!(benches);
