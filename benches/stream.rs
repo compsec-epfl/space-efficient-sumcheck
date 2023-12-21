@@ -215,6 +215,6 @@ fn tradeoff_k3_benches(c: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default().sample_size(10);
-    targets = tradeoff_k2_benches
+    targets = tradeoff_k2_benches, tradeoff_k3_benches
 }
 criterion_main!(benches);

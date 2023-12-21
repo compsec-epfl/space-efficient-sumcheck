@@ -12,8 +12,8 @@ use ark_poly::{
 #[modulus = "19"]
 #[generator = "2"]
 
-pub struct FrConfig;
-pub type TestField = Fp64<MontBackend<FrConfig, 1>>;
+pub struct TestFieldConfig;
+pub type TestField = Fp64<MontBackend<TestFieldConfig, 1>>;
 pub type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
 
 pub fn run_boolean_sumcheck_test<F: Field + std::convert::From<i32>, P: Prover<F>>(mut prover: P) {

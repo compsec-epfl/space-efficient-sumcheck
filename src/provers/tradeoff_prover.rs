@@ -40,10 +40,13 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             stage_size,
         }
     }
-    fn compute_partial_sums(precomputed: Vec<F>) -> Vec<F> {
-        let mut partial_sums: Vec<F> = Vec::<F>::with_capacity(precomputed.len());
+    fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
+        (num << shift_amount) | (1 << shift_amount) - 1
+    }
+    fn compute_partial_sums(sums: &Vec<F>) -> Vec<F> {
+        let mut partial_sums: Vec<F> = Vec::<F>::with_capacity(sums.len());
         let mut running_sum = F::ZERO;
-        for eval in &precomputed {
+        for eval in sums {
             running_sum += eval;
             partial_sums.push(running_sum);
         }
@@ -111,13 +114,12 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         }
         self.sums = sum;
     }
-    fn compute_round(&self) -> (F, F) {
+    fn compute_round(&self, partial_sums: &Vec<F>) -> (F, F) {
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
         let j_prime = self.current_round - (self.current_stage() * self.stage_size); // := j-(s-1)l
         let r_shift = self.current_stage() * self.stage_size;
-        for (b2_index, b2) in Hypercube::new(self.stage_size).enumerate() {
-            let b2_start: &[F] = &b2[0..(j_prime + 1)];
+        for (b2_start_index, b2_start) in Hypercube::<F>::new(j_prime + 1).enumerate() {
             let mut r2_start_0: Vec<F> =
                 self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
             let mut r2_start_1: Vec<F> =
@@ -126,8 +128,17 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             r2_start_1.push(F::ONE); // need to add ONE to end
             let lag_poly_0: F = lagrange_polynomial(&b2_start, &r2_start_0).unwrap();
             let lag_poly_1: F = lagrange_polynomial(&b2_start, &r2_start_1).unwrap();
-            sum_0 += lag_poly_0 * self.sums[b2_index];
-            sum_1 += lag_poly_1 * self.sums[b2_index];
+            let b2_start_index_0 = b2_start_index << (self.stage_size - j_prime - 1);
+            let b2_start_index_1 =
+                Self::shift_and_one_fill(b2_start_index, self.stage_size - j_prime - 1);
+            let left_value: F = if b2_start_index_0 == 0 {
+                F::ZERO
+            } else {
+                partial_sums[b2_start_index_0 - 1]
+            };
+            let right_value = partial_sums[b2_start_index_1];
+            sum_0 += lag_poly_0 * (right_value - left_value);
+            sum_1 += lag_poly_1 * (right_value - left_value);
         }
         return (sum_0, sum_1);
     }
@@ -154,7 +165,7 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
         }
 
         // compute the sum
-        let sums: (F, F) = self.compute_round();
+        let sums: (F, F) = self.compute_round(&Self::compute_partial_sums(&self.sums));
 
         // Increment the round counter
         self.current_round += 1;
