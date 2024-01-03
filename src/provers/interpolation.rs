@@ -1,5 +1,5 @@
 use crate::provers::hypercube::Hypercube;
-use ark_ff::Field;
+use ark_ff::{batch_inversion, Field};
 use std::cmp;
 
 pub fn lagrange_polynomial<F: Field>(x: &[F], w: &[F]) -> Option<F> {
@@ -33,11 +33,14 @@ impl<F: Field> BasicSequentialLagrangePolynomial<F> {
         let last_value: F = messages
             .iter()
             .fold(F::ONE, |acc: F, &x| acc * (F::ONE - x));
-        let inverse_messages = messages.iter().map(|message| F::ONE / message).collect();
-        let inverse_message_hats = messages
+        let mut inverse_messages: Vec<F> = messages.clone();
+        batch_inversion(&mut inverse_messages);
+        let mut inverse_message_hats: Vec<F> = messages
+            .clone()
             .iter()
-            .map(|message| F::ONE / (F::ONE - message))
+            .map(|message| F::ONE - message)
             .collect();
+        batch_inversion(&mut inverse_message_hats);
         Self {
             messages: messages.to_vec(),
             inverse_messages,
