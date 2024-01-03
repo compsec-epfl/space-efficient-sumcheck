@@ -23,6 +23,8 @@ pub trait SequentialLagrangePolynomial<F: Field> {
 
 pub struct BasicSequentialLagrangePolynomial<F: Field> {
     pub messages: Vec<F>,
+    pub inverse_messages: Vec<F>,
+    pub inverse_message_hats: Vec<F>,
     pub last_value: F,
     pub last_position: Option<usize>,
 }
@@ -31,8 +33,15 @@ impl<F: Field> BasicSequentialLagrangePolynomial<F> {
         let last_value: F = messages
             .iter()
             .fold(F::ONE, |acc: F, &x| acc * (F::ONE - x));
+        let inverse_messages = messages.iter().map(|message| F::ONE / message).collect();
+        let inverse_message_hats = messages
+            .iter()
+            .map(|message| F::ONE / (F::ONE - message))
+            .collect();
         Self {
             messages: messages.to_vec(),
+            inverse_messages,
+            inverse_message_hats,
             last_value,
             last_position: None,
         }
@@ -61,11 +70,14 @@ impl<F: Field> SequentialLagrangePolynomial<F> for BasicSequentialLagrangePolyno
         for bit_index in (0..=index_of_highest_set_bit).rev() {
             let message = self.messages[self.messages.len() - bit_index - 1];
             let message_hat = F::ONE - message;
+            let inverse_message = self.inverse_messages[self.messages.len() - bit_index - 1];
+            let inverse_message_hat =
+                self.inverse_message_hats[self.messages.len() - bit_index - 1];
             let last_bit = (last_position >> bit_index) & 1;
             let next_bit = (next_position >> bit_index) & 1;
             next_value = match (last_bit, next_bit) {
-                (0, 1) => (next_value / message_hat) * message,
-                (1, 0) => (next_value / message) * message_hat,
+                (0, 1) => next_value * inverse_message_hat * message,
+                (1, 0) => next_value * inverse_message * message_hat,
                 _ => next_value,
             }
         }
