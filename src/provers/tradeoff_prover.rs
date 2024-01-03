@@ -1,9 +1,12 @@
 use ark_ff::Field;
 use ark_std::vec::Vec;
-use std::cmp;
 
 use crate::provers::{
-    evaluation_stream::EvaluationStream, hypercube::Hypercube, interpolation::lagrange_polynomial,
+    evaluation_stream::EvaluationStream,
+    hypercube::Hypercube,
+    interpolation::{
+        lagrange_polynomial, BasicSequentialLagrangePolynomial, SequentialLagrangePolynomial,
+    },
     Prover,
 };
 
@@ -52,35 +55,6 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         }
         return partial_sums;
     }
-    fn lag_init(verifier_messages: &Vec<F>) -> (F, usize) {
-        let current_value: F = verifier_messages
-            .iter()
-            .fold(F::ONE, |acc: F, &x| acc * (F::ONE - x));
-        let current_position: usize = 0;
-        (current_value, current_position)
-    }
-    fn lag_next(verifier_messages: &Vec<F>, last_value: F, last_position: usize) -> (F, usize) {
-        assert!(last_position < Hypercube::<F>::pow2(verifier_messages.len()) - 1); // e.g. 2 ^ 3 = 8, so 7 is 111
-        let next_position: usize = last_position + 1;
-        let mut next_value: F = last_value;
-        // iterate up to the highest order bit to compute changes
-        let index_of_highest_set_bit: usize = match last_position == 0 {
-            false => cmp::max(last_position.ilog2(), next_position.ilog2()) as usize,
-            true => 0, // argument of integer logarithm must be positive
-        };
-        for bit_index in (0..=index_of_highest_set_bit).rev() {
-            let verifier_message = verifier_messages[verifier_messages.len() - bit_index - 1];
-            let verifier_message_hat = F::ONE - verifier_message;
-            let last_bit = (last_position >> bit_index) & 1;
-            let next_bit = (next_position >> bit_index) & 1;
-            next_value = match (last_bit, next_bit) {
-                (0, 1) => (next_value / verifier_message_hat) * verifier_message,
-                (1, 0) => (next_value / verifier_message) * verifier_message_hat,
-                _ => next_value,
-            }
-        }
-        (next_value, next_position)
-    }
     fn current_stage(&self) -> usize {
         self.current_round / self.stage_size
     }
@@ -90,17 +64,15 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         let b1_num_vars: usize = self.current_stage() * self.stage_size; // := (s-1)l because we are zero-indexed
         let b2_num_vars: usize = self.stage_size; // := l
         let b3_num_vars: usize = self.num_variables - b1_num_vars - b2_num_vars; // := (k-s)l because we are zero-indexed
-        // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
+                                                                                 // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
         let mut sum: Vec<F> = vec![F::ZERO; Hypercube::<F>::pow2(b2_num_vars)];
         // 2. Initialize st := LagInit((s - l)l, r)
-        let mut lag_poly_st: (F, usize) = Self::lag_init(&self.verifier_messages);
+        let mut bslp: BasicSequentialLagrangePolynomial<F> =
+            BasicSequentialLagrangePolynomial::new(self.verifier_messages.clone());
         // 3. For each b1 ∈ {0,1}^(s-1)l
         for b1_index in 0..Hypercube::<F>::pow2(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
-            lag_poly_st = match b1_index == 0 {
-                true => lag_poly_st,
-                false => Self::lag_next(&self.verifier_messages, lag_poly_st.0, lag_poly_st.1),
-            };
+            let lag_poly = bslp.next();
             // (b) For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
             for b2_index in 0..Hypercube::<F>::pow2(b2_num_vars) {
                 for b3_index in 0..Hypercube::<F>::pow2(b3_num_vars) {
@@ -108,7 +80,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                         | b2_index << b3_num_vars
                         | b3_index;
                     sum[b2_index] = sum[b2_index]
-                        + lag_poly_st.0 * self.evaluation_stream.get_evaluation_from_index(index);
+                        + lag_poly * self.evaluation_stream.get_evaluation_from_index(index);
                 }
             }
         }
@@ -181,13 +153,11 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
 #[cfg(test)]
 mod tests {
     use crate::provers::{
-        interpolation::lagrange_polynomial,
         test_helpers::{
             run_basic_sumcheck_test, test_polynomial, BasicEvaluationStream, TestField,
         },
         TradeoffProver,
     };
-    use ark_ff::Field;
 
     #[test]
     fn sumcheck() {
@@ -195,100 +165,5 @@ mod tests {
             BasicEvaluationStream::new(test_polynomial());
         run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
         run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
-    }
-
-    #[test]
-    fn lag_init_test() {
-        let verifier_messages: Vec<TestField> = vec![
-            TestField::from(13),
-            TestField::from(11),
-            TestField::from(7),
-            TestField::from(2),
-        ];
-        let lag_poly_st: (TestField, usize) = TradeoffProver::lag_init(&verifier_messages);
-        assert_eq!(
-            lag_poly_st.0,
-            lagrange_polynomial(
-                &vec![
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO,
-                    TestField::ZERO
-                ],
-                &verifier_messages
-            )
-            .unwrap()
-        );
-        assert_eq!(lag_poly_st.1, 0);
-    }
-
-    #[test]
-    fn lag_next_test() {
-        let verifier_messages: Vec<TestField> =
-            vec![TestField::from(13), TestField::from(11), TestField::from(7)];
-        let st_0: (TestField, usize) = TradeoffProver::lag_init(&verifier_messages);
-        let st_1: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_0.0, st_0.1);
-        assert_eq!(
-            st_1.0,
-            lagrange_polynomial(
-                &vec![TestField::ZERO, TestField::ZERO, TestField::ONE],
-                &verifier_messages
-            )
-            .unwrap()
-        );
-        let st_2: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_1.0, st_1.1);
-        assert_eq!(
-            st_2.0,
-            lagrange_polynomial(
-                &vec![TestField::ZERO, TestField::ONE, TestField::ZERO],
-                &verifier_messages
-            )
-            .unwrap()
-        );
-        let st_3: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_2.0, st_2.1);
-        assert_eq!(
-            st_3.0,
-            lagrange_polynomial(
-                &vec![TestField::ZERO, TestField::ONE, TestField::ONE],
-                &verifier_messages
-            )
-            .unwrap()
-        );
-        let st_4: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_3.0, st_3.1);
-        assert_eq!(
-            st_4.0,
-            lagrange_polynomial(
-                &vec![TestField::ONE, TestField::ZERO, TestField::ZERO],
-                &verifier_messages
-            )
-            .unwrap()
-        );
-        let st_5: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_4.0, st_4.1);
-        assert_eq!(
-            st_5.0,
-            lagrange_polynomial(
-                &vec![TestField::ONE, TestField::ZERO, TestField::ONE],
-                &verifier_messages
-            )
-            .unwrap()
-        );
-        let st_6: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_5.0, st_5.1);
-        assert_eq!(
-            st_6.0,
-            lagrange_polynomial(
-                &vec![TestField::ONE, TestField::ONE, TestField::ZERO],
-                &verifier_messages
-            )
-            .unwrap()
-        );
-        let st_7: (TestField, usize) = TradeoffProver::lag_next(&verifier_messages, st_6.0, st_6.1);
-        assert_eq!(
-            st_7.0,
-            lagrange_polynomial(
-                &vec![TestField::ONE, TestField::ONE, TestField::ONE],
-                &verifier_messages
-            )
-            .unwrap()
-        );
     }
 }
