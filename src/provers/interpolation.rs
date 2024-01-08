@@ -22,24 +22,17 @@ pub trait SequentialLagrangePolynomial<F: Field> {
 pub struct BasicSequentialLagrangePolynomial<F: Field> {
     pub last_position: Option<usize>,
     pub messages: Vec<F>,
-    pub message_hats: Vec<F>,
     pub stack: Vec<F>,
 }
 impl<F: Field> BasicSequentialLagrangePolynomial<F> {
     pub fn new(messages: Vec<F>) -> Self {
-        let message_hats: Vec<F> = messages
-            .clone()
-            .iter()
-            .map(|message| F::ONE - message)
-            .collect();
         let mut stack: Vec<F> = Vec::with_capacity(messages.len() + 1);
         stack.push(F::ONE);
-        for message_hat in &message_hats {
-            stack.push(*stack.last().unwrap() * message_hat);
+        for message in &messages {
+            stack.push(*stack.last().unwrap() * (F::ONE - message));
         }
         Self {
             messages: messages.clone(),
-            message_hats,
             stack,
             last_position: None,
         }
@@ -64,7 +57,7 @@ impl<F: Field> SequentialLagrangePolynomial<F> for BasicSequentialLagrangePolyno
             let next_bit: bool = (next_position & (1 << bit_index)) != 0;
             self.stack.push(match next_bit {
                 true => *last_element * self.messages[messages_len - bit_index - 1],
-                false => *last_element * self.message_hats[messages_len - bit_index - 1],
+                false => *last_element * (F::ONE - self.messages[messages_len - bit_index - 1]),
             });
         }
         self.last_position = Some(next_position);
