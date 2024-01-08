@@ -1,6 +1,5 @@
 use crate::provers::hypercube::Hypercube;
-use ark_ff::{batch_inversion, Field};
-use std::cmp;
+use ark_ff::Field;
 
 pub fn lagrange_polynomial<F: Field>(x: &[F], w: &[F]) -> Option<F> {
     if x.len() != w.len() {
@@ -22,30 +21,26 @@ pub trait SequentialLagrangePolynomial<F: Field> {
 }
 
 pub struct BasicSequentialLagrangePolynomial<F: Field> {
-    pub messages: Vec<F>,
-    pub inverse_messages: Vec<F>,
-    pub inverse_message_hats: Vec<F>,
-    pub last_value: F,
     pub last_position: Option<usize>,
+    pub messages: Vec<F>,
+    pub message_hats: Vec<F>,
+    pub stack: Vec<F>,
 }
 impl<F: Field> BasicSequentialLagrangePolynomial<F> {
     pub fn new(messages: Vec<F>) -> Self {
-        let last_value: F = messages
-            .iter()
-            .fold(F::ONE, |acc: F, &x| acc * (F::ONE - x));
-        let mut inverse_messages: Vec<F> = messages.clone();
-        batch_inversion(&mut inverse_messages);
-        let mut inverse_message_hats: Vec<F> = messages
+        let message_hats: Vec<F> = messages
             .clone()
             .iter()
             .map(|message| F::ONE - message)
             .collect();
-        batch_inversion(&mut inverse_message_hats);
+        let mut stack: Vec<F> = vec![F::ONE];
+        for message_hat in &message_hats {
+            stack.push(*stack.last().unwrap() * message_hat);
+        }
         Self {
-            messages: messages.to_vec(),
-            inverse_messages,
-            inverse_message_hats,
-            last_value,
+            messages: messages.clone(),
+            message_hats,
+            stack,
             last_position: None,
         }
     }
@@ -55,38 +50,37 @@ impl<F: Field> SequentialLagrangePolynomial<F> for BasicSequentialLagrangePolyno
         // this is the first call to next() after initialization
         if self.last_position == None {
             self.last_position = Some(0);
-            return self.last_value;
+            return *self.stack.last().unwrap();
         }
-
         // check we haven't interated too far
         assert!(self.last_position.unwrap() < Hypercube::<F>::pow2(self.messages.len()) - 1); // e.g. 2 ^ 3 = 8, so 7 is 111
-
-        // this is any other next() after initialization
+                                                                                              // this is any other next() after initialization
         let last_position = self.last_position.unwrap();
         let next_position = last_position + 1;
-        let mut next_value: F = self.last_value;
-        // iterate up to the highest order bit to compute changes
-        let index_of_highest_set_bit: usize = match last_position == 0 {
-            false => cmp::max(last_position.ilog2(), next_position.ilog2()) as usize,
-            true => 0, // argument of integer logarithm must be positive
+        // first, discard what's in the stack up to shared prefix
+        let not_shared_bits_in_positions = last_position ^ next_position;
+        let index_of_lowest_shared_bit: usize = match not_shared_bits_in_positions.checked_ilog2() {
+            Some(index_of_highest_not_shared_bit) => (index_of_highest_not_shared_bit + 1) as usize,
+            None => 1, // this can never occur
         };
-        for bit_index in (0..=index_of_highest_set_bit).rev() {
-            let message = self.messages[self.messages.len() - bit_index - 1];
-            let message_hat = F::ONE - message;
-            let inverse_message = self.inverse_messages[self.messages.len() - bit_index - 1];
-            let inverse_message_hat =
-                self.inverse_message_hats[self.messages.len() - bit_index - 1];
-            let last_bit = (last_position >> bit_index) & 1;
-            let next_bit = (next_position >> bit_index) & 1;
-            next_value = match (last_bit, next_bit) {
-                (0, 1) => next_value * inverse_message_hat * message,
-                (1, 0) => next_value * inverse_message * message_hat,
-                _ => next_value,
-            }
+        for _ in 0..index_of_lowest_shared_bit {
+            self.stack.pop();
         }
-        self.last_value = next_value;
+        // then iterate up to the shared prefix again to compute changes
+        for bit_index in (0..index_of_lowest_shared_bit).rev() {
+            let next_bit: bool = (next_position >> bit_index) & 1 != 0;
+            self.stack.push(match next_bit {
+                true => {
+                    *self.stack.last().unwrap() * self.messages[self.messages.len() - bit_index - 1]
+                }
+                false => {
+                    *self.stack.last().unwrap()
+                        * self.message_hats[self.messages.len() - bit_index - 1]
+                }
+            })
+        }
         self.last_position = Some(next_position);
-        next_value
+        return *self.stack.last().unwrap();
     }
 }
 
