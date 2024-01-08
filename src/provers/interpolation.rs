@@ -1,4 +1,3 @@
-use crate::provers::hypercube::Hypercube;
 use ark_ff::Field;
 
 pub fn lagrange_polynomial<F: Field>(x: &[F], w: &[F]) -> Option<F> {
@@ -47,40 +46,38 @@ impl<F: Field> BasicSequentialLagrangePolynomial<F> {
 }
 impl<F: Field> SequentialLagrangePolynomial<F> for BasicSequentialLagrangePolynomial<F> {
     fn next(&mut self) -> F {
-        // this is the first call to next() after initialization
-        if self.last_position == None {
+        if self.last_position.is_none() {
             self.last_position = Some(0);
             return *self.stack.last().unwrap();
         }
-        // check we haven't interated too far
-        assert!(self.last_position.unwrap() < Hypercube::<F>::pow2(self.messages.len()) - 1); // e.g. 2 ^ 3 = 8, so 7 is 111
-                                                                                              // this is any other next() after initialization
+
         let last_position = self.last_position.unwrap();
         let next_position = last_position + 1;
-        // first, discard what's in the stack up to shared prefix
+
+        let messages_len = self.messages.len();
+        let message_hats_len = self.message_hats.len();
+
         let not_shared_bits_in_positions = last_position ^ next_position;
-        let index_of_lowest_shared_bit: usize = match not_shared_bits_in_positions.checked_ilog2() {
-            Some(index_of_highest_not_shared_bit) => (index_of_highest_not_shared_bit + 1) as usize,
-            None => 1, // this can never occur
-        };
+        let index_of_lowest_shared_bit =
+            (not_shared_bits_in_positions + 1).trailing_zeros() as usize;
+
         for _ in 0..index_of_lowest_shared_bit {
             self.stack.pop();
         }
-        // then iterate up to the shared prefix again to compute changes
+
         for bit_index in (0..index_of_lowest_shared_bit).rev() {
-            let next_bit: bool = (next_position >> bit_index) & 1 != 0;
-            self.stack.push(match next_bit {
-                true => {
-                    *self.stack.last().unwrap() * self.messages[self.messages.len() - bit_index - 1]
-                }
-                false => {
-                    *self.stack.last().unwrap()
-                        * self.message_hats[self.messages.len() - bit_index - 1]
-                }
-            })
+            let next_bit = (next_position & (1 << bit_index)) != 0;
+            let last_element = self.stack.last().unwrap();
+            let multiplier = if next_bit {
+                *last_element * self.messages[messages_len - bit_index - 1]
+            } else {
+                *last_element * self.message_hats[message_hats_len - bit_index - 1]
+            };
+            self.stack.push(multiplier);
         }
+
         self.last_position = Some(next_position);
-        return *self.stack.last().unwrap();
+        *self.stack.last().unwrap()
     }
 }
 
