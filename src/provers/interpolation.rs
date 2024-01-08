@@ -22,6 +22,7 @@ pub trait SequentialLagrangePolynomial<F: Field> {
 pub struct BasicSequentialLagrangePolynomial<F: Field> {
     pub last_position: Option<usize>,
     pub messages: Vec<F>,
+    pub message_hats: Vec<F>,
     pub stack: Vec<F>,
 }
 impl<F: Field> BasicSequentialLagrangePolynomial<F> {
@@ -31,8 +32,16 @@ impl<F: Field> BasicSequentialLagrangePolynomial<F> {
         for message in &messages {
             stack.push(*stack.last().unwrap() * (F::ONE - message));
         }
+        let mut messages_clone = messages.clone();
+        messages_clone.reverse();
+        let message_hats: Vec<F> = messages_clone
+            .clone()
+            .iter()
+            .map(|message| F::ONE - message)
+            .collect();
         Self {
-            messages: messages.clone(),
+            messages: messages_clone,
+            message_hats,
             stack,
             last_position: None,
         }
@@ -51,13 +60,12 @@ impl<F: Field> SequentialLagrangePolynomial<F> for BasicSequentialLagrangePolyno
         let low_index_of_prefix = (bit_diff + 1).trailing_zeros() as usize;
         self.stack.truncate(self.stack.len() - low_index_of_prefix);
         // then, iterate up until shared prefix to compute changes
-        let messages_len = self.messages.len();
         for bit_index in (0..low_index_of_prefix).rev() {
             let last_element = self.stack.last().unwrap();
             let next_bit: bool = (next_position & (1 << bit_index)) != 0;
             self.stack.push(match next_bit {
-                true => *last_element * self.messages[messages_len - bit_index - 1],
-                false => *last_element * (F::ONE - self.messages[messages_len - bit_index - 1]),
+                true => *last_element * self.messages[bit_index],
+                false => *last_element * self.message_hats[bit_index],
             });
         }
         self.last_position = Some(next_position);
