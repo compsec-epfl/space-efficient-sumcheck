@@ -18,6 +18,8 @@ pub struct TradeoffProver<'a, F: Field> {
     pub num_stages: usize,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
+    pub inverse_verifier_messages: Vec<F>,
+    pub inverse_verifier_message_hats: Vec<F>,
     pub sums: Vec<F>,
     pub stage_size: usize,
 }
@@ -39,6 +41,8 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             num_stages,
             num_variables,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
+            inverse_verifier_messages: Vec::<F>::with_capacity(num_variables),
+            inverse_verifier_message_hats: Vec::<F>::with_capacity(num_variables),
             sums: Vec::<F>::with_capacity(stage_size),
             stage_size,
         }
@@ -67,8 +71,11 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                                                                                  // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
         let mut sum: Vec<F> = vec![F::ZERO; Hypercube::<F>::pow2(b2_num_vars)];
         // 2. Initialize st := LagInit((s - l)l, r)
-        let mut bslp: BasicSequentialLagrangePolynomial<F> =
-            BasicSequentialLagrangePolynomial::new(self.verifier_messages.clone());
+        let mut bslp: BasicSequentialLagrangePolynomial<F> = BasicSequentialLagrangePolynomial::new(
+            self.verifier_messages.clone(),
+            self.inverse_verifier_messages.clone(),
+            self.inverse_verifier_message_hats.clone(),
+        );
         // 3. For each b1 ∈ {0,1}^(s-1)l
         for b1_index in 0..Hypercube::<F>::pow2(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
@@ -130,6 +137,10 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
         if self.current_round != 0 {
             // store the verifier message
             self.verifier_messages.push(verifier_message.unwrap());
+            self.inverse_verifier_messages
+                .push(F::ONE / verifier_message.unwrap()); // optimization: only one division per round
+            self.inverse_verifier_message_hats
+                .push(F::ONE / (F::ONE - verifier_message.unwrap())); // optimization: only one division per round
         }
 
         if self.current_round % self.stage_size == 0 {

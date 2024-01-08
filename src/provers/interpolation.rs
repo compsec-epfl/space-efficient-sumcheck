@@ -1,5 +1,5 @@
 use crate::provers::hypercube::Hypercube;
-use ark_ff::{batch_inversion, Field};
+use ark_ff::Field;
 use std::cmp;
 
 pub fn lagrange_polynomial<F: Field>(x: &[F], w: &[F]) -> Option<F> {
@@ -29,18 +29,10 @@ pub struct BasicSequentialLagrangePolynomial<F: Field> {
     pub last_position: Option<usize>,
 }
 impl<F: Field> BasicSequentialLagrangePolynomial<F> {
-    pub fn new(messages: Vec<F>) -> Self {
+    pub fn new(messages: Vec<F>, inverse_messages: Vec<F>, inverse_message_hats: Vec<F>) -> Self {
         let last_value: F = messages
             .iter()
             .fold(F::ONE, |acc: F, &x| acc * (F::ONE - x));
-        let mut inverse_messages: Vec<F> = messages.clone();
-        batch_inversion(&mut inverse_messages);
-        let mut inverse_message_hats: Vec<F> = messages
-            .clone()
-            .iter()
-            .map(|message| F::ONE - message)
-            .collect();
-        batch_inversion(&mut inverse_message_hats);
         Self {
             messages: messages.to_vec(),
             inverse_messages,
@@ -98,14 +90,26 @@ mod tests {
         },
         test_helpers::TestField,
     };
-    use ark_ff::Field;
+    use ark_ff::{batch_inversion, Field};
 
     #[test]
     fn lag_next_test() {
         let messages: Vec<TestField> =
             vec![TestField::from(13), TestField::from(11), TestField::from(7)];
+        let mut inverse_messages: Vec<TestField> = messages.clone();
+        batch_inversion(&mut inverse_messages);
+        let mut inverse_message_hats: Vec<TestField> = messages
+            .clone()
+            .iter()
+            .map(|message| TestField::ONE - message)
+            .collect();
+        batch_inversion(&mut inverse_message_hats);
         let mut bslp: BasicSequentialLagrangePolynomial<TestField> =
-            BasicSequentialLagrangePolynomial::new(messages.clone());
+            BasicSequentialLagrangePolynomial::new(
+                messages.clone(),
+                inverse_messages,
+                inverse_message_hats,
+            );
         let st_0: TestField = bslp.next();
         assert_eq!(
             st_0,
