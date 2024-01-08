@@ -56,9 +56,7 @@ impl<F: Field> SequentialLagrangePolynomial<F> for BasicSequentialLagrangePolyno
         // first, pop all levels up until shared prefix
         let bit_diff = last_position ^ next_position;
         let low_index_of_prefix = (bit_diff + 1).trailing_zeros() as usize;
-        for _ in 0..low_index_of_prefix {
-            self.stack.pop();
-        }
+        self.stack.truncate(self.stack.len() - low_index_of_prefix);
         // then, iterate up until shared prefix to compute changes
         let messages_len = self.messages.len();
         for bit_index in (0..low_index_of_prefix).rev() {
