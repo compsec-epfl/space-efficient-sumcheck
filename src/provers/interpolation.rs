@@ -32,7 +32,8 @@ impl<F: Field> BasicSequentialLagrangePolynomial<F> {
             .iter()
             .map(|message| F::ONE - message)
             .collect();
-        let mut stack: Vec<F> = vec![F::ONE];
+        let mut stack: Vec<F> = Vec::with_capacity(messages.len() + 1);
+        stack.push(F::ONE);
         for message_hat in &message_hats {
             stack.push(*stack.last().unwrap() * message_hat);
         }
@@ -50,32 +51,24 @@ impl<F: Field> SequentialLagrangePolynomial<F> for BasicSequentialLagrangePolyno
             self.last_position = Some(0);
             return *self.stack.last().unwrap();
         }
-
         let last_position = self.last_position.unwrap();
         let next_position = last_position + 1;
-
-        let messages_len = self.messages.len();
-        let message_hats_len = self.message_hats.len();
-
-        let not_shared_bits_in_positions = last_position ^ next_position;
-        let index_of_lowest_shared_bit =
-            (not_shared_bits_in_positions + 1).trailing_zeros() as usize;
-
-        for _ in 0..index_of_lowest_shared_bit {
+        // first, pop all levels up until shared prefix
+        let bit_diff = last_position ^ next_position;
+        let low_index_of_prefix = (bit_diff + 1).trailing_zeros() as usize;
+        for _ in 0..low_index_of_prefix {
             self.stack.pop();
         }
-
-        for bit_index in (0..index_of_lowest_shared_bit).rev() {
-            let next_bit = (next_position & (1 << bit_index)) != 0;
+        // then, iterate up until shared prefix to compute changes
+        let messages_len = self.messages.len();
+        for bit_index in (0..low_index_of_prefix).rev() {
             let last_element = self.stack.last().unwrap();
-            let multiplier = if next_bit {
-                *last_element * self.messages[messages_len - bit_index - 1]
-            } else {
-                *last_element * self.message_hats[message_hats_len - bit_index - 1]
-            };
-            self.stack.push(multiplier);
+            let next_bit: bool = (next_position & (1 << bit_index)) != 0;
+            self.stack.push(match next_bit {
+                true => *last_element * self.messages[messages_len - bit_index - 1],
+                false => *last_element * self.message_hats[messages_len - bit_index - 1],
+            });
         }
-
         self.last_position = Some(next_position);
         *self.stack.last().unwrap()
     }
