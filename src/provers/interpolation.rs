@@ -29,14 +29,9 @@ impl<F: Field> BasicSequentialLagrangePolynomial<F> {
     pub fn new(messages: Vec<F>, message_hats: Vec<F>) -> Self {
         let mut stack: Vec<F> = Vec::with_capacity(messages.len() + 1);
         stack.push(F::ONE);
-        for message_hat in &message_hats {
+        for message_hat in message_hats.iter().rev() {
             stack.push(*stack.last().unwrap() * message_hat);
         }
-        // check if reversing once is better than indexing v[len - i - 1] like that
-        // let mut messages_clone = messages.clone();
-        // messages_clone.reverse();
-        // let mut message_hats_clone = message_hats.clone();
-        // message_hats_clone.reverse();
         // return
         Self {
             messages: messages,
@@ -64,13 +59,12 @@ impl<F: Field> SequentialLagrangePolynomial<F> for BasicSequentialLagrangePolyno
         let low_index_of_prefix = (bit_diff + 1).trailing_zeros() as usize;
         self.stack.truncate(self.stack.len() - low_index_of_prefix);
         // then, iterate up until shared prefix to compute changes
-        let messages_len = self.messages.len();
         for bit_index in (0..low_index_of_prefix).rev() {
             let last_element = self.stack.last().unwrap();
             let next_bit: bool = (next_position & (1 << bit_index)) != 0;
             self.stack.push(match next_bit {
-                true => *last_element * self.messages[messages_len - bit_index - 1],
-                false => *last_element * self.message_hats[messages_len - bit_index - 1],
+                true => *last_element * self.messages[bit_index],
+                false => *last_element * self.message_hats[bit_index],
             });
         }
         self.last_position = Some(next_position);
@@ -89,13 +83,15 @@ mod tests {
 
     #[test]
     fn lag_next_test() {
-        let messages: Vec<TestField> =
+        let mut messages: Vec<TestField> =
             vec![TestField::from(13), TestField::from(11), TestField::from(7)];
-        let message_hats: Vec<TestField> = messages
+        messages.reverse();
+        let mut message_hats: Vec<TestField> = messages
             .clone()
             .iter()
             .map(|message| TestField::from(1) - message)
             .collect();
+        message_hats.reverse();
         let mut bslp: BasicSequentialLagrangePolynomial<TestField> =
             BasicSequentialLagrangePolynomial::new(messages.clone(), message_hats.clone());
         let st_0: TestField = bslp.next();

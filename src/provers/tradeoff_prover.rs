@@ -19,6 +19,8 @@ pub struct TradeoffProver<'a, F: Field> {
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
     pub verifier_message_hats: Vec<F>,
+    pub verifier_messages_reverse: Vec<F>,
+    pub verifier_message_hats_reverse: Vec<F>,
     pub sums: Vec<F>,
     pub stage_size: usize,
 }
@@ -41,6 +43,8 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             num_variables,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
+            verifier_messages_reverse: Vec::<F>::with_capacity(num_variables),
+            verifier_message_hats_reverse: Vec::<F>::with_capacity(num_variables),
             sums: Vec::<F>::with_capacity(stage_size),
             stage_size,
         }
@@ -70,8 +74,8 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         let mut sum: Vec<F> = vec![F::ZERO; Hypercube::pow2(b2_num_vars)];
         // 2. Initialize st := LagInit((s - l)l, r)
         let mut bslp: BasicSequentialLagrangePolynomial<F> = BasicSequentialLagrangePolynomial::new(
-            self.verifier_messages.clone(),
-            self.verifier_message_hats.clone(),
+            self.verifier_messages_reverse.clone(),
+            self.verifier_message_hats_reverse.clone(),
         );
         // 3. For each b1 ∈ {0,1}^(s-1)l
         for b1_index in 0..Hypercube::pow2(b1_num_vars) {
@@ -150,6 +154,10 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
             self.verifier_messages.push(verifier_message.unwrap());
             self.verifier_message_hats
                 .push(F::ONE - verifier_message.unwrap());
+            self.verifier_messages_reverse
+                .insert(0, verifier_message.unwrap());
+            self.verifier_message_hats_reverse
+                .insert(0, F::ONE - verifier_message.unwrap());
         }
 
         if self.current_round % self.stage_size == 0 {
