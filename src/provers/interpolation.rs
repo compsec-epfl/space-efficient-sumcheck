@@ -1,5 +1,7 @@
 use ark_ff::Field;
 
+use crate::provers::hypercube::Hypercube;
+
 pub fn lagrange_polynomial<F: Field>(x: Vec<F>, x_hat: Vec<F>, b: Vec<bool>) -> F {
     x.to_vec()
         .iter()
@@ -24,22 +26,21 @@ pub struct BasicSequentialLagrangePolynomial<F: Field> {
     pub stack: Vec<F>,
 }
 impl<F: Field> BasicSequentialLagrangePolynomial<F> {
-    pub fn new(messages: Vec<F>) -> Self {
+    pub fn new(messages: Vec<F>, message_hats: Vec<F>) -> Self {
         let mut stack: Vec<F> = Vec::with_capacity(messages.len() + 1);
         stack.push(F::ONE);
-        for message in &messages {
-            stack.push(*stack.last().unwrap() * (F::ONE - message));
+        for message_hat in &message_hats {
+            stack.push(*stack.last().unwrap() * message_hat);
         }
+        // check if reversing once is better than indexing v[len - i - 1] like that
         let mut messages_clone = messages.clone();
         messages_clone.reverse();
-        let message_hats: Vec<F> = messages_clone
-            .clone()
-            .iter()
-            .map(|message| F::ONE - message)
-            .collect();
+        let mut message_hats_clone = message_hats.clone();
+        message_hats_clone.reverse();
+        // return
         Self {
             messages: messages_clone,
-            message_hats,
+            message_hats: message_hats_clone,
             stack,
             last_position: None,
         }
@@ -94,9 +95,8 @@ mod tests {
             .iter()
             .map(|message| TestField::from(1) - message)
             .collect();
-        println!("{:?}", message_hats);
         let mut bslp: BasicSequentialLagrangePolynomial<TestField> =
-            BasicSequentialLagrangePolynomial::new(messages.clone());
+            BasicSequentialLagrangePolynomial::new(messages.clone(), message_hats.clone());
         let st_0: TestField = bslp.next();
         let exp_0: TestField = lagrange_polynomial(
             messages.clone(),
