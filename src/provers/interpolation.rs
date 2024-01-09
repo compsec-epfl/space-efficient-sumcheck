@@ -29,7 +29,7 @@ impl<F: Field> BasicSequentialLagrangePolynomial<F> {
     pub fn new(messages: Vec<F>, message_hats: Vec<F>) -> Self {
         let mut stack: Vec<F> = Vec::with_capacity(messages.len() + 1);
         stack.push(F::ONE);
-        // check if this running product is faster
+        // didn't notice any perf difference w/ this variable running_product but keeping anyway
         let mut running_product = F::ONE;
         for message_hat in &message_hats {
             running_product *= message_hat;
