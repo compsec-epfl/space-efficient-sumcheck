@@ -27,20 +27,16 @@ pub struct BasicSequentialLagrangePolynomial<F: Field> {
     pub last_position: Option<usize>,
 }
 impl<F: Field> BasicSequentialLagrangePolynomial<F> {
-    pub fn new(messages: Vec<F>) -> Self {
-        let last_value: F = messages
+    pub fn new(messages: Vec<F>, message_hats: Vec<F>) -> Self {
+        let last_value: F = message_hats
             .iter()
-            .fold(F::ONE, |acc: F, &x| acc * (F::ONE - x));
+            .fold(F::ONE, |acc: F, &message_hat| acc * message_hat);
         let mut inverse_messages: Vec<F> = messages.clone();
         batch_inversion(&mut inverse_messages);
-        let mut inverse_message_hats: Vec<F> = messages
-            .clone()
-            .iter()
-            .map(|message| F::ONE - message)
-            .collect();
+        let mut inverse_message_hats: Vec<F> = message_hats.clone();
         batch_inversion(&mut inverse_message_hats);
         Self {
-            messages: messages.to_vec(),
+            messages: messages,
             inverse_messages,
             inverse_message_hats,
             last_value,
@@ -106,9 +102,8 @@ mod tests {
             .iter()
             .map(|message| TestField::from(1) - message)
             .collect();
-        println!("{:?}", message_hats);
         let mut bslp: BasicSequentialLagrangePolynomial<TestField> =
-            BasicSequentialLagrangePolynomial::new(messages.clone());
+            BasicSequentialLagrangePolynomial::new(messages.clone(), message_hats.clone());
         let st_0: TestField = bslp.next();
         let exp_0: TestField = lagrange_polynomial(
             messages.clone(),
