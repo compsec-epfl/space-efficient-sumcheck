@@ -1,18 +1,16 @@
 use ark_ff::Field;
 
-pub fn lagrange_polynomial<F: Field>(x: &[F], w: &[F]) -> Option<F> {
-    if x.len() != w.len() {
-        None
-    } else {
-        Some(
-            x.to_vec()
-                .iter()
-                .zip(w.iter())
-                .fold(F::ONE, |acc, (&x_i, &w_i)| {
-                    acc * (x_i * w_i + (F::ONE - x_i) * (F::ONE - w_i))
-                }),
-        )
-    }
+pub fn lagrange_polynomial<F: Field>(x: Vec<F>, x_hat: Vec<F>, b: Vec<bool>) -> F {
+    x.to_vec()
+        .iter()
+        .zip(x_hat.iter())
+        .zip(b.iter())
+        .fold(F::ONE, |acc, ((x_i, x_hat_i), b_i)| {
+            acc * match b_i {
+                true => x_i,
+                false => x_hat_i,
+            }
+        })
 }
 
 pub trait SequentialLagrangePolynomial<F: Field> {
@@ -53,6 +51,11 @@ impl<F: Field> SequentialLagrangePolynomial<F> for BasicSequentialLagrangePolyno
             self.last_position = Some(0);
             return *self.stack.last().unwrap();
         }
+
+        // check we haven't interated too far
+        assert!(self.last_position.unwrap() < Hypercube::pow2(self.messages.len()) - 1); // e.g. 2 ^ 3 = 8, so 7 is 111
+
+        // this is any other next() after initialization
         let last_position = self.last_position.unwrap();
         let next_position = last_position + 1;
         // first, pop all levels up until shared prefix
@@ -81,85 +84,74 @@ mod tests {
         },
         test_helpers::TestField,
     };
-    use ark_ff::Field;
 
     #[test]
     fn lag_next_test() {
         let messages: Vec<TestField> =
             vec![TestField::from(13), TestField::from(11), TestField::from(7)];
+        let message_hats: Vec<TestField> = messages
+            .clone()
+            .iter()
+            .map(|message| TestField::from(1) - message)
+            .collect();
+        println!("{:?}", message_hats);
         let mut bslp: BasicSequentialLagrangePolynomial<TestField> =
             BasicSequentialLagrangePolynomial::new(messages.clone());
         let st_0: TestField = bslp.next();
-        assert_eq!(
-            st_0,
-            lagrange_polynomial(
-                &vec![TestField::ZERO, TestField::ZERO, TestField::ZERO],
-                &messages
-            )
-            .unwrap()
+        let exp_0: TestField = lagrange_polynomial(
+            messages.clone(),
+            message_hats.clone(),
+            vec![false, false, false],
         );
+        assert_eq!(st_0, exp_0);
         let st_1: TestField = bslp.next();
-        assert_eq!(
-            st_1,
-            lagrange_polynomial(
-                &vec![TestField::ZERO, TestField::ZERO, TestField::ONE],
-                &messages
-            )
-            .unwrap()
+        let exp_1: TestField = lagrange_polynomial(
+            messages.clone(),
+            message_hats.clone(),
+            vec![false, false, true],
         );
+        assert_eq!(st_1, exp_1);
         let st_2: TestField = bslp.next();
-        assert_eq!(
-            st_2,
-            lagrange_polynomial(
-                &vec![TestField::ZERO, TestField::ONE, TestField::ZERO],
-                &messages
-            )
-            .unwrap()
+        let exp_2: TestField = lagrange_polynomial(
+            messages.clone(),
+            message_hats.clone(),
+            vec![false, true, false],
         );
+        assert_eq!(st_2, exp_2);
         let st_3: TestField = bslp.next();
-        assert_eq!(
-            st_3,
-            lagrange_polynomial(
-                &vec![TestField::ZERO, TestField::ONE, TestField::ONE],
-                &messages
-            )
-            .unwrap()
+        let exp_3: TestField = lagrange_polynomial(
+            messages.clone(),
+            message_hats.clone(),
+            vec![false, true, true],
         );
+        assert_eq!(st_3, exp_3);
         let st_4: TestField = bslp.next();
-        assert_eq!(
-            st_4,
-            lagrange_polynomial(
-                &vec![TestField::ONE, TestField::ZERO, TestField::ZERO],
-                &messages
-            )
-            .unwrap()
+        let exp_4: TestField = lagrange_polynomial(
+            messages.clone(),
+            message_hats.clone(),
+            vec![true, false, false],
         );
+        assert_eq!(st_4, exp_4);
         let st_5: TestField = bslp.next();
-        assert_eq!(
-            st_5,
-            lagrange_polynomial(
-                &vec![TestField::ONE, TestField::ZERO, TestField::ONE],
-                &messages
-            )
-            .unwrap()
+        let exp_5: TestField = lagrange_polynomial(
+            messages.clone(),
+            message_hats.clone(),
+            vec![true, false, true],
         );
+        assert_eq!(st_5, exp_5);
         let st_6: TestField = bslp.next();
-        assert_eq!(
-            st_6,
-            lagrange_polynomial(
-                &vec![TestField::ONE, TestField::ONE, TestField::ZERO],
-                &messages
-            )
-            .unwrap()
+        let exp_6: TestField = lagrange_polynomial(
+            messages.clone(),
+            message_hats.clone(),
+            vec![true, true, false],
         );
+        assert_eq!(st_6, exp_6);
         let st_7: TestField = bslp.next();
-        assert_eq!(
-            st_7,
-            lagrange_polynomial(
-                &vec![TestField::ONE, TestField::ONE, TestField::ONE],
-                &messages
-            )
-            .unwrap()
+        let exp_7: TestField = lagrange_polynomial(
+            messages.clone(),
+            message_hats.clone(),
+            vec![true, true, true],
         );
+        assert_eq!(st_7, exp_7);
     }
 }

@@ -18,6 +18,7 @@ pub struct TradeoffProver<'a, F: Field> {
     pub num_stages: usize,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
+    pub verifier_message_hats: Vec<F>,
     pub sums: Vec<F>,
     pub stage_size: usize,
 }
@@ -39,6 +40,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             num_stages,
             num_variables,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
+            verifier_message_hats: Vec::<F>::with_capacity(num_variables),
             sums: Vec::<F>::with_capacity(stage_size),
             stage_size,
         }
@@ -65,17 +67,17 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         let b2_num_vars: usize = self.stage_size; // := l
         let b3_num_vars: usize = self.num_variables - b1_num_vars - b2_num_vars; // := (k-s)l because we are zero-indexed
                                                                                  // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
-        let mut sum: Vec<F> = vec![F::ZERO; Hypercube::<F>::pow2(b2_num_vars)];
+        let mut sum: Vec<F> = vec![F::ZERO; Hypercube::pow2(b2_num_vars)];
         // 2. Initialize st := LagInit((s - l)l, r)
         let mut bslp: BasicSequentialLagrangePolynomial<F> =
             BasicSequentialLagrangePolynomial::new(self.verifier_messages.clone());
         // 3. For each b1 ∈ {0,1}^(s-1)l
-        for b1_index in 0..Hypercube::<F>::pow2(b1_num_vars) {
+        for b1_index in 0..Hypercube::pow2(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
             let lag_poly = bslp.next();
             // (b) For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
-            for b2_index in 0..Hypercube::<F>::pow2(b2_num_vars) {
-                for b3_index in 0..Hypercube::<F>::pow2(b3_num_vars) {
+            for b2_index in 0..Hypercube::pow2(b2_num_vars) {
+                for b3_index in 0..Hypercube::pow2(b3_num_vars) {
                     let index = b1_index << (b2_num_vars + b3_num_vars)
                         | b2_index << b3_num_vars
                         | b3_index;
@@ -91,15 +93,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         let mut sum_1 = F::ZERO;
         let j_prime = self.current_round - (self.current_stage() * self.stage_size); // := j-(s-1)l
         let r_shift = self.current_stage() * self.stage_size;
-        for (b2_start_index, b2_start) in Hypercube::<F>::new(j_prime + 1).enumerate() {
-            let mut r2_start_0: Vec<F> =
-                self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
-            let mut r2_start_1: Vec<F> =
-                self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
-            r2_start_0.push(F::ZERO); // need to add ZERO to end
-            r2_start_1.push(F::ONE); // need to add ONE to end
-            let lag_poly_0: F = lagrange_polynomial(&b2_start, &r2_start_0).unwrap();
-            let lag_poly_1: F = lagrange_polynomial(&b2_start, &r2_start_1).unwrap();
+        for (b2_start_index, b2_start) in Hypercube::new(j_prime + 1).enumerate() {
             let b2_start_index_0 = b2_start_index << (self.stage_size - j_prime - 1);
             let b2_start_index_1 =
                 Self::shift_and_one_fill(b2_start_index, self.stage_size - j_prime - 1);
@@ -109,8 +103,30 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                 partial_sums[b2_start_index_0 - 1]
             };
             let right_value = partial_sums[b2_start_index_1];
-            sum_0 += lag_poly_0 * (right_value - left_value);
-            sum_1 += lag_poly_1 * (right_value - left_value);
+            match *b2_start.last().unwrap() {
+                false => {
+                    let mut r2_start_0: Vec<F> =
+                        self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
+                    r2_start_0.push(F::ZERO); // need to add ZERO to end
+                    let mut r2_start_hat_0: Vec<F> =
+                        self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec();
+                    r2_start_hat_0.push(F::ONE); // need to add ONE - ZERO to end
+                    let lag_poly_0: F =
+                        lagrange_polynomial(r2_start_0.clone(), r2_start_hat_0, b2_start.clone());
+                    sum_0 += lag_poly_0 * (right_value - left_value);
+                }
+                true => {
+                    let mut r2_start_1: Vec<F> =
+                        self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
+                    r2_start_1.push(F::ONE); // need to add ONE to end
+                    let mut r2_start_hat_1: Vec<F> =
+                        self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec();
+                    r2_start_hat_1.push(F::ZERO); // need to add ONE - ONE to end
+                    let lag_poly_1: F =
+                        lagrange_polynomial(r2_start_1, r2_start_hat_1, b2_start.clone());
+                    sum_1 += lag_poly_1 * (right_value - left_value);
+                }
+            }
         }
         return (sum_0, sum_1);
     }
@@ -130,6 +146,8 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
         if self.current_round != 0 {
             // store the verifier message
             self.verifier_messages.push(verifier_message.unwrap());
+            self.verifier_message_hats
+                .push(F::ONE - verifier_message.unwrap());
         }
 
         if self.current_round % self.stage_size == 0 {
