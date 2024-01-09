@@ -11,6 +11,7 @@ pub struct TimeProver<'a, F: Field> {
     pub evaluation_stream: Box<&'a dyn EvaluationStream<F>>, // Keep this for now, case we can do some small optimizations of first round etc
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
+    pub verifier_message_hats: Vec<F>,
 }
 
 impl<'a, F: Field> TimeProver<'a, F> {
@@ -29,6 +30,7 @@ impl<'a, F: Field> TimeProver<'a, F> {
             evaluation_stream,
             num_variables,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
+            verifier_message_hats: Vec::<F>::with_capacity(num_variables),
         }
     }
     fn num_free_variables(&self) -> usize {

@@ -12,6 +12,7 @@ pub struct SpaceProver<'a, F: Field> {
     pub evaluation_stream: Box<&'a dyn EvaluationStream<F>>,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
+    pub verifier_message_hats: Vec<F>,
 }
 
 impl<'a, F: Field> SpaceProver<'a, F> {
@@ -22,6 +23,7 @@ impl<'a, F: Field> SpaceProver<'a, F> {
             claimed_sum,
             evaluation_stream,
             verifier_messages: Vec::<F>::with_capacity(num_variables), // TODO: could be halfed somehow
+            verifier_message_hats: Vec::<F>::with_capacity(num_variables),
             current_round: 0,
             num_variables,
         }
@@ -34,8 +36,12 @@ impl<'a, F: Field> SpaceProver<'a, F> {
         // iterate in two loops
         let num_vars_outer_loop = self.current_round;
         let num_vars_inner_loop = self.num_variables - num_vars_outer_loop;
-        for (index_outer, outer) in Hypercube::<F>::new(num_vars_outer_loop).enumerate() {
-            let weight: F = lagrange_polynomial(&outer, &self.verifier_messages).unwrap();
+        for (index_outer, outer) in Hypercube::new(num_vars_outer_loop).enumerate() {
+            let weight: F = lagrange_polynomial(
+                self.verifier_messages.clone(),
+                self.verifier_message_hats.clone(),
+                outer,
+            );
             for index_inner in 0..2_usize.pow(num_vars_inner_loop as u32) {
                 let evaluation_index = index_outer << num_vars_inner_loop | index_inner;
                 let is_set: bool = (evaluation_index & bitmask) != 0;
@@ -76,6 +82,8 @@ impl<'a, F: Field> Prover<F> for SpaceProver<'a, F> {
         // If it's not the first round, add the verifier message to verifier_messages
         if self.current_round != 0 {
             self.verifier_messages.push(verifier_message.unwrap());
+            self.verifier_message_hats
+                .push(F::ONE - verifier_message.unwrap());
         }
 
         // evaluate using cty
