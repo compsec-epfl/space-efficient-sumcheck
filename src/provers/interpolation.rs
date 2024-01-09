@@ -33,14 +33,14 @@ impl<F: Field> BasicSequentialLagrangePolynomial<F> {
             stack.push(*stack.last().unwrap() * message_hat);
         }
         // check if reversing once is better than indexing v[len - i - 1] like that
-        let mut messages_clone = messages.clone();
-        messages_clone.reverse();
-        let mut message_hats_clone = message_hats.clone();
-        message_hats_clone.reverse();
+        // let mut messages_clone = messages.clone();
+        // messages_clone.reverse();
+        // let mut message_hats_clone = message_hats.clone();
+        // message_hats_clone.reverse();
         // return
         Self {
-            messages: messages_clone,
-            message_hats: message_hats_clone,
+            messages: messages,
+            message_hats: message_hats,
             stack,
             last_position: None,
         }
@@ -64,12 +64,13 @@ impl<F: Field> SequentialLagrangePolynomial<F> for BasicSequentialLagrangePolyno
         let low_index_of_prefix = (bit_diff + 1).trailing_zeros() as usize;
         self.stack.truncate(self.stack.len() - low_index_of_prefix);
         // then, iterate up until shared prefix to compute changes
+        let messages_len = self.messages.len();
         for bit_index in (0..low_index_of_prefix).rev() {
             let last_element = self.stack.last().unwrap();
             let next_bit: bool = (next_position & (1 << bit_index)) != 0;
             self.stack.push(match next_bit {
-                true => *last_element * self.messages[bit_index],
-                false => *last_element * self.message_hats[bit_index],
+                true => *last_element * self.messages[messages_len - bit_index - 1],
+                false => *last_element * self.message_hats[messages_len - bit_index - 1],
             });
         }
         self.last_position = Some(next_position);
