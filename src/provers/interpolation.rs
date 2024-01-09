@@ -29,8 +29,11 @@ impl<F: Field> BasicSequentialLagrangePolynomial<F> {
     pub fn new(messages: Vec<F>, message_hats: Vec<F>) -> Self {
         let mut stack: Vec<F> = Vec::with_capacity(messages.len() + 1);
         stack.push(F::ONE);
+        // check if this running product is faster
+        let mut running_product = F::ONE;
         for message_hat in &message_hats {
-            stack.push(*stack.last().unwrap() * message_hat);
+            running_product *= message_hat;
+            stack.push(running_product);
         }
         // confirmed slightly faster to reverse these first rather than index in reverse like v[len - i - 1]
         let mut messages_clone = messages.clone();
