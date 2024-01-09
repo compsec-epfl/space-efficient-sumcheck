@@ -29,13 +29,18 @@ impl<F: Field> BasicSequentialLagrangePolynomial<F> {
     pub fn new(messages: Vec<F>, message_hats: Vec<F>) -> Self {
         let mut stack: Vec<F> = Vec::with_capacity(messages.len() + 1);
         stack.push(F::ONE);
-        for message_hat in message_hats.iter().rev() {
+        for message_hat in &message_hats {
             stack.push(*stack.last().unwrap() * message_hat);
         }
+        // confirmed slightly faster to reverse these first rather than index in reverse like v[len - i - 1]
+        let mut messages_clone = messages.clone();
+        messages_clone.reverse();
+        let mut message_hats_clone = message_hats.clone();
+        message_hats_clone.reverse();
         // return
         Self {
-            messages: messages,
-            message_hats: message_hats,
+            messages: messages_clone,
+            message_hats: message_hats_clone,
             stack,
             last_position: None,
         }
@@ -83,15 +88,13 @@ mod tests {
 
     #[test]
     fn lag_next_test() {
-        let mut messages: Vec<TestField> =
+        let messages: Vec<TestField> =
             vec![TestField::from(13), TestField::from(11), TestField::from(7)];
-        messages.reverse();
-        let mut message_hats: Vec<TestField> = messages
+        let message_hats: Vec<TestField> = messages
             .clone()
             .iter()
             .map(|message| TestField::from(1) - message)
             .collect();
-        message_hats.reverse();
         let mut bslp: BasicSequentialLagrangePolynomial<TestField> =
             BasicSequentialLagrangePolynomial::new(messages.clone(), message_hats.clone());
         let st_0: TestField = bslp.next();
