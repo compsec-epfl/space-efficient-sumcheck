@@ -69,8 +69,10 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                                                                                  // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
         let mut sum: Vec<F> = vec![F::ZERO; Hypercube::pow2(b2_num_vars)];
         // 2. Initialize st := LagInit((s - l)l, r)
-        let mut bslp: BasicSequentialLagrangePolynomial<F> =
-            BasicSequentialLagrangePolynomial::new(self.verifier_messages.clone());
+        let mut bslp: BasicSequentialLagrangePolynomial<F> = BasicSequentialLagrangePolynomial::new(
+            self.verifier_messages.clone(),
+            self.verifier_message_hats.clone(),
+        );
         // 3. For each b1 ∈ {0,1}^(s-1)l
         for b1_index in 0..Hypercube::pow2(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
