@@ -152,15 +152,22 @@ pub fn test_polynomial() -> Vec<TestField> {
 
 // https://github.com/montekki/thaler-study/blob/master/sum-check-protocol/src/lib.rs
 pub trait TestHelperPolynomial<F: Field> {
-    fn evaluate(&self, point: &[F]) -> Option<F>;
+    fn evaluate(&self, point: &[bool]) -> Option<F>;
     fn num_vars(&self) -> usize;
     fn to_evaluations(&self) -> Vec<F>;
 }
 impl<F: Field> TestHelperPolynomial<F> for multivariate::SparsePolynomial<F, SparseTerm> {
-    fn evaluate(&self, point: &[F]) -> Option<F> {
+    fn evaluate(&self, point: &[bool]) -> Option<F> {
+        let mut point_field_element: Vec<F> = Vec::with_capacity(point.len());
+        for bit in point {
+            point_field_element.push(match bit {
+                true => F::ONE,
+                false => F::ZERO,
+            })
+        }
         let mut eval = F::ZERO;
         for (coeff, term) in self.terms().iter() {
-            eval += term.evaluate(&point) * coeff;
+            eval += term.evaluate(&point_field_element) * coeff;
         }
         Some(eval)
     }
@@ -168,8 +175,8 @@ impl<F: Field> TestHelperPolynomial<F> for multivariate::SparsePolynomial<F, Spa
         DenseMVPolynomial::num_vars(self)
     }
     fn to_evaluations(&self) -> Vec<F> {
-        Hypercube::<F>::new(DenseMVPolynomial::<F>::num_vars(self))
-            .map(|point: Vec<F>| TestHelperPolynomial::<F>::evaluate(self, &point).unwrap())
+        Hypercube::new(DenseMVPolynomial::<F>::num_vars(self))
+            .map(|point: Vec<bool>| TestHelperPolynomial::<F>::evaluate(self, &point).unwrap())
             .collect()
     }
 }
