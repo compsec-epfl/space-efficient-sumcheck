@@ -66,7 +66,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         let b1_num_vars: usize = self.current_stage() * self.stage_size; // := (s-1)l because we are zero-indexed
         let b2_num_vars: usize = self.stage_size; // := l
         let b3_num_vars: usize = self.num_variables - b1_num_vars - b2_num_vars; // := (k-s)l because we are zero-indexed
-                                                                                 // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
+        // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
         let mut sum: Vec<F> = vec![F::ZERO; Hypercube::pow2(b2_num_vars)];
         // 2. Initialize st := LagInit((s - l)l, r)
         let mut bslp: BasicSequentialLagrangePolynomial<F> = BasicSequentialLagrangePolynomial::new(
