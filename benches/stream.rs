@@ -35,31 +35,8 @@ enum Algorithm {
     Tradeoff,
 }
 
-fn run_bench<F: Field, P: Prover<F>>(
-    _c: &mut Criterion,
-    mut prover: P,
-    label: &String,
-    num_variables: usize,
-) {
-    let mut rng = ark_std::test_rng();
-    epoch::advance().unwrap();
-    let start_time = Instant::now();
-    Sumcheck::prove(&mut prover, &mut rng);
-    let end_time = Instant::now();
-    let elapsed_time = end_time - start_time;
-    let bytes_allocated = stats::allocated::read().unwrap();
-    println!(
-        "{}, {}, {}, {}, {}",
-        label,
-        num_variables,
-        elapsed_time.as_millis(),
-        num_variables,
-        bytes_allocated
-    );
-}
-
 fn run_group<F: Field>(
-    c: &mut Criterion,
+    _c: &mut Criterion,
     algorithm: Algorithm,
     max_num_variables: usize,
     stage_size: Option<usize>,
@@ -68,26 +45,37 @@ fn run_group<F: Field>(
     for num_variables in 15..=max_num_variables {
         if stage_size == None || num_variables % stage_size.unwrap() == 0 {
             let stream: BenchEvaluationStream<F> = BenchEvaluationStream::<F>::new(num_variables);
+            let mut rng = ark_std::test_rng();
+            epoch::advance().unwrap();
+            let start_time = Instant::now();
             match algorithm {
-                Algorithm::CTY => run_bench(
-                    c,
-                    SpaceProver::<F>::new(Box::new(&stream)),
-                    &label,
-                    num_variables,
-                ),
-                Algorithm::VSBW => run_bench(
-                    c,
-                    TimeProver::<F>::new(Box::new(&stream)),
-                    &label,
-                    num_variables,
-                ),
-                Algorithm::Tradeoff => run_bench(
-                    c,
-                    TradeoffProver::<F>::new(Box::new(&stream), stage_size.unwrap()),
-                    &label,
-                    num_variables,
-                ),
+                Algorithm::CTY => {
+                    Sumcheck::prove(&mut SpaceProver::<F>::new(Box::new(&stream)), &mut rng);
+                }
+                Algorithm::VSBW => {
+                    Sumcheck::prove(&mut TimeProver::<F>::new(Box::new(&stream)), &mut rng);
+                }
+                Algorithm::Tradeoff => {
+                    Sumcheck::prove(
+                        &mut TradeoffProver::<F>::new(Box::new(&stream), stage_size.unwrap()),
+                        &mut rng,
+                    );
+                }
             };
+            let end_time = Instant::now();
+            let elapsed_time = end_time - start_time;
+            let bytes_allocated = stats::allocated::read().unwrap();
+            let bytes_resident = stats::resident::read().unwrap();
+            println!(
+                "{}, {}, {}, {}, {}, {}, {}",
+                label,
+                num_variables,
+                elapsed_time.as_millis(),
+                num_variables,
+                bytes_allocated,
+                num_variables,
+                bytes_resident,
+            );
         }
     }
 }
@@ -239,6 +227,6 @@ fn tradeoff_k4_benches(c: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default().sample_size(10);
-    targets = warm_up, tradeoff_k2_benches, tradeoff_k3_benches, tradeoff_k4_benches, vsbw_benches, cty_benches
+    targets = warm_up, vsbw_benches, tradeoff_k2_benches, tradeoff_k3_benches, tradeoff_k4_benches, cty_benches
 }
 criterion_main!(benches);
