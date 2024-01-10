@@ -11,7 +11,7 @@ ark-std ="0.4.0"
 [dev-dependencies]
 ark-bn254 = "0.4.0"
 criterion = "0.3"
-jemalloc-ctl = "0.3"
+jemalloc-ctl = "0.5"
 jemallocator = "0.3"
 
 [[bench]]
