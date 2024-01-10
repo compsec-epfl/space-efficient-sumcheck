@@ -49,12 +49,12 @@ impl<'a, F: Field> TimeProver<'a, F> {
         }
         (sum_0, sum_1)
     }
-    fn vsbw_reduce_evaluations(&mut self, verifier_message: F) {
+    fn vsbw_reduce_evaluations(&mut self, verifier_message: F, verifier_message_hat: F) {
         let half_size: usize = self.evaluations.len() / 2;
         let setbit: usize = 1 << self.num_free_variables(); // we use this to index the second half of the last round's evaluations e.g 001 AND 101
         for i0 in 0..half_size {
             let i1 = i0 | setbit;
-            self.evaluations[i0] = self.evaluations[i0] * (F::ONE - verifier_message)
+            self.evaluations[i0] = self.evaluations[i0] * verifier_message_hat
                 + self.evaluations[i1] * verifier_message;
         }
         self.evaluations.truncate(half_size);
@@ -71,14 +71,27 @@ impl<'a, F: Field> Prover<F> for TimeProver<'a, F> {
             return None;
         }
 
-        // If it's not the first round, reduce the evaluations table
-        if self.current_round != 0 {
-            // update the evaluations table by absorbing leftmost variable assigned to verifier_message
-            self.vsbw_reduce_evaluations(verifier_message.unwrap())
+        // mem 1/2 optimization requires 3 cases:
+        let sums: (F, F);
+        match self.current_round {
+            0 => {
+                // no reduce, evaluate should be done from stream
+                sums = self.vsbw_evaluate();
+            }
+            // 1 => {
+            //     // reduce should be done from stream, evaluate as normal
+            //     self.vsbw_reduce_evaluations(verifier_message.unwrap(), F::ONE - verifier_message.unwrap(), true);
+            //     sums = self.vsbw_evaluate(false);
+            // },
+            _ => {
+                // reduce as normal, evaluate as normal
+                self.vsbw_reduce_evaluations(
+                    verifier_message.unwrap(),
+                    F::ONE - verifier_message.unwrap(),
+                );
+                sums = self.vsbw_evaluate();
+            }
         }
-
-        // evaluate using vsbw
-        let sums = self.vsbw_evaluate();
 
         // Increment the round counter
         self.current_round += 1;
