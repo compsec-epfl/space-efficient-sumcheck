@@ -6,7 +6,7 @@ use ark_ff::{
 
 use space_efficient_sumcheck::{
     provers::{
-        test_helpers::BenchEvaluationStream, Prover, SpaceProver, TimeProver, TradeoffProver,
+        test_helpers::BenchEvaluationStream, SpaceProver, TimeProver, TradeoffProver,
     },
     Sumcheck,
 };
