@@ -2,11 +2,7 @@ use ark_ff::Field;
 use ark_std::vec::Vec;
 
 use crate::provers::{
-    evaluation_stream::EvaluationStream,
-    hypercube::Hypercube,
-    interpolation::{
-        lagrange_polynomial, BasicSequentialLagrangePolynomial, SequentialLagrangePolynomial,
-    },
+    evaluation_stream::EvaluationStream, hypercube::Hypercube, interpolation::LagrangePolynomial,
     Prover,
 };
 
@@ -69,14 +65,14 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                                                                                  // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
         let mut sum: Vec<F> = vec![F::ZERO; Hypercube::pow2(b2_num_vars)];
         // 2. Initialize st := LagInit((s - l)l, r)
-        let mut bslp: BasicSequentialLagrangePolynomial<F> = BasicSequentialLagrangePolynomial::new(
+        let mut bslp: LagrangePolynomial<F> = LagrangePolynomial::new(
             self.verifier_messages.clone(),
             self.verifier_message_hats.clone(),
         );
         // 3. For each b1 ∈ {0,1}^(s-1)l
         for b1_index in 0..Hypercube::pow2(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
-            let lag_poly = bslp.next();
+            let lag_poly = bslp.next().unwrap();
             // (b) For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
             for b2_index in 0..Hypercube::pow2(b2_num_vars) {
                 for b3_index in 0..Hypercube::pow2(b3_num_vars) {
@@ -112,8 +108,11 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                     let mut r2_start_hat_0: Vec<F> =
                         self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec();
                     r2_start_hat_0.push(F::ONE); // need to add ONE - ZERO to end
-                    let lag_poly_0: F =
-                        lagrange_polynomial(r2_start_0.clone(), r2_start_hat_0, b2_start.clone());
+                    let lag_poly_0: F = LagrangePolynomial::lag_poly(
+                        r2_start_0.clone(),
+                        r2_start_hat_0,
+                        b2_start.clone(),
+                    );
                     sum_0 += lag_poly_0 * (right_value - left_value);
                 }
                 true => {
@@ -124,7 +123,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                         self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec();
                     r2_start_hat_1.push(F::ZERO); // need to add ONE - ONE to end
                     let lag_poly_1: F =
-                        lagrange_polynomial(r2_start_1, r2_start_hat_1, b2_start.clone());
+                        LagrangePolynomial::lag_poly(r2_start_1, r2_start_hat_1, b2_start.clone());
                     sum_1 += lag_poly_1 * (right_value - left_value);
                 }
             }
