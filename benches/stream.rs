@@ -153,7 +153,7 @@ fn cty_benches(c: &mut Criterion) {
 }
 
 fn tradeoff_k2_benches(c: &mut Criterion) {
-    let max_num_variables = 26;
+    let max_num_variables = 30;
     // 64 bit field
     run_group::<Field64>(
         c,
