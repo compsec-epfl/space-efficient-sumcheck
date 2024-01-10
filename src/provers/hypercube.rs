@@ -1,6 +1,7 @@
 pub struct Hypercube {
     num_variables: usize,
-    current_member: usize,
+    last_member: Option<usize>,
+    last_point: Option<Vec<bool>>,
     stop_member: usize, // stop at this number (exclusive)
 }
 
@@ -9,7 +10,8 @@ impl Hypercube {
         let stop_member = 2usize.pow(num_variables as u32);
         Self {
             num_variables,
-            current_member: 0,
+            last_member: None,
+            last_point: None,
             stop_member,
         }
     }
@@ -21,20 +23,31 @@ impl Hypercube {
 impl Iterator for Hypercube {
     type Item = Vec<bool>;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_member >= self.stop_member {
+        // a) check if this is first iteration
+        if self.last_member == None {
+            self.last_member = Some(0);
+            self.last_point = Some(vec![false; self.num_variables]);
+            return self.last_point.clone();
+        }
+        // b) check if in last iteration we finished iterating
+        let next_member = self.last_member.unwrap() + 1;
+        if next_member >= self.stop_member {
             return None;
-        } else if self.num_variables == 0 {
-            self.current_member += 1;
-            return Some(vec![]);
         }
-
-        let mut point: Vec<bool> = Vec::with_capacity(self.num_variables);
-        for i in (0..self.num_variables).rev() {
-            let bit: bool = 0 != (self.current_member >> i) & 1;
-            point.push(bit);
+        // c) everything else, first get bit diff
+        let bit_diff = self.last_member.unwrap() ^ next_member;
+        // determine the shared prefix of most significant bits
+        let low_index_of_prefix = (bit_diff + 1).trailing_zeros() as usize;
+        // iterate up to this prefix setting bits correctly, half of the time this is only one bit!
+        let mut last_point = self.last_point.clone().unwrap();
+        for bit_index in (0..low_index_of_prefix).rev() {
+            let target_bit: bool = (next_member & (1 << bit_index)) != 0;
+            last_point[self.num_variables - bit_index - 1] = target_bit;
         }
-        self.current_member += 1;
-        Some(point)
+        // don't forget to increment current member
+        self.last_member = Some(next_member);
+        self.last_point = Some(last_point);
+        self.last_point.clone()
     }
 }
 
@@ -44,40 +57,32 @@ mod tests {
 
     #[test]
     fn basic() {
-        // small n
-        let hypercube_size_0 = Hypercube::new(0);
-        let expected_0: Vec<Vec<bool>> = vec![vec![], vec![]];
-        for (i, point) in hypercube_size_0.enumerate() {
-            assert_eq!(expected_0[i], point);
-        }
-        let hypercube_size_1 = Hypercube::new(1);
-        let expected_1: Vec<Vec<bool>> = vec![vec![false], vec![true]];
-        for (i, point) in hypercube_size_1.enumerate() {
-            assert_eq!(expected_1[i], point);
-        }
-        let hypercube_size_2 = Hypercube::new(2);
-        let expected_2: Vec<Vec<bool>> = vec![
-            vec![false, false],
-            vec![false, true],
-            vec![true, false],
-            vec![true, true],
-        ];
-        for (i, point) in hypercube_size_2.enumerate() {
-            assert_eq!(expected_2[i], point);
-        }
-        let hypercube = Hypercube::new(3);
-        let points = vec![
-            vec![false, false, false],
-            vec![false, false, true],
-            vec![false, true, false],
-            vec![false, true, true],
-            vec![true, false, false],
-            vec![true, false, true],
-            vec![true, true, false],
-            vec![true, true, true],
-        ];
-        for (i, point) in hypercube.enumerate() {
-            assert_eq!(points[i], point);
-        }
+        // for 0, should return empty vec first call, none second call
+        let mut hypercube_size_0 = Hypercube::new(0);
+        assert_eq!(hypercube_size_0.next().unwrap(), vec![]);
+        assert_eq!(hypercube_size_0.next(), None);
+        // for 1, should return vec[false] first call, vec[true] second call and None third call
+        let mut hypercube_size_1 = Hypercube::new(1);
+        assert_eq!(hypercube_size_1.next().unwrap(), vec![false]);
+        assert_eq!(hypercube_size_1.next().unwrap(), vec![true]);
+        assert_eq!(hypercube_size_1.next(), None);
+        // so on for n=2
+        let mut hypercube_size_2 = Hypercube::new(2);
+        assert_eq!(hypercube_size_2.next().unwrap(), vec![false, false]);
+        assert_eq!(hypercube_size_2.next().unwrap(), vec![false, true]);
+        assert_eq!(hypercube_size_2.next().unwrap(), vec![true, false]);
+        assert_eq!(hypercube_size_2.next().unwrap(), vec![true, true]);
+        assert_eq!(hypercube_size_2.next(), None);
+        // so on for n=3
+        let mut hypercube_size_3 = Hypercube::new(3);
+        assert_eq!(hypercube_size_3.next().unwrap(), vec![false, false, false]);
+        assert_eq!(hypercube_size_3.next().unwrap(), vec![false, false, true]);
+        assert_eq!(hypercube_size_3.next().unwrap(), vec![false, true, false]);
+        assert_eq!(hypercube_size_3.next().unwrap(), vec![false, true, true]);
+        assert_eq!(hypercube_size_3.next().unwrap(), vec![true, false, false]);
+        assert_eq!(hypercube_size_3.next().unwrap(), vec![true, false, true]);
+        assert_eq!(hypercube_size_3.next().unwrap(), vec![true, true, false]);
+        assert_eq!(hypercube_size_3.next().unwrap(), vec![true, true, true]);
+        assert_eq!(hypercube_size_3.next(), None);
     }
 }
