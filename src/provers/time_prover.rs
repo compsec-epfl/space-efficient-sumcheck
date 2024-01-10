@@ -36,26 +36,43 @@ impl<'a, F: Field> TimeProver<'a, F> {
     fn num_free_variables(&self) -> usize {
         self.num_variables - self.current_round
     }
-    fn vsbw_evaluate(&self) -> (F, F) {
+    fn vsbw_evaluate(&self, use_stream: bool) -> (F, F) {
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
         let bitmask: usize = 1 << self.num_free_variables() - 1;
         for i in 0..self.evaluations.len() {
             let is_set: bool = (i & bitmask) != 0;
+            let point_evaluation = match use_stream {
+                true => self.evaluation_stream.get_evaluation_from_index(i),
+                false => self.evaluations[i],
+            };
             match is_set {
-                false => sum_0 += self.evaluations[i],
-                true => sum_1 += self.evaluations[i],
+                false => sum_0 += point_evaluation,
+                true => sum_1 += point_evaluation,
             }
         }
         (sum_0, sum_1)
     }
-    fn vsbw_reduce_evaluations(&mut self, verifier_message: F, verifier_message_hat: F) {
+    fn vsbw_reduce_evaluations(
+        &mut self,
+        verifier_message: F,
+        verifier_message_hat: F,
+        use_stream: bool,
+    ) {
         let half_size: usize = self.evaluations.len() / 2;
         let setbit: usize = 1 << self.num_free_variables(); // we use this to index the second half of the last round's evaluations e.g 001 AND 101
         for i0 in 0..half_size {
             let i1 = i0 | setbit;
-            self.evaluations[i0] = self.evaluations[i0] * verifier_message_hat
-                + self.evaluations[i1] * verifier_message;
+            let point_evaluation_i0 = match use_stream {
+                true => self.evaluation_stream.get_evaluation_from_index(i0),
+                false => self.evaluations[i0],
+            };
+            let point_evaluation_i1 = match use_stream {
+                true => self.evaluation_stream.get_evaluation_from_index(i1),
+                false => self.evaluations[i1],
+            };
+            self.evaluations[i0] =
+                point_evaluation_i0 * verifier_message_hat + point_evaluation_i1 * verifier_message;
         }
         self.evaluations.truncate(half_size);
     }
@@ -76,11 +93,11 @@ impl<'a, F: Field> Prover<F> for TimeProver<'a, F> {
         match self.current_round {
             0 => {
                 // no reduce, evaluate should be done from stream
-                sums = self.vsbw_evaluate();
+                sums = self.vsbw_evaluate(true);
             }
             // 1 => {
             //     // reduce should be done from stream, evaluate as normal
-            //     self.vsbw_reduce_evaluations(verifier_message.unwrap(), F::ONE - verifier_message.unwrap(), true);
+            //     self.vsbw_reduce_evaluations(verifier_message.unwrap(), F::ONE - verifier_message.unwrap());
             //     sums = self.vsbw_evaluate(false);
             // },
             _ => {
@@ -88,8 +105,9 @@ impl<'a, F: Field> Prover<F> for TimeProver<'a, F> {
                 self.vsbw_reduce_evaluations(
                     verifier_message.unwrap(),
                     F::ONE - verifier_message.unwrap(),
+                    false,
                 );
-                sums = self.vsbw_evaluate();
+                sums = self.vsbw_evaluate(false);
             }
         }
 
