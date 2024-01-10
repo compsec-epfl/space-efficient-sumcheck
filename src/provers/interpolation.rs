@@ -45,23 +45,26 @@ impl<F: Field> LagrangePolynomial<F> {
 impl<F: Field> Iterator for LagrangePolynomial<F> {
     type Item = F;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.last_position.is_none() {
+        // a) check if this is first iteration
+        if self.last_position == None {
+            // initialize last position
             self.last_position = Some(0);
+            // return top of stack
             return Some(*self.stack.last().unwrap());
         }
-
-        // check we haven't interated too far e.g. 2 ^ 3 = 8, so 7 is 111
+        // b) check if in last iteration we finished iterating (e.g. 2 ^ 3 = 8, so 7 is 111)
         if self.last_position.unwrap() >= Hypercube::pow2(self.messages.len()) - 1 {
             return None;
         }
-        // this is any other next() after initialization
+        // c) everything else, first get bit diff
         let last_position = self.last_position.unwrap();
         let next_position = last_position + 1;
-        // first, pop all levels up until shared prefix
         let bit_diff = last_position ^ next_position;
+        // determine the shared prefix of most significant bits
         let low_index_of_prefix = (bit_diff + 1).trailing_zeros() as usize;
+        // discard any stack values outside of this prefix
         self.stack.truncate(self.stack.len() - low_index_of_prefix);
-        // then, iterate up until shared prefix to compute changes
+        // iterate up to this prefix setting computing lag poly correctly
         for bit_index in (0..low_index_of_prefix).rev() {
             let last_element = self.stack.last().unwrap();
             let next_bit: bool = (next_position & (1 << bit_index)) != 0;
@@ -70,7 +73,9 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
                 false => *last_element * self.message_hats[bit_index],
             });
         }
+        // don't forget to update last position
         self.last_position = Some(next_position);
+        // return top of the stack
         Some(*self.stack.last().unwrap())
     }
 }
