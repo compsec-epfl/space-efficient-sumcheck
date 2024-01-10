@@ -19,10 +19,7 @@ impl<'a, F: Field> TimeProver<'a, F> {
         let claimed_sum = evaluation_stream.get_claimed_sum();
         let num_variables = evaluation_stream.get_num_variables();
         let hypercube_len = 2usize.pow(num_variables.try_into().unwrap());
-        let mut evaluations: Vec<F> = Vec::with_capacity(hypercube_len);
-        for i in 0..hypercube_len {
-            evaluations.push(evaluation_stream.get_evaluation_from_index(i));
-        }
+        let evaluations: Vec<F> = vec![F::ZERO; hypercube_len];
         Self {
             claimed_sum,
             current_round: 0,
@@ -57,17 +54,17 @@ impl<'a, F: Field> TimeProver<'a, F> {
         &mut self,
         verifier_message: F,
         verifier_message_hat: F,
-        use_stream: bool,
+        is_round_one: bool,
     ) {
         let half_size: usize = self.evaluations.len() / 2;
         let setbit: usize = 1 << self.num_free_variables(); // we use this to index the second half of the last round's evaluations e.g 001 AND 101
         for i0 in 0..half_size {
             let i1 = i0 | setbit;
-            let point_evaluation_i0 = match use_stream {
+            let point_evaluation_i0 = match is_round_one {
                 true => self.evaluation_stream.get_evaluation_from_index(i0),
                 false => self.evaluations[i0],
             };
-            let point_evaluation_i1 = match use_stream {
+            let point_evaluation_i1 = match is_round_one {
                 true => self.evaluation_stream.get_evaluation_from_index(i1),
                 false => self.evaluations[i1],
             };
@@ -95,11 +92,15 @@ impl<'a, F: Field> Prover<F> for TimeProver<'a, F> {
                 // no reduce, evaluate should be done from stream
                 sums = self.vsbw_evaluate(true);
             }
-            // 1 => {
-            //     // reduce should be done from stream, evaluate as normal
-            //     self.vsbw_reduce_evaluations(verifier_message.unwrap(), F::ONE - verifier_message.unwrap());
-            //     sums = self.vsbw_evaluate(false);
-            // },
+            1 => {
+                // reduce should be done from stream, evaluate as normal
+                self.vsbw_reduce_evaluations(
+                    verifier_message.unwrap(),
+                    F::ONE - verifier_message.unwrap(),
+                    true,
+                );
+                sums = self.vsbw_evaluate(false);
+            }
             _ => {
                 // reduce as normal, evaluate as normal
                 self.vsbw_reduce_evaluations(
