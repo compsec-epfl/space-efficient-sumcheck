@@ -1,7 +1,7 @@
 use ark_ff::Field;
 
 use crate::provers::{
-    evaluation_stream::EvaluationStream, hypercube::Hypercube, interpolation::lagrange_polynomial,
+    evaluation_stream::EvaluationStream, hypercube::Hypercube, interpolation::LagrangePolynomial,
     Prover,
 };
 
@@ -37,7 +37,7 @@ impl<'a, F: Field> SpaceProver<'a, F> {
         let num_vars_outer_loop = self.current_round;
         let num_vars_inner_loop = self.num_variables - num_vars_outer_loop;
         for (index_outer, outer) in Hypercube::new(num_vars_outer_loop).enumerate() {
-            let weight: F = lagrange_polynomial(
+            let weight: F = LagrangePolynomial::lag_poly(
                 self.verifier_messages.clone(),
                 self.verifier_message_hats.clone(),
                 outer,
