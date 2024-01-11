@@ -20,3 +20,5 @@ jobs:
       run: cargo fmt --check
     - name: Run tests
       run: cargo test --verbose
+    - name: Bench runner
+      run: ./workflows/aws_bench_runner.sh
