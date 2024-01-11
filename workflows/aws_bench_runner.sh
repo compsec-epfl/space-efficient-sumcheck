@@ -25,7 +25,6 @@ export READ_GITHUB_ACCESS_TOKEN="$READ_GITHUB_ACCESS_TOKEN"
 echo $GITHUB_REF 
 
 # Create an EC2 instance
-aws configure
 instance_id=$(aws ec2 run-instances \
     --launch-template LaunchTemplateId=lt-05edf3d1d43301f02 \
     --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=bench-$GITHUB_REF}, {Key=Group,Value=bench-machines}]" \
