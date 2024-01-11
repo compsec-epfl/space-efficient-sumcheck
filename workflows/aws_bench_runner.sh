@@ -2,10 +2,10 @@
 
 # Function to handle errors
 handle_error() {
-    echo "An error occurred. Exiting." >&2
-    if [ -n "$instance_id" ]; then
-        aws ec2 terminate-instances --instance-ids $instance_id
-    fi
+    # echo "An error occurred. Exiting." >&2
+    # if [ -n "$instance_id" ]; then
+    #     aws ec2 terminate-instances --instance-ids $instance_id
+    # fi
     exit 1
 }
 
@@ -23,8 +23,6 @@ export GITHUB_SHA="$GITHUB_SHA"
 export GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER"
 export GITHUB_REF="$GITHUB_REF"
 export READ_GITHUB_ACCESS_TOKEN="$READ_GITHUB_ACCESS_TOKEN"
-
-echo $AWS_ACCESS_KEY_ID
 
 # Create an EC2 instance
 instance_id=$(aws ec2 run-instances \
