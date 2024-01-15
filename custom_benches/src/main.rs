@@ -143,13 +143,6 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
             );
         }
     };
-    // println!(
-    //     "{:?}, {:?}, {}, {}",
-    //     bench_args.field_label,
-    //     bench_args.algorithm_label,
-    //     bench_args.num_variables,
-    //     bench_args.stage_size,
-    // );
 }
 
 fn main() {
