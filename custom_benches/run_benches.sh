@@ -16,9 +16,9 @@ for algorithm in $algorithms; do
                 *) ;;
             esac
             output=`(gtime ./target/release/benches $algorithm $field $num_vars $stage_size) 2>&1`
-            time_seconds=$(expr "$output" : '.* \([0-9]*\)user')
+            user_time_seconds=$(echo "$output" | awk '/user/ {printf "%.2f", $2}')
             ram_bytes=$(expr "$output" : '.* \([0-9]*\)maxresident')
-            echo "$algorithm, $field, $num_vars, $time_seconds, $num_vars, $ram_bytes"
+            echo "$algorithm, $field, $num_vars, $user_time_seconds, $num_vars, $ram_bytes"
             num_vars=$((num_vars + 1))
         done
     done
