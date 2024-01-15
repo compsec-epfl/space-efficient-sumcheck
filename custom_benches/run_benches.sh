@@ -15,10 +15,11 @@ for algorithm in $algorithms; do
                 "CTY") stage_size="1" ;;
                 *) ;;
             esac
-            output=`(gtime ./target/release/benches $algorithm $field $num_vars $stage_size) 2>&1`
-            user_time_seconds=$(echo "$output" | awk '/user/ {printf "%.2f", $2}')
+            output=`(gtime -v ./target/release/benches $algorithm $field $num_vars $stage_size) 2>&1`
+            user_time_seconds=$(echo "$output" | grep "User time (seconds):" | awk '{print $4}')
             user_time_ms=$(awk "BEGIN {printf \"%.0f\", $user_time_seconds * 1000}")
-            ram_bytes=$(expr "$output" : '.* \([0-9]*\)maxresident')
+            ram_kilobytes=$(echo "$output" | grep "Maximum resident set size (kbytes)" | awk '{print $6}')
+            ram_bytes=$(echo "$ram_kilobytes" | awk '{ printf "%.0f", $1 * 1000 }')
             echo "$algorithm, $field, $num_vars, $user_time_ms, $num_vars, $ram_bytes"
             num_vars=$((num_vars + 1))
         done
