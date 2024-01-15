@@ -1,3 +1,4 @@
 /target
 /Cargo.lock
+/custom_benches/Cargo.lock
 **/custom_benches/target/
