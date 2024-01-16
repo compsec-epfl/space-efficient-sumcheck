@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn algorithm_consistency() {
-        let evaluation_stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new(16);
+        let evaluation_stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new(20);
         let rng_1 = &mut ark_std::test_rng();
         let rng_2 = &mut ark_std::test_rng();
         let mut tradeoff_k4_prover =

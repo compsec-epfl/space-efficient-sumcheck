@@ -1,33 +1,32 @@
 use crate::provers::hypercube::Hypercube;
-use ark_ff::{batch_inversion, Field};
-use std::cmp;
+use ark_ff::Field;
 pub struct LagrangePolynomial<F: Field> {
-    pub messages: Vec<F>,
-    pub inverse_messages: Vec<F>,
-    pub inverse_message_hats: Vec<F>,
-    pub last_value: F,
     pub last_position: Option<usize>,
+    pub messages: Vec<F>,
+    pub message_hats: Vec<F>,
+    pub stack: Vec<F>,
 }
 
 impl<F: Field> LagrangePolynomial<F> {
     pub fn new(messages: Vec<F>, message_hats: Vec<F>) -> Self {
-        // reversing these first seems slightly faster than indexing from the end like v[len - i - 1]
+        let mut stack: Vec<F> = Vec::with_capacity(messages.len() + 1);
+        stack.push(F::ONE);
+        // didn't notice any perf difference w/ this variable running_product but keeping anyway
+        let mut running_product = F::ONE;
+        for message_hat in &message_hats {
+            running_product *= message_hat;
+            stack.push(running_product);
+        }
+        // confirmed slightly faster to reverse these first rather than index in reverse like v[len - i - 1]
         let mut messages_clone = messages.clone();
         messages_clone.reverse();
-        let mut inverse_messages: Vec<F> = messages.clone();
-        batch_inversion(&mut inverse_messages);
-        inverse_messages.reverse();
-        let mut inverse_message_hats: Vec<F> = message_hats.clone();
-        batch_inversion(&mut inverse_message_hats);
-        inverse_message_hats.reverse();
-        let last_value: F = message_hats
-            .iter()
-            .fold(F::ONE, |acc: F, &message_hat| acc * message_hat);
+        let mut message_hats_clone = message_hats.clone();
+        message_hats_clone.reverse();
+        // return
         Self {
             messages: messages_clone,
-            inverse_messages,
-            inverse_message_hats,
-            last_value,
+            message_hats: message_hats_clone,
+            stack,
             last_position: None,
         }
     }
@@ -46,40 +45,38 @@ impl<F: Field> LagrangePolynomial<F> {
 impl<F: Field> Iterator for LagrangePolynomial<F> {
     type Item = F;
     fn next(&mut self) -> Option<Self::Item> {
-        // this is the first call to next() after initialization
+        // a) check if this is first iteration
         if self.last_position == None {
+            // initialize last position
             self.last_position = Some(0);
-            return Some(self.last_value);
+            // return top of stack
+            return Some(*self.stack.last().unwrap());
         }
-        // check we haven't interated too far e.g. 2 ^ 3 = 8, so 7 is 111
+        // b) check if in last iteration we finished iterating (e.g. 2 ^ 3 = 8, so 7 is 111)
         if self.last_position.unwrap() >= Hypercube::pow2(self.messages.len()) - 1 {
             return None;
         }
-        // this is any other next() after initialization
+        // c) everything else, first get bit diff
         let last_position = self.last_position.unwrap();
         let next_position = last_position + 1;
-        let mut next_value: F = self.last_value;
-        // iterate up to the highest order bit to compute changes
-        let index_of_highest_set_bit: usize = match last_position == 0 {
-            false => cmp::max(last_position.ilog2(), next_position.ilog2()) as usize,
-            true => 0, // argument of integer logarithm must be positive
-        };
-        for bit_index in (0..=index_of_highest_set_bit).rev() {
-            let message = self.messages[bit_index];
-            let message_hat = F::ONE - message;
-            let inverse_message = self.inverse_messages[bit_index];
-            let inverse_message_hat = self.inverse_message_hats[bit_index];
-            let last_bit = (last_position >> bit_index) & 1;
-            let next_bit = (next_position >> bit_index) & 1;
-            next_value = match (last_bit, next_bit) {
-                (0, 1) => next_value * inverse_message_hat * message,
-                (1, 0) => next_value * inverse_message * message_hat,
-                _ => next_value,
-            }
+        let bit_diff = last_position ^ next_position;
+        // determine the shared prefix of most significant bits
+        let low_index_of_prefix = (bit_diff + 1).trailing_zeros() as usize;
+        // discard any stack values outside of this prefix
+        self.stack.truncate(self.stack.len() - low_index_of_prefix);
+        // iterate up to this prefix setting computing lag poly correctly
+        for bit_index in (0..low_index_of_prefix).rev() {
+            let last_element = self.stack.last().unwrap();
+            let next_bit: bool = (next_position & (1 << bit_index)) != 0;
+            self.stack.push(match next_bit {
+                true => *last_element * self.messages[bit_index],
+                false => *last_element * self.message_hats[bit_index],
+            });
         }
-        self.last_value = next_value;
+        // don't forget to update last position
         self.last_position = Some(next_position);
-        Some(next_value)
+        // return top of the stack
+        Some(*self.stack.last().unwrap())
     }
 }
 
