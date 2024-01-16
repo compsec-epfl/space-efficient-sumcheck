@@ -95,10 +95,9 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             let b2_start_index_0 = b2_start_index << (self.stage_size - j_prime - 1);
             let b2_start_index_1 =
                 Self::shift_and_one_fill(b2_start_index, self.stage_size - j_prime - 1);
-            let left_value: F = if b2_start_index_0 == 0 {
-                F::ZERO
-            } else {
-                partial_sums[b2_start_index_0 - 1]
+            let left_value: F = match b2_start_index_0 {
+                0 => F::ZERO,
+                _ => partial_sums[b2_start_index_0 - 1],
             };
             let right_value = partial_sums[b2_start_index_1];
             match *b2_start.last().unwrap() {
