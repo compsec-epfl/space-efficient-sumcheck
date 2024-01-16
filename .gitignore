@@ -1,2 +1,4 @@
 /target
 /Cargo.lock
+/benches/Cargo.lock
+**/benches/target/
