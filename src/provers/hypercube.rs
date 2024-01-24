@@ -23,30 +23,39 @@ impl Hypercube {
 impl Iterator for Hypercube {
     type Item = Vec<bool>;
     fn next(&mut self) -> Option<Self::Item> {
-        // a) check if this is first iteration
+        // a) Check if this is the first iteration
         if self.last_member == None {
+            // Initialize last member and last point
             self.last_member = Some(0);
             self.last_point = Some(vec![false; self.num_variables]);
+            // Return the cloned last point
             return self.last_point.clone();
         }
-        // b) check if in last iteration we finished iterating
+
+        // b) Check if in the last iteration we finished iterating
         let next_member = self.last_member.unwrap() + 1;
         if next_member >= self.stop_member {
             return None;
         }
-        // c) everything else, first get bit diff
+
+        // c) Everything else, first get bit diff
         let bit_diff = self.last_member.unwrap() ^ next_member;
-        // determine the shared prefix of most significant bits
+
+        //   Determine the shared prefix of the most significant bits
         let low_index_of_prefix = (bit_diff + 1).trailing_zeros() as usize;
-        // iterate up to this prefix setting bits correctly, half of the time this is only one bit!
+
+        //   Iterate up to this prefix, setting bits correctly (half of the time this is only one bit!)
         let mut last_point = self.last_point.clone().unwrap();
         for bit_index in (0..low_index_of_prefix).rev() {
             let target_bit: bool = (next_member & (1 << bit_index)) != 0;
             last_point[self.num_variables - bit_index - 1] = target_bit;
         }
-        // don't forget to increment current member
+
+        //   Don't forget to increment the current member
         self.last_member = Some(next_member);
         self.last_point = Some(last_point);
+
+        //   Return the cloned last point
         self.last_point.clone()
     }
 }

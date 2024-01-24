@@ -56,58 +56,79 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
     fn current_stage(&self) -> usize {
         self.current_round / self.stage_size
     }
-    // sumUpdatef(r1):
     fn sum_update(&mut self) {
-        // 0. declare these ranges for convenience
-        let b1_num_vars: usize = self.current_stage() * self.stage_size; // := (s-1)l because we are zero-indexed
-        let b2_num_vars: usize = self.stage_size; // := l
-        let b3_num_vars: usize = self.num_variables - b1_num_vars - b2_num_vars; // := (k-s)l because we are zero-indexed
-                                                                                 // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
+        // 0. Declare ranges for convenience
+        let b1_num_vars: usize = self.current_stage() * self.stage_size;
+        let b2_num_vars: usize = self.stage_size;
+        let b3_num_vars: usize = self.num_variables - b1_num_vars - b2_num_vars;
+
+        // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
         let mut sum: Vec<F> = vec![F::ZERO; Hypercube::pow2(b2_num_vars)];
+
         // 2. Initialize st := LagInit((s - l)l, r)
-        let mut bslp: LagrangePolynomial<F> = LagrangePolynomial::new(
+        let mut sequential_lag_poly: LagrangePolynomial<F> = LagrangePolynomial::new(
             self.verifier_messages.clone(),
             self.verifier_message_hats.clone(),
         );
+
         // 3. For each b1 ∈ {0,1}^(s-1)l
         for b1_index in 0..Hypercube::pow2(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
-            let lag_poly = bslp.next().unwrap();
+            let lag_poly = sequential_lag_poly.next().unwrap();
+
             // (b) For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
             for b2_index in 0..Hypercube::pow2(b2_num_vars) {
                 for b3_index in 0..Hypercube::pow2(b3_num_vars) {
+                    // Calculate the index for the current combination of b1, b2, and b3
                     let index = b1_index << (b2_num_vars + b3_num_vars)
                         | b2_index << b3_num_vars
                         | b3_index;
-                    sum[b2_index] = sum[b2_index]
-                        + lag_poly * self.evaluation_stream.get_evaluation_from_index(index);
+
+                    // Update SUM[b2]
+                    sum[b2_index] =
+                        sum[b2_index] + lag_poly * self.evaluation_stream.get_evaluation(index);
                 }
             }
         }
+
+        // Update the internal state with the new sums
         self.sums = sum;
     }
     fn compute_round(&self, partial_sums: &Vec<F>) -> (F, F) {
+        // Initialize accumulators for sum_0 and sum_1
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
-        let j_prime = self.current_round - (self.current_stage() * self.stage_size); // := j-(s-1)l
+
+        // Calculate j_prime as j-(s-1)l
+        let j_prime = self.current_round - (self.current_stage() * self.stage_size);
+
+        // Calculate r_shift as s*l
         let r_shift = self.current_stage() * self.stage_size;
+
+        // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
         for (b2_start_index, b2_start) in Hypercube::new(j_prime + 1).enumerate() {
+            // Calculate b2_start_index_0 and b2_start_index_1 for indexing partial_sums
             let b2_start_index_0 = b2_start_index << (self.stage_size - j_prime - 1);
             let b2_start_index_1 =
                 Self::shift_and_one_fill(b2_start_index, self.stage_size - j_prime - 1);
+
+            // Calculate left_value and right_value based on partial_sums
             let left_value: F = match b2_start_index_0 {
                 0 => F::ZERO,
                 _ => partial_sums[b2_start_index_0 - 1],
             };
             let right_value = partial_sums[b2_start_index_1];
+
+            // Match based on the last bit of b2_start
             match *b2_start.last().unwrap() {
                 false => {
+                    // If the last bit is 0, calculate lag_poly_0 and update sum_0
                     let mut r2_start_0: Vec<F> =
                         self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_0.push(F::ZERO); // need to add ZERO to end
+                    r2_start_0.push(F::ZERO); // Add ZERO to the end
                     let mut r2_start_hat_0: Vec<F> =
                         self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_hat_0.push(F::ONE); // need to add ONE - ZERO to end
+                    r2_start_hat_0.push(F::ONE); // Add ONE - ZERO to the end
                     let lag_poly_0: F = LagrangePolynomial::lag_poly(
                         r2_start_0.clone(),
                         r2_start_hat_0,
@@ -116,19 +137,22 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                     sum_0 += lag_poly_0 * (right_value - left_value);
                 }
                 true => {
+                    // If the last bit is 1, calculate lag_poly_1 and update sum_1
                     let mut r2_start_1: Vec<F> =
                         self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_1.push(F::ONE); // need to add ONE to end
+                    r2_start_1.push(F::ONE); // Add ONE to the end
                     let mut r2_start_hat_1: Vec<F> =
                         self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_hat_1.push(F::ZERO); // need to add ONE - ONE to end
+                    r2_start_hat_1.push(F::ZERO); // Add ONE - ONE to the end
                     let lag_poly_1: F =
                         LagrangePolynomial::lag_poly(r2_start_1, r2_start_hat_1, b2_start.clone());
                     sum_1 += lag_poly_1 * (right_value - left_value);
                 }
             }
         }
-        return (sum_0, sum_1);
+
+        // Return the accumulated sums
+        (sum_0, sum_1)
     }
 }
 
@@ -144,24 +168,25 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
 
         // If it's not the first round, reduce the evaluations table
         if self.current_round != 0 {
-            // store the verifier message
+            // Store the verifier message and its complement
             self.verifier_messages.push(verifier_message.unwrap());
             self.verifier_message_hats
                 .push(F::ONE - verifier_message.unwrap());
         }
 
+        // If the current round is a multiple of the stage size, update the sums
         if self.current_round % self.stage_size == 0 {
             self.sum_update();
         }
 
-        // compute the sum
+        // Compute the sum based on partial sums
         let sums: (F, F) = self.compute_round(&Self::compute_partial_sums(&self.sums));
 
         // Increment the round counter
         self.current_round += 1;
 
-        // Return the computed polynomial
-        return Some(sums);
+        // Return the computed polynomial sums
+        Some(sums)
     }
     fn total_rounds(&self) -> usize {
         self.num_variables
