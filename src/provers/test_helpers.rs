@@ -220,10 +220,7 @@ impl<F: Field> EvaluationStream<F> for BasicEvaluationStream<F> {
     fn get_claimed_sum(&self) -> F {
         self.evaluations.iter().sum()
     }
-    fn get_evaluation(&self, point: Vec<F>) -> F {
-        self.evaluations[BasicEvaluationStream::vec_of_field_to_usize(point)]
-    }
-    fn get_evaluation_from_index(&self, point: usize) -> F {
+    fn get_evaluation(&self, point: usize) -> F {
         self.evaluations[point]
     }
     fn get_num_variables(&self) -> usize {
@@ -267,11 +264,7 @@ impl<F: Field> EvaluationStream<F> for BenchEvaluationStream<F> {
     fn get_claimed_sum(&self) -> F {
         self.claimed_sum
     }
-    fn get_evaluation(&self, point: Vec<F>) -> F {
-        let index = BenchEvaluationStream::vec_of_field_to_usize(point);
-        F::from(index as u64)
-    }
-    fn get_evaluation_from_index(&self, point: usize) -> F {
+    fn get_evaluation(&self, point: usize) -> F {
         F::from(point as u64)
     }
     fn get_num_variables(&self) -> usize {

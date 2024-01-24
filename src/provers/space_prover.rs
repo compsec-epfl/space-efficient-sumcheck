@@ -28,39 +28,48 @@ impl<'a, F: Field> SpaceProver<'a, F> {
             num_variables,
         }
     }
-    // instance methods
     fn cty_evaluate(&self) -> (F, F) {
+        // Initialize accumulators for sum_0 and sum_1
         let mut sum_0: F = F::ZERO;
         let mut sum_1: F = F::ZERO;
-        let bitmask: usize = 1 << self.num_free_variables() - 1;
-        // iterate in two loops
+
+        // Create a bitmask for the number of free variables
+        let bitmask: usize = 1 << (self.num_free_variables() - 1);
+
+        // Iterate in two loops
         let num_vars_outer_loop = self.current_round;
         let num_vars_inner_loop = self.num_variables - num_vars_outer_loop;
+
+        // Outer loop over a subset of variables
         for (index_outer, outer) in Hypercube::new(num_vars_outer_loop).enumerate() {
+            // Calculate the weight using Lagrange polynomial
             let weight: F = LagrangePolynomial::lag_poly(
                 self.verifier_messages.clone(),
                 self.verifier_message_hats.clone(),
                 outer,
             );
+
+            // Inner loop over all possible evaluations for the remaining variables
             for index_inner in 0..2_usize.pow(num_vars_inner_loop as u32) {
+                // Calculate the evaluation index
                 let evaluation_index = index_outer << num_vars_inner_loop | index_inner;
+
+                // Check if the bit at the position specified by the bitmask is set
                 let is_set: bool = (evaluation_index & bitmask) != 0;
+
+                // Use match to accumulate the appropriate value based on whether the bit is set or not
                 match is_set {
                     false => {
-                        sum_0 += self
-                            .evaluation_stream
-                            .get_evaluation_from_index(evaluation_index)
-                            * weight
+                        sum_0 += self.evaluation_stream.get_evaluation(evaluation_index) * weight
                     }
                     true => {
-                        sum_1 += self
-                            .evaluation_stream
-                            .get_evaluation_from_index(evaluation_index)
-                            * weight
+                        sum_1 += self.evaluation_stream.get_evaluation(evaluation_index) * weight
                     }
                 }
             }
         }
+
+        // Return the accumulated sums
         (sum_0, sum_1)
     }
     fn num_free_variables(&self) -> usize {
