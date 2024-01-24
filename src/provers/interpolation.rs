@@ -1,5 +1,6 @@
 use crate::provers::hypercube::Hypercube;
 use ark_ff::Field;
+
 pub struct LagrangePolynomial<F: Field> {
     pub last_position: Option<usize>,
     pub messages: Vec<F>,
@@ -9,20 +10,24 @@ pub struct LagrangePolynomial<F: Field> {
 
 impl<F: Field> LagrangePolynomial<F> {
     pub fn new(messages: Vec<F>, message_hats: Vec<F>) -> Self {
+        // Initialize a stack with capacity for messages/ message_hats and the identity element
         let mut stack: Vec<F> = Vec::with_capacity(messages.len() + 1);
         stack.push(F::ONE);
-        // didn't notice any perf difference w/ this variable running_product but keeping anyway
-        let mut running_product = F::ONE;
+
+        // Iterate over the message_hats, update the running product, and push it onto the stack
+        let mut running_product: F = F::ONE;
         for message_hat in &message_hats {
             running_product *= message_hat;
             stack.push(running_product);
         }
-        // confirmed slightly faster to reverse these first rather than index in reverse like v[len - i - 1]
+
+        // Clone and reverse the messages and message_hats vectors
         let mut messages_clone = messages.clone();
         messages_clone.reverse();
         let mut message_hats_clone = message_hats.clone();
         message_hats_clone.reverse();
-        // return
+
+        // Return
         Self {
             messages: messages_clone,
             message_hats: message_hats_clone,
@@ -31,40 +36,51 @@ impl<F: Field> LagrangePolynomial<F> {
         }
     }
     pub fn lag_poly(x: Vec<F>, x_hat: Vec<F>, b: Vec<bool>) -> F {
-        x.to_vec().iter().zip(x_hat.iter()).zip(b.iter()).fold(
+        // Iterate over the zipped triple x, x_hat, and boolean hypercube vectors
+        x.iter().zip(x_hat.iter()).zip(b.iter()).fold(
+            // Initial the accumulation to F::ONE
             F::ONE,
+            // Closure for the folding operation, taking accumulator and ((x_i, x_hat_i), b_i)
             |acc, ((x_i, x_hat_i), b_i)| {
+                // Multiply the accumulator by either x_i or x_hat_i based on the boolean value b_i
                 acc * match b_i {
-                    true => x_i,
-                    false => x_hat_i,
+                    true => *x_i,
+                    false => *x_hat_i,
                 }
             },
         )
     }
 }
+
 impl<F: Field> Iterator for LagrangePolynomial<F> {
     type Item = F;
+    // Iterator implementation for the struct
     fn next(&mut self) -> Option<Self::Item> {
-        // a) check if this is first iteration
+        // a) Check if this is the first iteration
         if self.last_position == None {
-            // initialize last position
+            // Initialize last position
             self.last_position = Some(0);
-            // return top of stack
+            // Return the top of the stack
             return Some(*self.stack.last().unwrap());
         }
-        // b) check if in last iteration we finished iterating (e.g. 2 ^ 3 = 8, so 7 is 111)
+
+        // b) Check if in the last iteration we finished iterating
         if self.last_position.unwrap() >= Hypercube::pow2(self.messages.len()) - 1 {
             return None;
         }
-        // c) everything else, first get bit diff
+
+        // c) Everything else, first get bit diff
         let last_position = self.last_position.unwrap();
         let next_position = last_position + 1;
         let bit_diff = last_position ^ next_position;
-        // determine the shared prefix of most significant bits
+
+        // Determine the shared prefix of the most significant bits
         let low_index_of_prefix = (bit_diff + 1).trailing_zeros() as usize;
-        // discard any stack values outside of this prefix
+
+        // Discard any stack values outside of this prefix
         self.stack.truncate(self.stack.len() - low_index_of_prefix);
-        // iterate up to this prefix setting computing lag poly correctly
+
+        // Iterate up to this prefix computing lag poly correctly
         for bit_index in (0..low_index_of_prefix).rev() {
             let last_element = self.stack.last().unwrap();
             let next_bit: bool = (next_position & (1 << bit_index)) != 0;
@@ -73,9 +89,11 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
                 false => *last_element * self.message_hats[bit_index],
             });
         }
-        // don't forget to update last position
+
+        // Don't forget to update the last position
         self.last_position = Some(next_position);
-        // return top of the stack
+
+        // Return the top of the stack
         Some(*self.stack.last().unwrap())
     }
 }
