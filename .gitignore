@@ -1,4 +1,4 @@
 /target
 /Cargo.lock
-/benches/Cargo.lock
-**/benches/target/
+/sumcheck-benches/Cargo.lock
+**/sumcheck-benches/target/
