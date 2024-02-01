@@ -2,3 +2,4 @@
 /Cargo.lock
 /sumcheck-benches/Cargo.lock
 **/sumcheck-benches/target/
+.vscode
