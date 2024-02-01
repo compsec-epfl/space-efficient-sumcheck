@@ -44,7 +44,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
     fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
         (num << shift_amount) | (1 << shift_amount) - 1
     }
-    fn compute_partial_sums(sums: &Vec<F>) -> Vec<F> {
+    fn compute_prefix_sums(sums: &Vec<F>) -> Vec<F> {
         sums.iter().scan(F::ZERO, |sum, i| {*sum += i; Some(*sum)}).collect::<Vec<F>>()
     }
     fn current_stage(&self) -> usize {
@@ -174,7 +174,7 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
         }
 
         // Compute the sum based on partial sums
-        let sums: (F, F) = self.compute_round(&Self::compute_partial_sums(&self.sums));
+        let sums: (F, F) = self.compute_round(&Self::compute_prefix_sums(&self.sums));
 
         // Increment the round counter
         self.current_round += 1;
