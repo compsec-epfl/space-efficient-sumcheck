@@ -148,7 +148,7 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
 fn main() {
     // Collect command line arguments
     let bench_args: BenchArgs = validate_and_format_command_line_args(env::args().collect());
-    // Run the requested bench TODO: need a warmup?
+    // Run the requested bench
     match bench_args.field_label {
         FieldLabel::Field64 => {
             run_bench_on_field::<Field64>(bench_args);
