@@ -15,13 +15,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install minimal stable with rustfmt
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        components: rustfmt
-
     - name: Check lint
       run: cargo fmt --check
 

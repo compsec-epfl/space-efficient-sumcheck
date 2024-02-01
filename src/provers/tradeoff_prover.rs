@@ -45,7 +45,12 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         (num << shift_amount) | (1 << shift_amount) - 1
     }
     fn compute_prefix_sums(sums: &Vec<F>) -> Vec<F> {
-        sums.iter().scan(F::ZERO, |sum, i| {*sum += i; Some(*sum)}).collect::<Vec<F>>()
+        sums.iter()
+            .scan(F::ZERO, |sum, i| {
+                *sum += i;
+                Some(*sum)
+            })
+            .collect::<Vec<F>>()
     }
     fn current_stage(&self) -> usize {
         self.current_round / self.stage_size
