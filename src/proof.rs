@@ -72,12 +72,12 @@ mod tests {
         // take an evaluation stream
         let evaluation_stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new(20);
         // initialize the provers
-        let mut tradeoff_k4_prover =
+        let mut tradeoff_k3_prover =
             TradeoffProver::<TestField>::new(Box::new(&evaluation_stream), 3);
         let mut time_prover = TimeProver::<TestField>::new(Box::new(&evaluation_stream));
         // run them and get the transcript
         let tradeoff_prover_transcript =
-            Sumcheck::<TestField>::prove(&mut tradeoff_k4_prover, &mut ark_std::test_rng());
+            Sumcheck::<TestField>::prove(&mut tradeoff_k3_prover, &mut ark_std::test_rng());
         let time_prover_transcript =
             Sumcheck::<TestField>::prove(&mut time_prover, &mut ark_std::test_rng());
         // ensure the transcript is identical

@@ -55,6 +55,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // 0. Declare ranges for convenience
         let b1_num_vars: usize = self.current_stage() * self.stage_size;
         let b2_num_vars: usize = if self.num_variables - b1_num_vars < self.stage_size {
+            // this is the oddly sized last stage when k doesn't divide num_vars
             self.num_variables - b1_num_vars
         } else {
             self.stage_size
@@ -98,14 +99,6 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
 
-        // TODO: explain why this works
-        let index_stage_size: usize =
-            if self.num_variables - (self.current_stage() * self.stage_size) < self.stage_size {
-                self.num_variables - (self.current_stage() * self.stage_size)
-            } else {
-                self.stage_size
-            };
-
         // Calculate j_prime as j-(s-1)l
         let j_prime = self.current_round - (self.current_stage() * self.stage_size);
 
@@ -115,9 +108,16 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
         for (b2_start_index, b2_start) in Hypercube::new(j_prime + 1).enumerate() {
             // Calculate b2_start_index_0 and b2_start_index_1 for indexing partial_sums
-            let b2_start_index_0 = b2_start_index << (index_stage_size - j_prime - 1);
-            let b2_start_index_1 =
-                Self::shift_and_one_fill(b2_start_index, index_stage_size - j_prime - 1);
+            let shift_amount = if self.num_variables - (self.current_stage() * self.stage_size)
+                < self.stage_size
+            {
+                // this is the oddly sized last stage when k doesn't divide num_vars
+                self.num_variables - (self.current_stage() * self.stage_size) - j_prime - 1
+            } else {
+                self.stage_size - j_prime - 1
+            };
+            let b2_start_index_0 = b2_start_index << shift_amount;
+            let b2_start_index_1 = Self::shift_and_one_fill(b2_start_index, shift_amount);
 
             // Calculate left_value and right_value based on partial_sums
             let left_value: F = match b2_start_index_0 {
