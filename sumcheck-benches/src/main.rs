@@ -106,14 +106,6 @@ fn validate_and_format_command_line_args(argsv: Vec<String>) -> BenchArgs {
         std::process::exit(1);
     }
     let stage_size = argsv[4].clone().parse::<usize>().unwrap();
-    if num_variables % stage_size != 0 {
-        eprintln!(
-            "Usage: {} field_label algorithm_label num_variables stage_size",
-            argsv[0]
-        );
-        eprintln!("Invalid input: stage_size must divide num_variables with no remainder");
-        std::process::exit(1);
-    }
     return BenchArgs {
         field_label,
         algorithm_label,
