@@ -119,42 +119,34 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             let b2_start_index_0 = b2_start_index << shift_amount;
             let b2_start_index_1 = Self::shift_and_one_fill(b2_start_index, shift_amount);
 
-            // Calculate left_value and right_value based on partial_sums
+            // Calculate the partial sum
             let left_value: F = match b2_start_index_0 {
                 0 => F::ZERO,
                 _ => partial_sums[b2_start_index_0 - 1],
             };
-            let right_value = partial_sums[b2_start_index_1];
+            let right_value: F = partial_sums[b2_start_index_1];
+            let partial_sum: F = right_value - left_value;
 
-            // Match based on the last bit of b2_start
-            match *b2_start.last().unwrap() {
-                false => {
-                    // If the last bit is 0, calculate lag_poly_0 and update sum_0
-                    let mut r2_start_0: Vec<F> =
-                        self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_0.push(F::ZERO); // Add ZERO to the end
-                    let mut r2_start_hat_0: Vec<F> =
-                        self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_hat_0.push(F::ONE); // Add ONE - ZERO to the end
-                    let lag_poly_0: F = LagrangePolynomial::lag_poly(
-                        r2_start_0.clone(),
-                        r2_start_hat_0,
-                        b2_start.clone(),
-                    );
-                    sum_0 += lag_poly_0 * (right_value - left_value);
-                }
-                true => {
-                    // If the last bit is 1, calculate lag_poly_1 and update sum_1
-                    let mut r2_start_1: Vec<F> =
-                        self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_1.push(F::ONE); // Add ONE to the end
-                    let mut r2_start_hat_1: Vec<F> =
-                        self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_hat_1.push(F::ZERO); // Add ONE - ONE to the end
-                    let lag_poly_1: F =
-                        LagrangePolynomial::lag_poly(r2_start_1, r2_start_hat_1, b2_start.clone());
-                    sum_1 += lag_poly_1 * (right_value - left_value);
-                }
+            // calculate lag_poly
+            let last_bit_b2: bool = *b2_start.last().unwrap();
+            let lag_poly: F = LagrangePolynomial::lag_poly(
+                self.verifier_messages[r_shift..(r_shift + j_prime)] // r2_start
+                    .iter()
+                    .copied()
+                    .chain(std::iter::once(if last_bit_b2 { F::ONE } else { F::ZERO }))
+                    .collect(),
+                self.verifier_message_hats[r_shift..(r_shift + j_prime)] // r2_start_hat
+                    .iter()
+                    .copied()
+                    .chain(std::iter::once(if last_bit_b2 { F::ZERO } else { F::ONE }))
+                    .collect(),
+                b2_start.clone(),
+            );
+
+            // update one of the sums based on last bit of b2_start
+            match last_bit_b2 {
+                false => sum_0 += lag_poly * partial_sum,
+                true => sum_1 += lag_poly * partial_sum,
             }
         }
 
