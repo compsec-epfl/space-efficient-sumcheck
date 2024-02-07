@@ -1,5 +1,6 @@
 use ark_ff::Field;
 use ark_std::vec::Vec;
+use std::collections::HashMap;
 
 use crate::provers::{
     evaluation_stream::EvaluationStream, hypercube::Hypercube, interpolation::LagrangePolynomial,
@@ -15,6 +16,7 @@ pub struct TradeoffProver<'a, F: Field> {
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
     pub verifier_message_hats: Vec<F>,
+    pub stage_lag_polys: HashMap<usize, F>,
     pub sums: Vec<F>,
     pub stage_size: usize,
 }
@@ -33,6 +35,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             num_variables,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
+            stage_lag_polys: HashMap::new(),
             sums: Vec::<F>::with_capacity(stage_size),
             stage_size,
         }
@@ -94,7 +97,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // Update the internal state with the new sums
         self.sums = sum;
     }
-    fn compute_round(&self, partial_sums: &Vec<F>) -> (F, F) {
+    fn compute_round(&mut self, partial_sums: &Vec<F>) -> (F, F) {
         // Initialize accumulators for sum_0 and sum_1
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
@@ -129,24 +132,50 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
 
             // calculate lag_poly
             let last_bit_b2: bool = *b2_start.last().unwrap();
-            let lag_poly: F = LagrangePolynomial::lag_poly(
-                self.verifier_messages[r_shift..(r_shift + j_prime)] // r2_start
-                    .iter()
-                    .copied()
-                    .chain(std::iter::once(if last_bit_b2 { F::ONE } else { F::ZERO }))
-                    .collect(),
-                self.verifier_message_hats[r_shift..(r_shift + j_prime)] // r2_start_hat
-                    .iter()
-                    .copied()
-                    .chain(std::iter::once(if last_bit_b2 { F::ZERO } else { F::ONE }))
-                    .collect(),
-                b2_start.clone(),
+            let sum_0_index = b2_start_index << 1;
+            let sum_1_index = Self::shift_and_one_fill(b2_start_index, shift_amount);
+            if last_bit_b2 == false {
+                let random_message = if b2_start_index == 0 {
+                    F::ONE
+                } else {
+                    self.verifier_messages[r_shift + j_prime - 1]
+                };
+                let random_message_hat = if b2_start_index == 0 {
+                    F::ONE
+                } else {
+                    self.verifier_message_hats[r_shift + j_prime - 1]
+                };
+                let lag_poly_prev_round = match self.stage_lag_polys.is_empty() {
+                    true => LagrangePolynomial::lag_poly(
+                        self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec(), // r2_start
+                        self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec(), // r2_start_hat
+                        b2_start.clone(),
+                    ),
+                    false => *self.stage_lag_polys.get(&b2_start_index).unwrap(),
+                };
+                self.stage_lag_polys
+                    .insert(sum_1_index, lag_poly_prev_round * random_message);
+                self.stage_lag_polys
+                    .insert(sum_0_index, lag_poly_prev_round * random_message_hat);
+            }
+            println!(
+                "stage_lag_polys: {:?}, sum_0_index: {}, sum_1_index: {}",
+                self.stage_lag_polys, sum_0_index, sum_1_index
             );
 
             // update one of the sums based on last bit of b2_start
             match last_bit_b2 {
-                false => sum_0 += lag_poly * partial_sum,
-                true => sum_1 += lag_poly * partial_sum,
+                false => {
+                    sum_0 +=
+                        *self.stage_lag_polys.get(&(b2_start_index << 1)).unwrap() * partial_sum
+                }
+                true => {
+                    sum_1 += *self
+                        .stage_lag_polys
+                        .get(&Self::shift_and_one_fill(b2_start_index, shift_amount))
+                        .unwrap()
+                        * partial_sum
+                }
             }
         }
 
