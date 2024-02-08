@@ -16,8 +16,8 @@ pub struct TradeoffProver<'a, F: Field> {
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
     pub verifier_message_hats: Vec<F>,
-    pub stage_lag_polys: HashMap<usize, F>,
     pub sums: Vec<F>,
+    pub lag_polys: HashMap<Vec<bool>, F>,
     pub stage_size: usize,
 }
 
@@ -35,8 +35,8 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             num_variables,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
-            stage_lag_polys: HashMap::new(),
             sums: Vec::<F>::with_capacity(stage_size),
+            lag_polys: HashMap::new(),
             stage_size,
         }
     }
@@ -105,9 +105,6 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // Calculate j_prime as j-(s-1)l
         let j_prime = self.current_round - (self.current_stage() * self.stage_size);
 
-        // Calculate r_shift as s*l
-        let r_shift = self.current_stage() * self.stage_size;
-
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
         for (b2_start_index, b2_start) in Hypercube::new(j_prime + 1).enumerate() {
             // Calculate b2_start_index_0 and b2_start_index_1 for indexing partial_sums
@@ -122,60 +119,34 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             let b2_start_index_0 = b2_start_index << shift_amount;
             let b2_start_index_1 = Self::shift_and_one_fill(b2_start_index, shift_amount);
 
-            // Calculate the partial sum
+            // Calculate left_value and right_value based on partial_sums
             let left_value: F = match b2_start_index_0 {
                 0 => F::ZERO,
                 _ => partial_sums[b2_start_index_0 - 1],
             };
-            let right_value: F = partial_sums[b2_start_index_1];
-            let partial_sum: F = right_value - left_value;
+            let right_value = partial_sums[b2_start_index_1];
 
-            // calculate lag_poly
-            let last_bit_b2: bool = *b2_start.last().unwrap();
-            let sum_0_index = b2_start_index << 1;
-            let sum_1_index = Self::shift_and_one_fill(b2_start_index, shift_amount);
-            if last_bit_b2 == false {
-                let random_message = if b2_start_index == 0 {
-                    F::ONE
-                } else {
-                    self.verifier_messages[r_shift + j_prime - 1]
-                };
-                let random_message_hat = if b2_start_index == 0 {
-                    F::ONE
-                } else {
-                    self.verifier_message_hats[r_shift + j_prime - 1]
-                };
-                let lag_poly_prev_round = match self.stage_lag_polys.is_empty() {
-                    true => LagrangePolynomial::lag_poly(
-                        self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec(), // r2_start
-                        self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec(), // r2_start_hat
-                        b2_start.clone(),
-                    ),
-                    false => *self.stage_lag_polys.get(&b2_start_index).unwrap(),
-                };
-                self.stage_lag_polys
-                    .insert(sum_1_index, lag_poly_prev_round * random_message);
-                self.stage_lag_polys
-                    .insert(sum_0_index, lag_poly_prev_round * random_message_hat);
-            }
-            println!(
-                "stage_lag_polys: {:?}, sum_0_index: {}, sum_1_index: {}",
-                self.stage_lag_polys, sum_0_index, sum_1_index
-            );
+            // calculate lag_poly from precomputed
+            let lag_poly = match j_prime {
+                0 => F::ONE,
+                _ => {
+                    let mut prefix = b2_start.clone();
+                    prefix.pop();
+                    let precomputed: F = *self.lag_polys.get(&prefix).unwrap();
+                    match prefix.last().unwrap().clone() {
+                        true => precomputed * *self.verifier_messages.last().unwrap(),
+                        false => precomputed * *self.verifier_message_hats.last().unwrap(),
+                    }
+                }
+            };
 
-            // update one of the sums based on last bit of b2_start
-            match last_bit_b2 {
-                false => {
-                    sum_0 +=
-                        *self.stage_lag_polys.get(&(b2_start_index << 1)).unwrap() * partial_sum
-                }
-                true => {
-                    sum_1 += *self
-                        .stage_lag_polys
-                        .get(&Self::shift_and_one_fill(b2_start_index, shift_amount))
-                        .unwrap()
-                        * partial_sum
-                }
+            // insert this into precomputed
+            self.lag_polys.insert(b2_start.clone(), lag_poly);
+
+            // Match based on the last bit of b2_start
+            match *b2_start.last().unwrap() {
+                false => sum_0 += lag_poly * (right_value - left_value),
+                true => sum_1 += lag_poly * (right_value - left_value),
             }
         }
 
