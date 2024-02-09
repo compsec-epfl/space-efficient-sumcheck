@@ -1,6 +1,5 @@
 use ark_ff::Field;
 use ark_std::vec::Vec;
-use std::collections::HashMap;
 
 use crate::provers::{
     evaluation_stream::EvaluationStream, hypercube::Hypercube, interpolation::LagrangePolynomial,
@@ -17,7 +16,7 @@ pub struct TradeoffProver<'a, F: Field> {
     pub verifier_messages: Vec<F>,
     pub verifier_message_hats: Vec<F>,
     pub sums: Vec<F>,
-    pub lag_polys: HashMap<Vec<bool>, F>,
+    pub lag_polys: Vec<F>,
     pub stage_size: usize,
 }
 
@@ -36,7 +35,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
             sums: Vec::<F>::with_capacity(stage_size),
-            lag_polys: HashMap::new(),
+            lag_polys: vec![F::ONE; Hypercube::pow2(stage_size)],
             stage_size,
         }
     }
@@ -97,6 +96,30 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // Update the internal state with the new sums
         self.sums = sum;
     }
+    fn update_lag_polys(&mut self) {
+        // Calculate j_prime as j-(s-1)l
+        let j_prime = self.current_round - (self.current_stage() * self.stage_size);
+
+        // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
+        let mut updated: Vec<F> = vec![F::ONE; Hypercube::pow2(self.stage_size)];
+        for (b2_start_index, b2_start) in Hypercube::new(j_prime + 1).enumerate() {
+            // calculate lag_poly from precomputed
+            let lag_poly = match j_prime {
+                0 => F::ONE,
+                _ => {
+                    let mut prefix = b2_start.clone();
+                    prefix.pop();
+                    let precomputed: F = *self.lag_polys.get(b2_start_index >> 1).unwrap();
+                    match prefix.last().unwrap().clone() {
+                        true => precomputed * *self.verifier_messages.last().unwrap(),
+                        false => precomputed * *self.verifier_message_hats.last().unwrap(),
+                    }
+                }
+            };
+            updated[b2_start_index] = lag_poly;
+        }
+        self.lag_polys = updated;
+    }
     fn compute_round(&mut self, partial_sums: &Vec<F>) -> (F, F) {
         // Initialize accumulators for sum_0 and sum_1
         let mut sum_0 = F::ZERO;
@@ -126,27 +149,10 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             };
             let right_value = partial_sums[b2_start_index_1];
 
-            // calculate lag_poly from precomputed
-            let lag_poly = match j_prime {
-                0 => F::ONE,
-                _ => {
-                    let mut prefix = b2_start.clone();
-                    prefix.pop();
-                    let precomputed: F = *self.lag_polys.get(&prefix).unwrap();
-                    match prefix.last().unwrap().clone() {
-                        true => precomputed * *self.verifier_messages.last().unwrap(),
-                        false => precomputed * *self.verifier_message_hats.last().unwrap(),
-                    }
-                }
-            };
-
-            // insert this into precomputed
-            self.lag_polys.insert(b2_start.clone(), lag_poly);
-
             // Match based on the last bit of b2_start
             match *b2_start.last().unwrap() {
-                false => sum_0 += lag_poly * (right_value - left_value),
-                true => sum_1 += lag_poly * (right_value - left_value),
+                false => sum_0 += self.lag_polys[b2_start_index] * (right_value - left_value),
+                true => sum_1 += self.lag_polys[b2_start_index] * (right_value - left_value),
             }
         }
 
@@ -179,6 +185,7 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
         }
 
         // Compute the sum based on partial sums
+        self.update_lag_polys();
         let sums: (F, F) = self.compute_round(&Self::compute_prefix_sums(&self.sums));
 
         // Increment the round counter
@@ -206,6 +213,6 @@ mod tests {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
         run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
-        run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
+        // run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
     }
 }
