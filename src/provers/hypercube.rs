@@ -7,7 +7,7 @@ pub struct Hypercube {
 
 impl Hypercube {
     pub fn new(num_variables: usize) -> Self {
-        let stop_member = 2usize.pow(num_variables as u32);
+        let stop_member = 1 << num_variables;
         Self {
             num_variables,
             last_member: None,
@@ -16,7 +16,7 @@ impl Hypercube {
         }
     }
     pub fn pow2(num_variables: usize) -> usize {
-        2usize.pow(num_variables as u32)
+        1 << num_variables
     }
 }
 
