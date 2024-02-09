@@ -10,8 +10,8 @@ pub struct Sumcheck<F: Field> {
     pub is_accepted: bool,
 }
 
-impl<F: Field> Sumcheck<F> {
-    pub fn prove<P: Prover<F>, R: Rng>(prover: &mut P, rng: &mut R) -> Self {
+impl<'a, F: Field> Sumcheck<F> {
+    pub fn prove<P: Prover<'a, F>, R: Rng>(prover: &mut P, rng: &mut R) -> Self {
         // Initialize vectors to store prover and verifier messages
         let mut prover_messages: Vec<(F, F)> = Vec::with_capacity(prover.total_rounds());
         let mut verifier_messages: Vec<F> = Vec::with_capacity(prover.total_rounds());
@@ -64,7 +64,7 @@ mod tests {
     use super::Sumcheck;
     use crate::provers::{
         test_helpers::{BenchEvaluationStream, TestField},
-        BlendedProver, TimeProver,
+        BlendedProver, Prover, ProverArgs, TimeProver,
     };
 
     #[test]
@@ -72,9 +72,14 @@ mod tests {
         // take an evaluation stream
         let evaluation_stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new(20);
         // initialize the provers
-        let mut blended_k3_prover =
-            BlendedProver::<TestField>::new(Box::new(&evaluation_stream), 3);
-        let mut time_prover = TimeProver::<TestField>::new(Box::new(&evaluation_stream));
+        let mut blended_k3_prover = BlendedProver::<TestField>::new(ProverArgs {
+            stream: Box::new(&evaluation_stream),
+            num_stages: 3,
+        });
+        let mut time_prover = TimeProver::<TestField>::new(ProverArgs {
+            stream: Box::new(&evaluation_stream),
+            num_stages: TimeProver::<TestField>::DEFAULT_NUM_STAGES,
+        });
         // run them and get the transcript
         let blended_prover_transcript =
             Sumcheck::<TestField>::prove(&mut blended_k3_prover, &mut ark_std::test_rng());
