@@ -2,12 +2,12 @@ use ark_ff::Field;
 use ark_std::vec::Vec;
 
 use crate::provers::{
-    evaluation_stream::EvaluationStream, hypercube::Hypercube, interpolation::LagrangePolynomial,
-    Prover,
+    evaluation_stream::EvaluationStream, hypercube::Hypercube,
+    lagrange_polynomial::LagrangePolynomial, Prover,
 };
 
-// the state of the tradeoff prover in the protocol
-pub struct TradeoffProver<'a, F: Field> {
+// the state of the Blended prover in the protocol
+pub struct BlendedProver<'a, F: Field> {
     pub claimed_sum: F,
     pub current_round: usize,
     pub evaluation_stream: Box<&'a dyn EvaluationStream<F>>,
@@ -20,12 +20,12 @@ pub struct TradeoffProver<'a, F: Field> {
     pub stage_size: usize,
 }
 
-impl<'a, F: Field> TradeoffProver<'a, F> {
+impl<'a, F: Field> BlendedProver<'a, F> {
     pub fn new(evaluation_stream: Box<&'a dyn EvaluationStream<F>>, num_stages: usize) -> Self {
         let claimed_sum = evaluation_stream.get_claimed_sum();
         let num_variables = evaluation_stream.get_num_variables();
         let stage_size: usize = num_variables / num_stages;
-        // return the TradeoffProver instance
+        // return the BlendedProver instance
         Self {
             claimed_sum,
             current_round: 0,
@@ -161,7 +161,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
     }
 }
 
-impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
+impl<'a, F: Field> Prover<F> for BlendedProver<'a, F> {
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
@@ -205,14 +205,14 @@ mod tests {
         test_helpers::{
             run_basic_sumcheck_test, test_polynomial, BasicEvaluationStream, TestField,
         },
-        TradeoffProver,
+        BlendedProver,
     };
 
     #[test]
     fn sumcheck() {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
-        run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
-        run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
+        run_basic_sumcheck_test(BlendedProver::new(Box::new(&evaluation_stream), 1));
+        run_basic_sumcheck_test(BlendedProver::new(Box::new(&evaluation_stream), 3));
     }
 }

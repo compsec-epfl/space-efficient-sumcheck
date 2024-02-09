@@ -4,7 +4,7 @@ use ark_ff::{
     Field,
 };
 use space_efficient_sumcheck::{
-    provers::{test_helpers::BenchEvaluationStream, SpaceProver, TimeProver, TradeoffProver},
+    provers::{test_helpers::BenchEvaluationStream, SpaceProver, TimeProver, BlendedProver},
     Sumcheck,
 };
 use std::env;
@@ -32,7 +32,7 @@ enum FieldLabel {
 enum AlgorithmLabel {
     CTY,
     VSBW,
-    Tradeoff,
+    Blended,
 }
 
 struct BenchArgs {
@@ -59,18 +59,18 @@ fn validate_and_format_command_line_args(argsv: Vec<String>) -> BenchArgs {
         std::process::exit(1);
     }
     // algorithm label
-    if !(argsv[1] == "CTY" || argsv[1] == "VSBW" || argsv[1] == "Tradeoff") {
+    if !(argsv[1] == "CTY" || argsv[1] == "VSBW" || argsv[1] == "Blended") {
         eprintln!(
             "Usage: {} field_label algorithm_label num_variables stage_size",
             argsv[0]
         );
-        eprintln!("Invalid input: algorithm_label must be one of (CTY, VSBW, Tradeoff)");
+        eprintln!("Invalid input: algorithm_label must be one of (CTY, VSBW, Blended)");
         std::process::exit(1);
     }
     let algorithm_label = match argsv[1].as_str() {
         "CTY" => AlgorithmLabel::CTY,
         "VSBW" => AlgorithmLabel::VSBW,
-        _ => AlgorithmLabel::Tradeoff, // this is checked in previous line
+        _ => AlgorithmLabel::Blended, // this is checked in previous line
     };
     // field_label
     if !(argsv[2] == "Field64" || argsv[2] == "Field128" || argsv[2] == "FieldBn254") {
@@ -128,9 +128,9 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
         AlgorithmLabel::VSBW => {
             Sumcheck::prove(&mut TimeProver::<F>::new(Box::new(&stream)), &mut rng);
         }
-        AlgorithmLabel::Tradeoff => {
+        AlgorithmLabel::Blended => {
             Sumcheck::prove(
-                &mut TradeoffProver::<F>::new(Box::new(&stream), bench_args.stage_size),
+                &mut BlendedProver::<F>::new(Box::new(&stream), bench_args.stage_size),
                 &mut rng,
             );
         }
