@@ -100,6 +100,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // Calculate j_prime as j-(s-1)l
         let j_prime = self.current_round - (self.current_stage() * self.stage_size);
 
+        // We can't update in place, we must updated into a new vec and then replace the old one
         let mut updated: Vec<F> = vec![F::ONE; Hypercube::pow2(self.stage_size)];
 
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
