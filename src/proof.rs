@@ -64,7 +64,7 @@ mod tests {
     use super::Sumcheck;
     use crate::provers::{
         test_helpers::{BenchEvaluationStream, TestField},
-        TimeProver, TradeoffProver,
+        BlendedProver, TimeProver,
     };
 
     #[test]
@@ -72,18 +72,18 @@ mod tests {
         // take an evaluation stream
         let evaluation_stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new(20);
         // initialize the provers
-        let mut tradeoff_k3_prover =
-            TradeoffProver::<TestField>::new(Box::new(&evaluation_stream), 3);
+        let mut blended_k3_prover =
+            BlendedProver::<TestField>::new(Box::new(&evaluation_stream), 3);
         let mut time_prover = TimeProver::<TestField>::new(Box::new(&evaluation_stream));
         // run them and get the transcript
-        let tradeoff_prover_transcript =
-            Sumcheck::<TestField>::prove(&mut tradeoff_k3_prover, &mut ark_std::test_rng());
+        let blended_prover_transcript =
+            Sumcheck::<TestField>::prove(&mut blended_k3_prover, &mut ark_std::test_rng());
         let time_prover_transcript =
             Sumcheck::<TestField>::prove(&mut time_prover, &mut ark_std::test_rng());
         // ensure the transcript is identical
         assert_eq!(
             time_prover_transcript.prover_messages,
-            tradeoff_prover_transcript.prover_messages
+            blended_prover_transcript.prover_messages
         );
     }
 }
