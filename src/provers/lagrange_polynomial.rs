@@ -100,7 +100,7 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::provers::{interpolation::LagrangePolynomial, test_helpers::TestField};
+    use crate::provers::{lagrange_polynomial::LagrangePolynomial, test_helpers::TestField};
 
     #[test]
     fn lag_next_test() {

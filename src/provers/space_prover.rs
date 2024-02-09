@@ -1,8 +1,8 @@
 use ark_ff::Field;
 
 use crate::provers::{
-    evaluation_stream::EvaluationStream, hypercube::Hypercube, interpolation::LagrangePolynomial,
-    Prover,
+    evaluation_stream::EvaluationStream, hypercube::Hypercube,
+    lagrange_polynomial::LagrangePolynomial, Prover,
 };
 
 // the state of the space prover in the protocol
