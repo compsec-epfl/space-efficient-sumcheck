@@ -202,6 +202,7 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
         // Return the computed polynomial sums
         Some(sums)
     }
+
     fn total_rounds(&self) -> usize {
         self.num_variables
     }
