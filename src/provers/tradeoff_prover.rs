@@ -213,6 +213,6 @@ mod tests {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
         run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 1));
-        // run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
+        run_basic_sumcheck_test(TradeoffProver::new(Box::new(&evaluation_stream), 3));
     }
 }
