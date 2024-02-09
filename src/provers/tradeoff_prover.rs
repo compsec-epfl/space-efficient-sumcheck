@@ -100,17 +100,16 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // Calculate j_prime as j-(s-1)l
         let j_prime = self.current_round - (self.current_stage() * self.stage_size);
 
-        // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
         let mut updated: Vec<F> = vec![F::ONE; Hypercube::pow2(self.stage_size)];
-        for (b2_start_index, b2_start) in Hypercube::new(j_prime + 1).enumerate() {
+
+        // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
+        for b2_start_index in 0..Hypercube::pow2(j_prime + 1) {
             // calculate lag_poly from precomputed
             let lag_poly = match j_prime {
                 0 => F::ONE,
                 _ => {
-                    let mut prefix = b2_start.clone();
-                    prefix.pop();
                     let precomputed: F = *self.lag_polys.get(b2_start_index >> 1).unwrap();
-                    match prefix.last().unwrap().clone() {
+                    match b2_start_index & 2 == 2 {
                         true => precomputed * *self.verifier_messages.last().unwrap(),
                         false => precomputed * *self.verifier_message_hats.last().unwrap(),
                     }
@@ -126,21 +125,20 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         let mut sum_1 = F::ZERO;
 
         // Calculate j_prime as j-(s-1)l
-        let j_prime = self.current_round - (self.current_stage() * self.stage_size);
+        let stage_start_index: usize = self.current_stage() * self.stage_size;
+        let j_prime = self.current_round - stage_start_index;
 
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
         for (b2_start_index, b2_start) in Hypercube::new(j_prime + 1).enumerate() {
             // Calculate b2_start_index_0 and b2_start_index_1 for indexing partial_sums
-            let shift_amount = if self.num_variables - (self.current_stage() * self.stage_size)
-                < self.stage_size
-            {
+            let shift_amount = if self.num_variables - stage_start_index < self.stage_size {
                 // this is the oddly sized last stage when k doesn't divide num_vars
                 self.num_variables - (self.current_stage() * self.stage_size) - j_prime - 1
             } else {
                 self.stage_size - j_prime - 1
             };
-            let b2_start_index_0 = b2_start_index << shift_amount;
-            let b2_start_index_1 = Self::shift_and_one_fill(b2_start_index, shift_amount);
+            let b2_start_index_0: usize = b2_start_index << shift_amount;
+            let b2_start_index_1: usize = Self::shift_and_one_fill(b2_start_index, shift_amount);
 
             // Calculate left_value and right_value based on partial_sums
             let left_value: F = match b2_start_index_0 {
@@ -148,11 +146,12 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                 _ => partial_sums[b2_start_index_0 - 1],
             };
             let right_value = partial_sums[b2_start_index_1];
+            let sum = right_value - left_value;
 
             // Match based on the last bit of b2_start
             match *b2_start.last().unwrap() {
-                false => sum_0 += self.lag_polys[b2_start_index] * (right_value - left_value),
-                true => sum_1 += self.lag_polys[b2_start_index] * (right_value - left_value),
+                false => sum_0 += self.lag_polys[b2_start_index] * sum,
+                true => sum_1 += self.lag_polys[b2_start_index] * sum,
             }
         }
 
