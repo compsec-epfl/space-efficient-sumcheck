@@ -4,7 +4,10 @@ use ark_ff::{
     Field,
 };
 use space_efficient_sumcheck::{
-    provers::{test_helpers::BenchEvaluationStream, SpaceProver, TimeProver, BlendedProver},
+    provers::{
+        test_helpers::BenchEvaluationStream, BlendedProver, Prover, ProverArgs, SpaceProver,
+        TimeProver,
+    },
     Sumcheck,
 };
 use std::env;
@@ -121,16 +124,32 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
     let stream: BenchEvaluationStream<F> =
         BenchEvaluationStream::<F>::new(bench_args.num_variables);
     // switch on algorithm_label
+
     match bench_args.algorithm_label {
         AlgorithmLabel::CTY => {
-            Sumcheck::prove(&mut SpaceProver::<F>::new(Box::new(&stream)), &mut rng);
+            Sumcheck::prove(
+                &mut SpaceProver::<F>::new(ProverArgs {
+                    stream: Box::new(&stream),
+                    num_stages: SpaceProver::<F>::DEFAULT_NUM_STAGES,
+                }),
+                &mut rng,
+            );
         }
         AlgorithmLabel::VSBW => {
-            Sumcheck::prove(&mut TimeProver::<F>::new(Box::new(&stream)), &mut rng);
+            Sumcheck::prove(
+                &mut TimeProver::<F>::new(ProverArgs {
+                    stream: Box::new(&stream),
+                    num_stages: TimeProver::<F>::DEFAULT_NUM_STAGES,
+                }),
+                &mut rng,
+            );
         }
         AlgorithmLabel::Blended => {
             Sumcheck::prove(
-                &mut BlendedProver::<F>::new(Box::new(&stream), bench_args.stage_size),
+                &mut BlendedProver::<F>::new(ProverArgs {
+                    stream: Box::new(&stream),
+                    num_stages: bench_args.stage_size,
+                }),
                 &mut rng,
             );
         }
