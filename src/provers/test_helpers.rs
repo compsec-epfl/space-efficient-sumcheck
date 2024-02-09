@@ -16,7 +16,9 @@ pub struct TestFieldConfig;
 pub type TestField = Fp64<MontBackend<TestFieldConfig, 1>>;
 pub type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
 
-pub fn run_boolean_sumcheck_test<F: Field + std::convert::From<i32>, P: Prover<F>>(mut prover: P) {
+pub fn run_boolean_sumcheck_test<'a, F: Field + std::convert::From<i32>, P: Prover<'a, F>>(
+    mut prover: P,
+) {
     // ZEROTH ROUND
     // all variables free
     // 000 = 0
@@ -78,7 +80,9 @@ pub fn run_boolean_sumcheck_test<F: Field + std::convert::From<i32>, P: Prover<F
     );
 }
 
-pub fn run_basic_sumcheck_test<F: Field + std::convert::From<i32>, P: Prover<F>>(mut prover: P) {
+pub fn run_basic_sumcheck_test<'a, F: Field + std::convert::From<i32>, P: Prover<'a, F>>(
+    mut prover: P,
+) {
     // FIRST ROUND x0 fixed to 3
     // 3,0,1 = 6
     // 3,0,0 = 6

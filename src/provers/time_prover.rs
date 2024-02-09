@@ -1,7 +1,10 @@
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
-use crate::provers::{evaluation_stream::EvaluationStream, prover::Prover};
+use crate::provers::{
+    evaluation_stream::EvaluationStream,
+    prover::{Prover, ProverArgs},
+};
 
 // the state of the time prover in the protocol
 pub struct TimeProver<'a, F: Field> {
@@ -13,17 +16,6 @@ pub struct TimeProver<'a, F: Field> {
 }
 
 impl<'a, F: Field> TimeProver<'a, F> {
-    pub fn new(evaluation_stream: Box<&'a dyn EvaluationStream<F>>) -> Self {
-        let claimed_sum = evaluation_stream.get_claimed_sum();
-        let num_variables = evaluation_stream.get_num_variables();
-        Self {
-            claimed_sum,
-            current_round: 0,
-            evaluations: None,
-            evaluation_stream,
-            num_variables,
-        }
-    }
     fn num_free_variables(&self) -> usize {
         self.num_variables - self.current_round
     }
@@ -113,7 +105,19 @@ impl<'a, F: Field> TimeProver<'a, F> {
     }
 }
 
-impl<'a, F: Field> Prover<F> for TimeProver<'a, F> {
+impl<'a, F: Field> Prover<'a, F> for TimeProver<'a, F> {
+    const DEFAULT_NUM_STAGES: usize = 1;
+    fn new(prover_args: ProverArgs<'a, F>) -> Self {
+        let claimed_sum = prover_args.stream.get_claimed_sum();
+        let num_variables = prover_args.stream.get_num_variables();
+        Self {
+            claimed_sum,
+            current_round: 0,
+            evaluations: None,
+            evaluation_stream: prover_args.stream,
+            num_variables,
+        }
+    }
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
@@ -149,18 +153,25 @@ impl<'a, F: Field> Prover<F> for TimeProver<'a, F> {
 #[cfg(test)]
 mod tests {
     use crate::provers::{
+        prover::ProverArgs,
         test_helpers::{
             run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
             BasicEvaluationStream, TestField,
         },
-        TimeProver,
+        Prover, TimeProver,
     };
 
     #[test]
     fn sumcheck() {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
-        run_boolean_sumcheck_test(TimeProver::new(Box::new(&evaluation_stream)));
-        run_basic_sumcheck_test(TimeProver::new(Box::new(&evaluation_stream)));
+        run_boolean_sumcheck_test(TimeProver::new(ProverArgs {
+            stream: Box::new(&evaluation_stream),
+            num_stages: TimeProver::<TestField>::DEFAULT_NUM_STAGES,
+        }));
+        run_basic_sumcheck_test(TimeProver::new(ProverArgs {
+            stream: Box::new(&evaluation_stream),
+            num_stages: TimeProver::<TestField>::DEFAULT_NUM_STAGES,
+        }));
     }
 }

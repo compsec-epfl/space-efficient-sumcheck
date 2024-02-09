@@ -1,8 +1,10 @@
 use ark_ff::Field;
 
 use crate::provers::{
-    evaluation_stream::EvaluationStream, hypercube::Hypercube,
-    lagrange_polynomial::LagrangePolynomial, Prover,
+    evaluation_stream::EvaluationStream,
+    hypercube::Hypercube,
+    lagrange_polynomial::LagrangePolynomial,
+    prover::{Prover, ProverArgs},
 };
 
 // the state of the space prover in the protocol
@@ -16,18 +18,6 @@ pub struct SpaceProver<'a, F: Field> {
 }
 
 impl<'a, F: Field> SpaceProver<'a, F> {
-    pub fn new(evaluation_stream: Box<&'a dyn EvaluationStream<F>>) -> Self {
-        let claimed_sum = evaluation_stream.get_claimed_sum();
-        let num_variables = evaluation_stream.get_num_variables();
-        Self {
-            claimed_sum,
-            evaluation_stream,
-            verifier_messages: Vec::<F>::with_capacity(num_variables), // TODO: could be halfed somehow
-            verifier_message_hats: Vec::<F>::with_capacity(num_variables),
-            current_round: 0,
-            num_variables,
-        }
-    }
     fn cty_evaluate(&self) -> (F, F) {
         // Initialize accumulators for sum_0 and sum_1
         let mut sum_0: F = F::ZERO;
@@ -77,7 +67,20 @@ impl<'a, F: Field> SpaceProver<'a, F> {
     }
 }
 
-impl<'a, F: Field> Prover<F> for SpaceProver<'a, F> {
+impl<'a, F: Field> Prover<'a, F> for SpaceProver<'a, F> {
+    const DEFAULT_NUM_STAGES: usize = 1;
+    fn new(prover_args: ProverArgs<'a, F>) -> Self {
+        let claimed_sum = prover_args.stream.get_claimed_sum();
+        let num_variables = prover_args.stream.get_num_variables();
+        Self {
+            claimed_sum,
+            evaluation_stream: prover_args.stream,
+            verifier_messages: Vec::<F>::with_capacity(num_variables), // TODO: could be halfed somehow
+            verifier_message_hats: Vec::<F>::with_capacity(num_variables),
+            current_round: 0,
+            num_variables,
+        }
+    }
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
@@ -116,14 +119,20 @@ mod tests {
             run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
             BasicEvaluationStream, TestField,
         },
-        SpaceProver,
+        Prover, ProverArgs, SpaceProver,
     };
 
     #[test]
     fn sumcheck() {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
-        run_boolean_sumcheck_test(SpaceProver::new(Box::new(&evaluation_stream)));
-        run_basic_sumcheck_test(SpaceProver::new(Box::new(&evaluation_stream)));
+        run_boolean_sumcheck_test(SpaceProver::new(ProverArgs {
+            stream: Box::new(&evaluation_stream),
+            num_stages: SpaceProver::<TestField>::DEFAULT_NUM_STAGES,
+        }));
+        run_basic_sumcheck_test(SpaceProver::new(ProverArgs {
+            stream: Box::new(&evaluation_stream),
+            num_stages: SpaceProver::<TestField>::DEFAULT_NUM_STAGES,
+        }));
     }
 }

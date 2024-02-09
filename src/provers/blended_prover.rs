@@ -2,8 +2,10 @@ use ark_ff::Field;
 use ark_std::vec::Vec;
 
 use crate::provers::{
-    evaluation_stream::EvaluationStream, hypercube::Hypercube,
-    lagrange_polynomial::LagrangePolynomial, Prover,
+    evaluation_stream::EvaluationStream,
+    hypercube::Hypercube,
+    lagrange_polynomial::LagrangePolynomial,
+    prover::{Prover, ProverArgs},
 };
 
 // the state of the Blended prover in the protocol
@@ -21,24 +23,6 @@ pub struct BlendedProver<'a, F: Field> {
 }
 
 impl<'a, F: Field> BlendedProver<'a, F> {
-    pub fn new(evaluation_stream: Box<&'a dyn EvaluationStream<F>>, num_stages: usize) -> Self {
-        let claimed_sum = evaluation_stream.get_claimed_sum();
-        let num_variables = evaluation_stream.get_num_variables();
-        let stage_size: usize = num_variables / num_stages;
-        // return the BlendedProver instance
-        Self {
-            claimed_sum,
-            current_round: 0,
-            evaluation_stream,
-            num_stages,
-            num_variables,
-            verifier_messages: Vec::<F>::with_capacity(num_variables),
-            verifier_message_hats: Vec::<F>::with_capacity(num_variables),
-            sums: Vec::<F>::with_capacity(stage_size),
-            lag_polys: vec![F::ONE; Hypercube::pow2(stage_size)],
-            stage_size,
-        }
-    }
     fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
         (num << shift_amount) | (1 << shift_amount) - 1
     }
@@ -161,7 +145,26 @@ impl<'a, F: Field> BlendedProver<'a, F> {
     }
 }
 
-impl<'a, F: Field> Prover<F> for BlendedProver<'a, F> {
+impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
+    const DEFAULT_NUM_STAGES: usize = 2;
+    fn new(prover_args: ProverArgs<'a, F>) -> Self {
+        let claimed_sum = prover_args.stream.get_claimed_sum();
+        let num_variables = prover_args.stream.get_num_variables();
+        let stage_size: usize = num_variables / prover_args.num_stages;
+        // return the BlendedProver instance
+        Self {
+            claimed_sum,
+            current_round: 0,
+            evaluation_stream: prover_args.stream,
+            num_stages: prover_args.num_stages,
+            num_variables,
+            verifier_messages: Vec::<F>::with_capacity(num_variables),
+            verifier_message_hats: Vec::<F>::with_capacity(num_variables),
+            sums: Vec::<F>::with_capacity(stage_size),
+            lag_polys: vec![F::ONE; Hypercube::pow2(stage_size)],
+            stage_size,
+        }
+    }
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
@@ -202,17 +205,25 @@ impl<'a, F: Field> Prover<F> for BlendedProver<'a, F> {
 #[cfg(test)]
 mod tests {
     use crate::provers::{
+        prover::ProverArgs,
         test_helpers::{
-            run_basic_sumcheck_test, test_polynomial, BasicEvaluationStream, TestField,
+            run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
+            BasicEvaluationStream, TestField,
         },
-        BlendedProver,
+        BlendedProver, Prover,
     };
 
     #[test]
     fn sumcheck() {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
-        run_basic_sumcheck_test(BlendedProver::new(Box::new(&evaluation_stream), 1));
-        run_basic_sumcheck_test(BlendedProver::new(Box::new(&evaluation_stream), 3));
+        run_boolean_sumcheck_test(BlendedProver::new(ProverArgs {
+            stream: Box::new(&evaluation_stream),
+            num_stages: BlendedProver::<TestField>::DEFAULT_NUM_STAGES,
+        }));
+        run_basic_sumcheck_test(BlendedProver::new(ProverArgs {
+            stream: Box::new(&evaluation_stream),
+            num_stages: BlendedProver::<TestField>::DEFAULT_NUM_STAGES,
+        }));
     }
 }
