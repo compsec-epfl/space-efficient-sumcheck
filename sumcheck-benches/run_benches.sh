@@ -8,7 +8,7 @@
 # Then:
 #   kill <pid>
 
-algorithms="Tradeoff2 Tradeoff3 Tradeoff4 VSBW CTY"
+algorithms="Tradeoff2 VSBW Tradeoff3 Tradeoff4 Tradeoff1 CTY"
 fields="Field64 Field128 FieldBn254"
 
 for algorithm in $algorithms; do
@@ -16,6 +16,7 @@ for algorithm in $algorithms; do
         num_vars=15
         while [ $num_vars -le 30 ]; do
             case "$algorithm" in
+                "Tradeoff1") stage_size="1" ;;
                 "Tradeoff2") stage_size="2" ;;
                 "Tradeoff3") stage_size="3" ;;
                 "Tradeoff4") stage_size="4" ;;
@@ -24,6 +25,7 @@ for algorithm in $algorithms; do
                 *) ;;
             esac
             case "$algorithm" in
+                "Tradeoff1") algorithm_label="Tradeoff" ;;
                 "Tradeoff2") algorithm_label="Tradeoff" ;;
                 "Tradeoff3") algorithm_label="Tradeoff" ;;
                 "Tradeoff4") algorithm_label="Tradeoff" ;;
