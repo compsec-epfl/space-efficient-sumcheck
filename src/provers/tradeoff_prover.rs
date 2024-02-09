@@ -16,6 +16,7 @@ pub struct TradeoffProver<'a, F: Field> {
     pub verifier_messages: Vec<F>,
     pub verifier_message_hats: Vec<F>,
     pub sums: Vec<F>,
+    pub lag_polys: Vec<F>,
     pub stage_size: usize,
 }
 
@@ -34,6 +35,7 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
             sums: Vec::<F>::with_capacity(stage_size),
+            lag_polys: vec![F::ONE; Hypercube::pow2(stage_size)],
             stage_size,
         }
     }
@@ -94,30 +96,50 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
         // Update the internal state with the new sums
         self.sums = sum;
     }
-    fn compute_round(&self, partial_sums: &Vec<F>) -> (F, F) {
+    fn update_lag_polys(&mut self) {
+        // Calculate j_prime as j-(s-1)l
+        let j_prime = self.current_round - (self.current_stage() * self.stage_size);
+
+        // We can't update in place, we must updated into a new vec and then replace the old one
+        let mut updated: Vec<F> = vec![F::ONE; Hypercube::pow2(self.stage_size)];
+
+        // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
+        for b2_start_index in 0..Hypercube::pow2(j_prime + 1) {
+            // calculate lag_poly from precomputed
+            let lag_poly = match j_prime {
+                0 => F::ONE,
+                _ => {
+                    let precomputed: F = *self.lag_polys.get(b2_start_index >> 1).unwrap();
+                    match b2_start_index & 2 == 2 {
+                        true => precomputed * *self.verifier_messages.last().unwrap(),
+                        false => precomputed * *self.verifier_message_hats.last().unwrap(),
+                    }
+                }
+            };
+            updated[b2_start_index] = lag_poly;
+        }
+        self.lag_polys = updated;
+    }
+    fn compute_round(&mut self, partial_sums: &Vec<F>) -> (F, F) {
         // Initialize accumulators for sum_0 and sum_1
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
 
         // Calculate j_prime as j-(s-1)l
-        let j_prime = self.current_round - (self.current_stage() * self.stage_size);
-
-        // Calculate r_shift as s*l
-        let r_shift = self.current_stage() * self.stage_size;
+        let stage_start_index: usize = self.current_stage() * self.stage_size;
+        let j_prime = self.current_round - stage_start_index;
 
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
         for (b2_start_index, b2_start) in Hypercube::new(j_prime + 1).enumerate() {
             // Calculate b2_start_index_0 and b2_start_index_1 for indexing partial_sums
-            let shift_amount = if self.num_variables - (self.current_stage() * self.stage_size)
-                < self.stage_size
-            {
+            let shift_amount = if self.num_variables - stage_start_index < self.stage_size {
                 // this is the oddly sized last stage when k doesn't divide num_vars
                 self.num_variables - (self.current_stage() * self.stage_size) - j_prime - 1
             } else {
                 self.stage_size - j_prime - 1
             };
-            let b2_start_index_0 = b2_start_index << shift_amount;
-            let b2_start_index_1 = Self::shift_and_one_fill(b2_start_index, shift_amount);
+            let b2_start_index_0: usize = b2_start_index << shift_amount;
+            let b2_start_index_1: usize = Self::shift_and_one_fill(b2_start_index, shift_amount);
 
             // Calculate left_value and right_value based on partial_sums
             let left_value: F = match b2_start_index_0 {
@@ -125,36 +147,12 @@ impl<'a, F: Field> TradeoffProver<'a, F> {
                 _ => partial_sums[b2_start_index_0 - 1],
             };
             let right_value = partial_sums[b2_start_index_1];
+            let sum = right_value - left_value;
 
             // Match based on the last bit of b2_start
             match *b2_start.last().unwrap() {
-                false => {
-                    // If the last bit is 0, calculate lag_poly_0 and update sum_0
-                    let mut r2_start_0: Vec<F> =
-                        self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_0.push(F::ZERO); // Add ZERO to the end
-                    let mut r2_start_hat_0: Vec<F> =
-                        self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_hat_0.push(F::ONE); // Add ONE - ZERO to the end
-                    let lag_poly_0: F = LagrangePolynomial::lag_poly(
-                        r2_start_0.clone(),
-                        r2_start_hat_0,
-                        b2_start.clone(),
-                    );
-                    sum_0 += lag_poly_0 * (right_value - left_value);
-                }
-                true => {
-                    // If the last bit is 1, calculate lag_poly_1 and update sum_1
-                    let mut r2_start_1: Vec<F> =
-                        self.verifier_messages[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_1.push(F::ONE); // Add ONE to the end
-                    let mut r2_start_hat_1: Vec<F> =
-                        self.verifier_message_hats[r_shift..(r_shift + j_prime)].to_vec();
-                    r2_start_hat_1.push(F::ZERO); // Add ONE - ONE to the end
-                    let lag_poly_1: F =
-                        LagrangePolynomial::lag_poly(r2_start_1, r2_start_hat_1, b2_start.clone());
-                    sum_1 += lag_poly_1 * (right_value - left_value);
-                }
+                false => sum_0 += self.lag_polys[b2_start_index] * sum,
+                true => sum_1 += self.lag_polys[b2_start_index] * sum,
             }
         }
 
@@ -187,6 +185,7 @@ impl<'a, F: Field> Prover<F> for TradeoffProver<'a, F> {
         }
 
         // Compute the sum based on partial sums
+        self.update_lag_polys();
         let sums: (F, F) = self.compute_round(&Self::compute_prefix_sums(&self.sums));
 
         // Increment the round counter
