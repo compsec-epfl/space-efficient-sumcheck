@@ -26,17 +26,20 @@ impl<'a, F: Field> BlendedProver<'a, F> {
     fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
         (num << shift_amount) | (1 << shift_amount) - 1
     }
-    fn compute_prefix_sums(sums: &Vec<F>) -> Vec<F> {
-        sums.iter()
+
+    fn compute_prefix_sums(sums: impl IntoIterator<Item = F>) -> Vec<F> {
+        sums.into_iter()
             .scan(F::ZERO, |sum, i| {
                 *sum += i;
                 Some(*sum)
             })
             .collect::<Vec<F>>()
     }
+
     fn current_stage(&self) -> usize {
         self.current_round / self.stage_size
     }
+
     fn sum_update(&mut self) {
         // 0. Declare ranges for convenience
         let b1_num_vars: usize = self.current_stage() * self.stage_size;
@@ -78,7 +81,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         }
 
         // Update the internal state with the new sums
-        self.sums = sum;
+        self.sums = Self::compute_prefix_sums(sum);
     }
     fn update_lag_polys(&mut self) {
         // Calculate j_prime as j-(s-1)l
@@ -104,7 +107,8 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         }
         self.lag_polys = updated;
     }
-    fn compute_round(&mut self, partial_sums: &Vec<F>) -> (F, F) {
+
+    fn compute_round(&self, partial_sums: &[F]) -> (F, F) {
         // Initialize accumulators for sum_0 and sum_1
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
@@ -189,7 +193,8 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
 
         // Compute the sum based on partial sums
         self.update_lag_polys();
-        let sums: (F, F) = self.compute_round(&Self::compute_prefix_sums(&self.sums));
+
+        let sums: (F, F) = self.compute_round(&self.sums);
 
         // Increment the round counter
         self.current_round += 1;
