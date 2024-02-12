@@ -18,6 +18,7 @@ pub struct BlendedProver<'a, F: Field> {
     pub verifier_messages: Vec<F>,
     pub verifier_message_hats: Vec<F>,
     pub sums: Vec<F>,
+    pub lag_polys_update: Vec<F>,
     pub lag_polys: Vec<F>,
     pub stage_size: usize,
 }
@@ -87,9 +88,6 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         // Calculate j_prime as j-(s-1)l
         let j_prime = self.current_round - (self.current_stage() * self.stage_size);
 
-        // We can't update in place, we must updated into a new vec and then replace the old one
-        let mut updated: Vec<F> = vec![F::ONE; Hypercube::stop_member_from_size(self.stage_size)];
-
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
         for b2_start_index in 0..Hypercube::stop_member_from_size(j_prime + 1) {
             // calculate lag_poly from precomputed
@@ -103,9 +101,9 @@ impl<'a, F: Field> BlendedProver<'a, F> {
                     }
                 }
             };
-            updated[b2_start_index] = lag_poly;
+            self.lag_polys_update[b2_start_index] = lag_poly;
         }
-        self.lag_polys = updated;
+        std::mem::swap(&mut self.lag_polys, &mut self.lag_polys_update);
     }
 
     fn compute_round(&self, partial_sums: &[F]) -> (F, F) {
@@ -165,6 +163,7 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
             sums: Vec::<F>::with_capacity(stage_size),
+            lag_polys_update: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
             lag_polys: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
             stage_size,
         }
