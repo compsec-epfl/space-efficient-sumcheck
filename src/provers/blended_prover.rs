@@ -118,7 +118,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         let j_prime = self.current_round - stage_start_index;
 
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
-        for (b2_start_index, b2_start) in Hypercube::new(j_prime + 1).enumerate() {
+        for b2_start_index in 0..Hypercube::pow2(j_prime + 1) {
             // Calculate b2_start_index_0 and b2_start_index_1 for indexing partial_sums
             let shift_amount = if self.num_variables - stage_start_index < self.stage_size {
                 // this is the oddly sized last stage when k doesn't divide num_vars
@@ -138,7 +138,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
             let sum = right_value - left_value;
 
             // Match based on the last bit of b2_start
-            match *b2_start.last().unwrap() {
+            match b2_start_index & 1 == 1 {
                 false => sum_0 += self.lag_polys[b2_start_index] * sum,
                 true => sum_1 += self.lag_polys[b2_start_index] * sum,
             }
