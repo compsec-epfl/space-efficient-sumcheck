@@ -50,6 +50,21 @@ impl<F: Field> LagrangePolynomial<F> {
             },
         )
     }
+    pub fn lag_poly_2(x: Vec<F>, x_hat: Vec<F>, b: Vec<bool>) -> F {
+        // Iterate over the zipped triple x, x_hat, and boolean hypercube vectors
+        x.iter().zip(x_hat.iter()).zip(b.iter()).fold(
+            // Initial the accumulation to F::ONE
+            F::ONE,
+            // Closure for the folding operation, taking accumulator and ((x_i, x_hat_i), b_i)
+            |acc, ((x_i, x_hat_i), b_i)| {
+                // Multiply the accumulator by either x_i or x_hat_i based on the boolean value b_i
+                acc * match b_i {
+                    true => *x_i,
+                    false => *x_hat_i,
+                }
+            },
+        )
+    }
 }
 
 impl<F: Field> Iterator for LagrangePolynomial<F> {
