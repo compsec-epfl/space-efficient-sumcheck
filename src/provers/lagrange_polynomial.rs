@@ -65,7 +65,8 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
         }
 
         // b) Check if in the last iteration we finished iterating
-        if self.last_position.unwrap() >= Hypercube::pow2(self.messages.len()) - 1 {
+        if self.last_position.unwrap() >= Hypercube::stop_member_from_size(self.messages.len()) - 1
+        {
             return None;
         }
 

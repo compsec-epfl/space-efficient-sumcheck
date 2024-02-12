@@ -52,7 +52,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         let b3_num_vars: usize = self.num_variables - b1_num_vars - b2_num_vars;
 
         // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
-        let mut sum: Vec<F> = vec![F::ZERO; Hypercube::pow2(b2_num_vars)];
+        let mut sum: Vec<F> = vec![F::ZERO; Hypercube::stop_member_from_size(b2_num_vars)];
 
         // 2. Initialize st := LagInit((s - l)l, r)
         let mut sequential_lag_poly: LagrangePolynomial<F> = LagrangePolynomial::new(
@@ -61,13 +61,13 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         );
 
         // 3. For each b1 ∈ {0,1}^(s-1)l
-        for b1_index in 0..Hypercube::pow2(b1_num_vars) {
+        for b1_index in 0..Hypercube::stop_member_from_size(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
             let lag_poly = sequential_lag_poly.next().unwrap();
 
             // (b) For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
-            for b2_index in 0..Hypercube::pow2(b2_num_vars) {
-                for b3_index in 0..Hypercube::pow2(b3_num_vars) {
+            for b2_index in 0..Hypercube::stop_member_from_size(b2_num_vars) {
+                for b3_index in 0..Hypercube::stop_member_from_size(b3_num_vars) {
                     // Calculate the index for the current combination of b1, b2, and b3
                     let index = b1_index << (b2_num_vars + b3_num_vars)
                         | b2_index << b3_num_vars
@@ -88,10 +88,10 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         let j_prime = self.current_round - (self.current_stage() * self.stage_size);
 
         // We can't update in place, we must updated into a new vec and then replace the old one
-        let mut updated: Vec<F> = vec![F::ONE; Hypercube::pow2(self.stage_size)];
+        let mut updated: Vec<F> = vec![F::ONE; Hypercube::stop_member_from_size(self.stage_size)];
 
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
-        for b2_start_index in 0..Hypercube::pow2(j_prime + 1) {
+        for b2_start_index in 0..Hypercube::stop_member_from_size(j_prime + 1) {
             // calculate lag_poly from precomputed
             let lag_poly = match j_prime {
                 0 => F::ONE,
@@ -118,7 +118,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         let j_prime = self.current_round - stage_start_index;
 
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
-        for b2_start_index in 0..Hypercube::pow2(j_prime + 1) {
+        for b2_start_index in 0..Hypercube::stop_member_from_size(j_prime + 1) {
             // Calculate b2_start_index_0 and b2_start_index_1 for indexing partial_sums
             let shift_amount = if self.num_variables - stage_start_index < self.stage_size {
                 // this is the oddly sized last stage when k doesn't divide num_vars
@@ -165,7 +165,7 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
             sums: Vec::<F>::with_capacity(stage_size),
-            lag_polys: vec![F::ONE; Hypercube::pow2(stage_size)],
+            lag_polys: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
             stage_size,
         }
     }
