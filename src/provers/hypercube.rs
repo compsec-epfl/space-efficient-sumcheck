@@ -40,14 +40,14 @@ pub struct Hypercube {
 
 impl Hypercube {
     pub fn new(num_variables: usize) -> Self {
-        let stop_member = 1 << num_variables;
+        let stop_member: usize = Self::stop_member_from_size(num_variables);
         Self {
             num_variables,
             last_member: None,
             stop_member,
         }
     }
-    pub fn pow2(num_variables: usize) -> usize {
+    pub fn stop_member_from_size(num_variables: usize) -> usize {
         1 << num_variables
     }
 }
