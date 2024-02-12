@@ -1,4 +1,4 @@
-use crate::provers::hypercube::Hypercube;
+use crate::provers::hypercube::{Hypercube, HypercubeMember};
 use ark_ff::Field;
 
 pub struct LagrangePolynomial<F: Field> {
@@ -35,24 +35,9 @@ impl<F: Field> LagrangePolynomial<F> {
             last_position: None,
         }
     }
-    pub fn lag_poly(x: Vec<F>, x_hat: Vec<F>, b: Vec<bool>) -> F {
+    pub fn lag_poly(x: Vec<F>, x_hat: Vec<F>, b: HypercubeMember) -> F {
         // Iterate over the zipped triple x, x_hat, and boolean hypercube vectors
-        x.iter().zip(x_hat.iter()).zip(b.iter()).fold(
-            // Initial the accumulation to F::ONE
-            F::ONE,
-            // Closure for the folding operation, taking accumulator and ((x_i, x_hat_i), b_i)
-            |acc, ((x_i, x_hat_i), b_i)| {
-                // Multiply the accumulator by either x_i or x_hat_i based on the boolean value b_i
-                acc * match b_i {
-                    true => *x_i,
-                    false => *x_hat_i,
-                }
-            },
-        )
-    }
-    pub fn lag_poly_2(x: Vec<F>, x_hat: Vec<F>, b: Vec<bool>) -> F {
-        // Iterate over the zipped triple x, x_hat, and boolean hypercube vectors
-        x.iter().zip(x_hat.iter()).zip(b.iter()).fold(
+        x.iter().zip(x_hat.iter()).zip(b).fold(
             // Initial the accumulation to F::ONE
             F::ONE,
             // Closure for the folding operation, taking accumulator and ((x_i, x_hat_i), b_i)
@@ -115,7 +100,10 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::provers::{lagrange_polynomial::LagrangePolynomial, test_helpers::TestField};
+    use crate::provers::{
+        hypercube::HypercubeMember, lagrange_polynomial::LagrangePolynomial,
+        test_helpers::TestField,
+    };
 
     #[test]
     fn lag_next_test() {
@@ -132,56 +120,56 @@ mod tests {
         let exp_0: TestField = LagrangePolynomial::lag_poly(
             messages.clone(),
             message_hats.clone(),
-            vec![false, false, false],
+            HypercubeMember::new(3, 0),
         );
         assert_eq!(st_0, exp_0);
         let st_1: TestField = bslp.next().unwrap();
         let exp_1: TestField = LagrangePolynomial::lag_poly(
             messages.clone(),
             message_hats.clone(),
-            vec![false, false, true],
+            HypercubeMember::new(3, 1),
         );
         assert_eq!(st_1, exp_1);
         let st_2: TestField = bslp.next().unwrap();
         let exp_2: TestField = LagrangePolynomial::lag_poly(
             messages.clone(),
             message_hats.clone(),
-            vec![false, true, false],
+            HypercubeMember::new(3, 2),
         );
         assert_eq!(st_2, exp_2);
         let st_3: TestField = bslp.next().unwrap();
         let exp_3: TestField = LagrangePolynomial::lag_poly(
             messages.clone(),
             message_hats.clone(),
-            vec![false, true, true],
+            HypercubeMember::new(3, 3),
         );
         assert_eq!(st_3, exp_3);
         let st_4: TestField = bslp.next().unwrap();
         let exp_4: TestField = LagrangePolynomial::lag_poly(
             messages.clone(),
             message_hats.clone(),
-            vec![true, false, false],
+            HypercubeMember::new(3, 4),
         );
         assert_eq!(st_4, exp_4);
         let st_5: TestField = bslp.next().unwrap();
         let exp_5: TestField = LagrangePolynomial::lag_poly(
             messages.clone(),
             message_hats.clone(),
-            vec![true, false, true],
+            HypercubeMember::new(3, 5),
         );
         assert_eq!(st_5, exp_5);
         let st_6: TestField = bslp.next().unwrap();
         let exp_6: TestField = LagrangePolynomial::lag_poly(
             messages.clone(),
             message_hats.clone(),
-            vec![true, true, false],
+            HypercubeMember::new(3, 6),
         );
         assert_eq!(st_6, exp_6);
         let st_7: TestField = bslp.next().unwrap();
         let exp_7: TestField = LagrangePolynomial::lag_poly(
             messages.clone(),
             message_hats.clone(),
-            vec![true, true, true],
+            HypercubeMember::new(3, 7),
         );
         assert_eq!(st_7, exp_7);
         assert_eq!(bslp.next(), None);
