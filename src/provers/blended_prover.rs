@@ -18,8 +18,8 @@ pub struct BlendedProver<'a, F: Field> {
     pub verifier_messages: Vec<F>,
     pub verifier_message_hats: Vec<F>,
     pub sums: Vec<F>,
-    pub lag_polys_update: Vec<F>,
     pub lag_polys: Vec<F>,
+    pub lag_polys_update: Vec<F>,
     pub stage_size: usize,
 }
 
@@ -99,7 +99,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         let b3_num_vars: usize = self.num_variables - b1_num_vars - b2_num_vars;
 
         // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
-        let mut sum: Vec<F> = vec![F::ZERO; Hypercube::stop_member_from_size(b2_num_vars)];
+        // we reuse self.sums we just have to zero out on the first access SEE BELOW
 
         // 2. Initialize st := LagInit((s - l)l, r)
         let mut sequential_lag_poly: LagrangePolynomial<F> = LagrangePolynomial::new(
@@ -108,6 +108,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         );
 
         // 3. For each b1 ∈ {0,1}^(s-1)l
+        let len_sums: usize = self.sums.len();
         for b1_index in 0..Hypercube::stop_member_from_size(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
             let lag_poly = sequential_lag_poly.next().unwrap();
@@ -121,12 +122,18 @@ impl<'a, F: Field> BlendedProver<'a, F> {
                         | b3_index;
 
                     // Update SUM[b2]
-                    sum[b2_index] =
-                        sum[b2_index] + lag_poly * self.evaluation_stream.get_evaluation(index);
+                    self.sums[b2_index] =
+                        match b1_index == 0 && b3_index == 0 && b2_index < len_sums {
+                            // SEE HERE zero out the array on first access per update
+                            true => lag_poly * self.evaluation_stream.get_evaluation(index),
+                            false => {
+                                self.sums[b2_index]
+                                    + lag_poly * self.evaluation_stream.get_evaluation(index)
+                            }
+                        };
                 }
             }
         }
-        self.sums = sum;
     }
     fn update_lag_polys(&mut self) {
         // Calculate j_prime as j-(s-1)l
@@ -183,8 +190,8 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
             sums: vec![F::ZERO; Hypercube::stop_member_from_size(stage_size)],
-            lag_polys_update: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
             lag_polys: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
+            lag_polys_update: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
             stage_size,
         }
     }
