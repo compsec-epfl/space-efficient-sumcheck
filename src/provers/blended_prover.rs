@@ -72,7 +72,11 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         self.current_round / self.stage_size
     }
 
-    fn is_start_of_round(&self) -> bool {
+    fn is_initial_round(&self) -> bool {
+        self.current_round == 0
+    }
+
+    fn is_start_of_stage(&self) -> bool {
         self.current_round % self.stage_size == 0
     }
 
@@ -193,20 +197,20 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
             return None;
         }
 
-        // If it's not the first round, reduce the evaluations table
-        if self.current_round != 0 {
-            // Store the verifier message and its complement
+        if !self.is_initial_round() {
+            // Store the verifier message and its hat
             self.verifier_messages.push(verifier_message.unwrap());
             self.verifier_message_hats
                 .push(F::ONE - verifier_message.unwrap());
         }
 
-        if self.is_start_of_round() {
+        // at start of stage do some stuff
+        if self.is_start_of_stage() {
             self.sum_update();
             self.update_prefix_sums();
         }
 
-        // Compute the sum based on partial sums
+        // update lag_polys based on previous round
         self.update_lag_polys();
 
         let sums: (F, F) = self.compute_round(&self.sums);
