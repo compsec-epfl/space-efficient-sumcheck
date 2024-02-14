@@ -18,7 +18,6 @@ pub struct BlendedProver<'a, F: Field> {
     pub verifier_messages: Vec<F>,
     pub verifier_message_hats: Vec<F>,
     pub sums: Vec<F>,
-    pub sums_update: Vec<F>,
     pub lag_polys: Vec<F>,
     pub lag_polys_update: Vec<F>,
     pub stage_size: usize,
@@ -100,7 +99,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         let b3_num_vars: usize = self.num_variables - b1_num_vars - b2_num_vars;
 
         // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
-        // we reuse self.sums_update, we just have to zero out on the first access
+        // we reuse self.sums we just have to zero out on the first access
         let mut is_first_access: Vec<bool> =
             vec![true; Hypercube::stop_member_from_size(b2_num_vars)];
 
@@ -124,10 +123,10 @@ impl<'a, F: Field> BlendedProver<'a, F> {
                         | b3_index;
 
                     // Update SUM[b2]
-                    self.sums_update[b2_index] = match is_first_access[b2_index] {
-                        true => lag_poly * self.evaluation_stream.get_evaluation(index), // zero out the array on first access
+                    self.sums[b2_index] = match is_first_access[b2_index] {
+                        true => lag_poly * self.evaluation_stream.get_evaluation(index), // zero out the array on first access per update
                         false => {
-                            self.sums_update[b2_index]
+                            self.sums[b2_index]
                                 + lag_poly * self.evaluation_stream.get_evaluation(index)
                         }
                     };
@@ -135,7 +134,6 @@ impl<'a, F: Field> BlendedProver<'a, F> {
                 }
             }
         }
-        std::mem::swap(&mut self.sums, &mut self.sums_update);
     }
     fn update_lag_polys(&mut self) {
         // Calculate j_prime as j-(s-1)l
@@ -192,7 +190,6 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
             sums: vec![F::ZERO; Hypercube::stop_member_from_size(stage_size)],
-            sums_update: vec![F::ZERO; Hypercube::stop_member_from_size(stage_size)],
             lag_polys: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
             lag_polys_update: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
             stage_size,
