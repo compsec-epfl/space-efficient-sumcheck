@@ -99,9 +99,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         let b3_num_vars: usize = self.num_variables - b1_num_vars - b2_num_vars;
 
         // 1. Initialize SUM[b2] := 0 for each b2 ∈ {0,1}^l
-        // we reuse self.sums we just have to zero out on the first access
-        let mut is_first_access: Vec<bool> =
-            vec![true; Hypercube::stop_member_from_size(b2_num_vars)];
+        // we reuse self.sums we just have to zero out on the first access SEE BELOW
 
         // 2. Initialize st := LagInit((s - l)l, r)
         let mut sequential_lag_poly: LagrangePolynomial<F> = LagrangePolynomial::new(
@@ -110,6 +108,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
         );
 
         // 3. For each b1 ∈ {0,1}^(s-1)l
+        let len_sums: usize = self.sums.len();
         for b1_index in 0..Hypercube::stop_member_from_size(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
             let lag_poly = sequential_lag_poly.next().unwrap();
@@ -123,14 +122,15 @@ impl<'a, F: Field> BlendedProver<'a, F> {
                         | b3_index;
 
                     // Update SUM[b2]
-                    self.sums[b2_index] = match is_first_access[b2_index] {
-                        true => lag_poly * self.evaluation_stream.get_evaluation(index), // zero out the array on first access per update
-                        false => {
-                            self.sums[b2_index]
-                                + lag_poly * self.evaluation_stream.get_evaluation(index)
-                        }
-                    };
-                    is_first_access[b2_index] = false;
+                    self.sums[b2_index] =
+                        match b1_index == 0 && b3_index == 0 && b2_index < len_sums {
+                            // SEE HERE zero out the array on first access per update
+                            true => lag_poly * self.evaluation_stream.get_evaluation(index),
+                            false => {
+                                self.sums[b2_index]
+                                    + lag_poly * self.evaluation_stream.get_evaluation(index)
+                            }
+                        };
                 }
             }
         }
