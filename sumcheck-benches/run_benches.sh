@@ -8,7 +8,7 @@
 # Then:
 #   kill <pid>
 
-algorithms="Blended2 VSBW Blended3 Blended4 Blended1 CTY"
+algorithms="Blended1 Blended2 VSBW Blended3 Blended4 CTY"
 fields="Field64 Field128 FieldBn254"
 
 for algorithm in $algorithms; do
@@ -33,7 +33,8 @@ for algorithm in $algorithms; do
                 "CTY") algorithm_label="CTY" ;;
                 *) ;;
             esac
-            output=`(gtime -v ./target/release/benches $algorithm_label $field $num_vars $stage_size) 2>&1`
+            # NOTE: if you're on mac you might install gnu-time and change next line to "gtime"
+            output=`(time -v ./target/release/benches $algorithm_label $field $num_vars $stage_size) 2>&1`
             user_time_seconds=$(echo "$output" | grep "User time (seconds):" | awk '{print $4}')
             user_time_ms=$(awk "BEGIN {printf \"%.0f\", $user_time_seconds * 1000}")
             ram_kilobytes=$(echo "$output" | grep "Maximum resident set size (kbytes)" | awk '{print $6}')

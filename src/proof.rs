@@ -64,7 +64,7 @@ mod tests {
     use super::Sumcheck;
     use crate::provers::{
         test_helpers::{BenchEvaluationStream, TestField},
-        BlendedProver, Prover, ProverArgs, TimeProver,
+        BlendedProver, Prover, ProverArgs, ProverArgsStageInfo, TimeProver,
     };
 
     #[test]
@@ -74,12 +74,11 @@ mod tests {
         // initialize the provers
         let mut blended_k3_prover = BlendedProver::<TestField>::new(ProverArgs {
             stream: Box::new(&evaluation_stream),
-            num_stages: 3,
+            stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
         });
-        let mut time_prover = TimeProver::<TestField>::new(ProverArgs {
-            stream: Box::new(&evaluation_stream),
-            num_stages: TimeProver::<TestField>::DEFAULT_NUM_STAGES,
-        });
+        let mut time_prover = TimeProver::<TestField>::new(
+            TimeProver::<TestField>::generate_default_args(Box::new(&evaluation_stream)),
+        );
         // run them and get the transcript
         let blended_prover_transcript =
             Sumcheck::<TestField>::prove(&mut blended_k3_prover, &mut ark_std::test_rng());

@@ -5,10 +5,9 @@ use crate::provers::{
     evaluation_stream::EvaluationStream,
     hypercube::Hypercube,
     lagrange_polynomial::LagrangePolynomial,
-    prover::{Prover, ProverArgs},
+    prover::{Prover, ProverArgs, ProverArgsStageInfo},
 };
 
-// the state of the Blended prover in the protocol
 pub struct BlendedProver<'a, F: Field> {
     pub claimed_sum: F,
     pub current_round: usize,
@@ -24,6 +23,8 @@ pub struct BlendedProver<'a, F: Field> {
 }
 
 impl<'a, F: Field> BlendedProver<'a, F> {
+    const DEFAULT_NUM_STAGES: usize = 2;
+
     fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
         (num << shift_amount) | (1 << shift_amount) - 1
     }
@@ -175,17 +176,30 @@ impl<'a, F: Field> BlendedProver<'a, F> {
 }
 
 impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
-    const DEFAULT_NUM_STAGES: usize = 2;
+    fn claimed_sum(&self) -> F {
+        self.claimed_sum
+    }
+
+    fn generate_default_args(stream: Box<&'a dyn EvaluationStream<F>>) -> ProverArgs<'a, F> {
+        ProverArgs {
+            stream,
+            stage_info: Some(ProverArgsStageInfo {
+                num_stages: BlendedProver::<F>::DEFAULT_NUM_STAGES,
+            }),
+        }
+    }
+
     fn new(prover_args: ProverArgs<'a, F>) -> Self {
-        let claimed_sum = prover_args.stream.get_claimed_sum();
-        let num_variables = prover_args.stream.get_num_variables();
-        let stage_size: usize = num_variables / prover_args.num_stages;
+        let claimed_sum: F = prover_args.stream.get_claimed_sum();
+        let num_variables: usize = prover_args.stream.get_num_variables();
+        let num_stages: usize = prover_args.stage_info.unwrap().num_stages;
+        let stage_size: usize = num_variables / num_stages;
         // return the BlendedProver instance
         Self {
             claimed_sum,
             current_round: 0,
             evaluation_stream: prover_args.stream,
-            num_stages: prover_args.num_stages,
+            num_stages,
             num_variables,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
@@ -195,9 +209,7 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
             stage_size,
         }
     }
-    fn claimed_sum(&self) -> F {
-        self.claimed_sum
-    }
+
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F)> {
         // Ensure the current round is within bounds
         if self.current_round >= self.total_rounds() {
@@ -237,31 +249,29 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
 #[cfg(test)]
 mod tests {
     use crate::provers::{
-        prover::ProverArgs,
+        prover::{Prover, ProverArgs, ProverArgsStageInfo},
         test_helpers::{
             run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
             BasicEvaluationStream, TestField,
         },
-        BlendedProver, Prover,
+        BlendedProver,
     };
 
     #[test]
     fn sumcheck() {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
-        run_boolean_sumcheck_test(BlendedProver::new(ProverArgs {
-            stream: Box::new(&evaluation_stream),
-            num_stages: BlendedProver::<TestField>::DEFAULT_NUM_STAGES,
-        }));
+        run_boolean_sumcheck_test(BlendedProver::new(BlendedProver::generate_default_args(
+            Box::new(&evaluation_stream),
+        )));
         // k=2
-        run_basic_sumcheck_test(BlendedProver::new(ProverArgs {
-            stream: Box::new(&evaluation_stream),
-            num_stages: BlendedProver::<TestField>::DEFAULT_NUM_STAGES,
-        }));
+        run_basic_sumcheck_test(BlendedProver::new(BlendedProver::generate_default_args(
+            Box::new(&evaluation_stream),
+        )));
         // k=1
         run_basic_sumcheck_test(BlendedProver::new(ProverArgs {
             stream: Box::new(&evaluation_stream),
-            num_stages: 1,
+            stage_info: Some(ProverArgsStageInfo { num_stages: 1 }),
         }));
     }
 }
