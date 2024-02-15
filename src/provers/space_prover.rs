@@ -7,7 +7,6 @@ use crate::provers::{
     prover::{Prover, ProverArgs},
 };
 
-// the state of the space prover in the protocol
 pub struct SpaceProver<'a, F: Field> {
     pub claimed_sum: F,
     pub current_round: usize,
@@ -68,7 +67,17 @@ impl<'a, F: Field> SpaceProver<'a, F> {
 }
 
 impl<'a, F: Field> Prover<'a, F> for SpaceProver<'a, F> {
-    const DEFAULT_NUM_STAGES: usize = 1;
+    fn claimed_sum(&self) -> F {
+        self.claimed_sum
+    }
+
+    fn generate_default_args(stream: Box<&'a dyn EvaluationStream<F>>) -> ProverArgs<'a, F> {
+        ProverArgs {
+            stream,
+            stage_info: None,
+        }
+    }
+
     fn new(prover_args: ProverArgs<'a, F>) -> Self {
         let claimed_sum = prover_args.stream.get_claimed_sum();
         let num_variables = prover_args.stream.get_num_variables();
@@ -80,9 +89,6 @@ impl<'a, F: Field> Prover<'a, F> for SpaceProver<'a, F> {
             current_round: 0,
             num_variables,
         }
-    }
-    fn claimed_sum(&self) -> F {
-        self.claimed_sum
     }
 
     fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F)> {
@@ -119,20 +125,18 @@ mod tests {
             run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
             BasicEvaluationStream, TestField,
         },
-        Prover, ProverArgs, SpaceProver,
+        Prover, SpaceProver,
     };
 
     #[test]
     fn sumcheck() {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
-        run_boolean_sumcheck_test(SpaceProver::new(ProverArgs {
-            stream: Box::new(&evaluation_stream),
-            num_stages: SpaceProver::<TestField>::DEFAULT_NUM_STAGES,
-        }));
-        run_basic_sumcheck_test(SpaceProver::new(ProverArgs {
-            stream: Box::new(&evaluation_stream),
-            num_stages: SpaceProver::<TestField>::DEFAULT_NUM_STAGES,
-        }));
+        run_boolean_sumcheck_test(SpaceProver::new(SpaceProver::generate_default_args(
+            Box::new(&evaluation_stream),
+        )));
+        run_basic_sumcheck_test(SpaceProver::new(SpaceProver::generate_default_args(
+            Box::new(&evaluation_stream),
+        )));
     }
 }
