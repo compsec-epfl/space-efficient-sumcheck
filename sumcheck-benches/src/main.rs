@@ -5,8 +5,8 @@ use ark_ff::{
 };
 use space_efficient_sumcheck::{
     provers::{
-        test_helpers::BenchEvaluationStream, BlendedProver, Prover, ProverArgs, SpaceProver,
-        TimeProver,
+        test_helpers::BenchEvaluationStream, BlendedProver, Prover, ProverArgs,
+        ProverArgsStageInfo, SpaceProver, TimeProver,
     },
     Sumcheck,
 };
@@ -130,7 +130,7 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
             Sumcheck::prove(
                 &mut SpaceProver::<F>::new(ProverArgs {
                     stream: Box::new(&stream),
-                    num_stages: SpaceProver::<F>::DEFAULT_NUM_STAGES,
+                    stage_info: None,
                 }),
                 &mut rng,
             );
@@ -139,7 +139,7 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
             Sumcheck::prove(
                 &mut TimeProver::<F>::new(ProverArgs {
                     stream: Box::new(&stream),
-                    num_stages: TimeProver::<F>::DEFAULT_NUM_STAGES,
+                    stage_info: None,
                 }),
                 &mut rng,
             );
@@ -148,7 +148,9 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
             Sumcheck::prove(
                 &mut BlendedProver::<F>::new(ProverArgs {
                     stream: Box::new(&stream),
-                    num_stages: bench_args.stage_size,
+                    stage_info: Some(ProverArgsStageInfo {
+                        num_stages: bench_args.stage_size,
+                    }),
                 }),
                 &mut rng,
             );
