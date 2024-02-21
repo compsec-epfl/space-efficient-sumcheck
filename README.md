@@ -1,4 +1,4 @@
-<h1 align="center">Blendy: a space-efficient sumcheck algorithm</h1>
+<h1 align="center">Blendy 🍹: a space-efficient sumcheck algorithm</h1>
 
 <p align="center">
     <a href="https://github.com/compsec-epfl/space-efficient-sumcheck/blob/main/LICENSE-APACHE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a>
