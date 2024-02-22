@@ -5,20 +5,20 @@
     <a href="https://github.com/compsec-epfl/space-efficient-sumcheck/blob/main/LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
 </p>
 
-This library was developed as part of the [eprint.iacr.org/2024/XXX](eprint.iacr.org/2024/XXX) paper using the arkworks ecosystem.
+This library was developed as part of the [eprint.iacr.org/2024/XXX](eprint.iacr.org/2024/XXX) paper using the [arkworks](https://arkworks.rs) ecosystem.
 
-**WARNING:** This is an academic proof-of-concept prototype, and in particular has not received careful code review. This implementation is NOT ready for production use.
+**WARNING:** This is an academic prototype and has not received careful code review. This implementation is NOT ready for production use.
 
 ## Overview
 This library implements the sumcheck protocol using two classical prover algorithms and a new prover algorithm, _Blendy_, that runs in linear time and sublinear space.
 
-[Prover](/src/provers/prover.rs) is a trait implemented by each of the three algorithms<br>
-[SpaceProver](/src/provers/space_prover.rs) implements the CormodeTY10 algorithm and runs in superlinear time and uses logarithmic space <br>
-[TimeProver](/src/provers/time_prover.rs) implements the VuSBW13 algorithm and runs in linear time and uses linear space <br>
-[BlendyProver](/src/provers/blendy_prover.rs) implements Blendy and runs in linear time and uses linear space <br>
+[Prover](/src/provers/prover.rs) is a trait implemented by each algorithm<br>
+[SpaceProver](/src/provers/space_prover.rs) implements the CormodeTY10 algorithm and runs in superlinear time and uses logarithmic space<br>
+[TimeProver](/src/provers/time_prover.rs) implements the VuSBW13 algorithm and runs in linear time and uses linear space<br>
+[BlendyProver](/src/provers/blendy_prover.rs) implements Blendy and runs in linear time and uses linear space<br>
 [Proof](/src/proof.rs) is a runner that takes a Prover and randomness and runs the protocol to generate a transcript<br>
 [Lag Poly](/src/lagrange_polynomial.rs) implements the sequential lagrange polynomial routine described in section 4.1<br>
-[Hypercube](/src/hypercube.rs) implements `iter` for boolean hypercube members as a wrapper over a `usize` <br>
+[Hypercube](/src/hypercube.rs) implements `iter` for boolean hypercube members as a wrapper over a `usize`<br>
 
 ## Evaluation
 As expected, the asymptotic improvement of BlendyProver translates to significantly lower memory consumption than TimeProver across all configurations tested. TimeProver and BlendyProver have similar runtimes and are orders of magnitude faster than SpaceProver.
