@@ -21,8 +21,8 @@ This library provides implementation of the sumcheck algorithm [[LFKN92](#refere
 [TimeProver](/src/provers/time_prover.rs) implements [[VSBW13](#references)]<br>
 [BlendyProver](/src/provers/blendy_prover.rs) implements Blendy🍹<br>
 [Proof](/src/proof.rs) is a runner that takes a Prover and randomness and runs the protocol to generate a transcript<br>
-[Lag Poly](/src/lagrange_polynomial.rs) implements the sequential lagrange polynomial routine described in section 4.1<br>
-[Hypercube](/src/hypercube.rs) implements `iter` for boolean hypercube members as a wrapper over a `usize`<br>
+[Lag Poly](/src/provers/lagrange_polynomial.rs) implements the sequential lagrange polynomial routine described in section 4.1<br>
+[Hypercube](/src/provers/hypercube.rs) implements `iter` for boolean hypercube members as a wrapper over a `usize`<br>
 
 ## Evaluation
 We perform an evaluation of the three algorithms we implemented. The asymptotic improvement of BlendyProver translates to significantly lower memory consumption than TimeProver across all configurations tested. TimeProver and BlendyProver have similar runtimes and are orders of magnitude faster than SpaceProver.
@@ -33,7 +33,7 @@ We perform an evaluation of the three algorithms we implemented. The asymptotic 
 </p>
 
 ##  Usage
-The library can be used to run sumcheck over an implementation for [EvaluationStream](/src/evaluation_stream.rs) to obtain a transcript: 
+The library can be used to run sumcheck over any implementation for [EvaluationStream](/src/provers/evaluation_stream.rs) to obtain a transcript: 
 
     use ark_std::rand::Rng;
     use space_efficient_sumcheck::{
