@@ -24,8 +24,8 @@ This library implements the sumcheck protocol using two classical prover algorit
 As expected, the asymptotic improvement of BlendyProver translates to significantly lower memory consumption than TimeProver across all configurations tested. TimeProver and BlendyProver have similar runtimes and are orders of magnitude faster than SpaceProver.
 
 <p align="center">
-    <img src="assets/evaluation_graphs.png#gh-light-mode-only" alt="Line graph showing runtime and memory consumption of provers for inputs ranging from 15 to 30 variables" width="75%" />
-    <img src="assets/evaluation_graphs_inverted.png#gh-dark-mode-only" alt="Line graph showing runtime and memory consumption of provers for inputs ranging from 15 to 30 variables" width="75%" />
+    <img src="assets/evaluation_graphs.png#gh-light-mode-only" alt="Line graph showing runtime and memory consumption of provers for inputs ranging from 15 to 30 variables" style="max-width: 800px;" />
+    <img src="assets/evaluation_graphs_inverted.png#gh-dark-mode-only" alt="Line graph showing runtime and memory consumption of provers for inputs ranging from 15 to 30 variables" style="max-width: 800px;" />
 </p>
 
 ## License
