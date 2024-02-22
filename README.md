@@ -32,6 +32,27 @@ We perform an evaluation of the three algorithms we implemented. The asymptotic 
     <img src="assets/evaluation_graphs_inverted.png#gh-dark-mode-only" alt="Line graph showing runtime and memory consumption of provers for inputs ranging from 15 to 30 variables" style="max-width: 800px;" />
 </p>
 
+##  Usage
+The library can be used to run sumcheck over an implementation for [EvaluationStream](/src/evaluation_stream.rs) to obtain a transcript: 
+
+    use ark_std::rand::Rng;
+    use space_efficient_sumcheck::{
+        provers::{
+            test_helpers::BenchEvaluationStream, BlendyProver, Prover, ProverArgs,
+        },
+        Sumcheck,
+    };
+
+
+    let mut rng = ark_std::test_rng();
+    let stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new();
+    let transcript = Sumcheck::prove(
+        &mut BlendyProver::<F>::new(BlendyProver::generate_default_args(
+            Box::new(&stream),
+        )),
+        &mut rng,
+    );
+
 ## License
 This library is released under the MIT and Apache v2 Licenses.
 
