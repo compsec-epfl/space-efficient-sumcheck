@@ -57,7 +57,7 @@ The library can be used to run sumcheck over any implementation for [EvaluationS
 This library is released under the MIT and Apache v2 Licenses.
 
 ## Paper
-[A time-space tradeoff for the sumcheck prover](eprint.iacr.org/2024/XXX)<br>
+[A Time-Space Tradeoff for the Sumcheck Prover](eprint.iacr.org/2024/XXX)<br>
 [Alessandro Chiesa](https://ic-people.epfl.ch/~achiesa/), [Elisabetta Fedele](https://elisabettafedele.github.io), [Giacomo Fenzi](https://gfenzi.io), and [Andrew Zitek-Estrada](https://github.com/z-tech)
 
 ## References
