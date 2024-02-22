@@ -64,7 +64,7 @@ mod tests {
     use super::Sumcheck;
     use crate::provers::{
         test_helpers::{BenchEvaluationStream, TestField},
-        BlendedProver, Prover, ProverArgs, ProverArgsStageInfo, TimeProver,
+        BlendyProver, Prover, ProverArgs, ProverArgsStageInfo, TimeProver,
     };
 
     #[test]
@@ -72,7 +72,7 @@ mod tests {
         // take an evaluation stream
         let evaluation_stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new(20);
         // initialize the provers
-        let mut blended_k3_prover = BlendedProver::<TestField>::new(ProverArgs {
+        let mut blendy_k3_prover = BlendyProver::<TestField>::new(ProverArgs {
             stream: Box::new(&evaluation_stream),
             stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
         });
@@ -80,14 +80,14 @@ mod tests {
             TimeProver::<TestField>::generate_default_args(Box::new(&evaluation_stream)),
         );
         // run them and get the transcript
-        let blended_prover_transcript =
-            Sumcheck::<TestField>::prove(&mut blended_k3_prover, &mut ark_std::test_rng());
+        let blendy_prover_transcript =
+            Sumcheck::<TestField>::prove(&mut blendy_k3_prover, &mut ark_std::test_rng());
         let time_prover_transcript =
             Sumcheck::<TestField>::prove(&mut time_prover, &mut ark_std::test_rng());
         // ensure the transcript is identical
         assert_eq!(
             time_prover_transcript.prover_messages,
-            blended_prover_transcript.prover_messages
+            blendy_prover_transcript.prover_messages
         );
     }
 }

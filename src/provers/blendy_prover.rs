@@ -8,7 +8,7 @@ use crate::provers::{
     prover::{Prover, ProverArgs, ProverArgsStageInfo},
 };
 
-pub struct BlendedProver<'a, F: Field> {
+pub struct BlendyProver<'a, F: Field> {
     pub claimed_sum: F,
     pub current_round: usize,
     pub evaluation_stream: Box<&'a dyn EvaluationStream<F>>,
@@ -22,7 +22,7 @@ pub struct BlendedProver<'a, F: Field> {
     pub stage_size: usize,
 }
 
-impl<'a, F: Field> BlendedProver<'a, F> {
+impl<'a, F: Field> BlendyProver<'a, F> {
     const DEFAULT_NUM_STAGES: usize = 2;
 
     fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
@@ -175,7 +175,7 @@ impl<'a, F: Field> BlendedProver<'a, F> {
     }
 }
 
-impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
+impl<'a, F: Field> Prover<'a, F> for BlendyProver<'a, F> {
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
@@ -184,7 +184,7 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
         ProverArgs {
             stream,
             stage_info: Some(ProverArgsStageInfo {
-                num_stages: BlendedProver::<F>::DEFAULT_NUM_STAGES,
+                num_stages: BlendyProver::<F>::DEFAULT_NUM_STAGES,
             }),
         }
     }
@@ -194,7 +194,7 @@ impl<'a, F: Field> Prover<'a, F> for BlendedProver<'a, F> {
         let num_variables: usize = prover_args.stream.get_num_variables();
         let num_stages: usize = prover_args.stage_info.unwrap().num_stages;
         let stage_size: usize = num_variables / num_stages;
-        // return the BlendedProver instance
+        // return the BlendyProver instance
         Self {
             claimed_sum,
             current_round: 0,
@@ -254,22 +254,22 @@ mod tests {
             run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
             BasicEvaluationStream, TestField,
         },
-        BlendedProver,
+        BlendyProver,
     };
 
     #[test]
     fn sumcheck() {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
-        run_boolean_sumcheck_test(BlendedProver::new(BlendedProver::generate_default_args(
+        run_boolean_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
             Box::new(&evaluation_stream),
         )));
         // k=2
-        run_basic_sumcheck_test(BlendedProver::new(BlendedProver::generate_default_args(
+        run_basic_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
             Box::new(&evaluation_stream),
         )));
         // k=1
-        run_basic_sumcheck_test(BlendedProver::new(ProverArgs {
+        run_basic_sumcheck_test(BlendyProver::new(ProverArgs {
             stream: Box::new(&evaluation_stream),
             stage_info: Some(ProverArgsStageInfo { num_stages: 1 }),
         }));
