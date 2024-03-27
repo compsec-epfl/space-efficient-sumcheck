@@ -3,6 +3,7 @@ use ark_ff::{
     fields::{Fp128, Fp64, MontBackend, MontConfig},
     Field,
 };
+use ark_std::marker::PhantomData;
 use space_efficient_sumcheck::{
     provers::{
         test_helpers::BenchEvaluationStream, BlendyProver, Prover, ProverArgs, ProverArgsStageInfo,
@@ -128,29 +129,32 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
     match bench_args.algorithm_label {
         AlgorithmLabel::CTY => {
             Sumcheck::prove(
-                &mut SpaceProver::<F>::new(ProverArgs {
+                &mut SpaceProver::<F, BenchEvaluationStream<F>>::new(ProverArgs {
                     stream: &stream,
                     stage_info: None,
+                    _phantom: PhantomData,
                 }),
                 &mut rng,
             );
         }
         AlgorithmLabel::VSBW => {
             Sumcheck::prove(
-                &mut TimeProver::<F>::new(ProverArgs {
+                &mut TimeProver::<F, BenchEvaluationStream<F>>::new(ProverArgs {
                     stream: &stream,
                     stage_info: None,
+                    _phantom: PhantomData,
                 }),
                 &mut rng,
             );
         }
         AlgorithmLabel::Blendy => {
             Sumcheck::prove(
-                &mut BlendyProver::<F>::new(ProverArgs {
+                &mut BlendyProver::<F, BenchEvaluationStream<F>>::new(ProverArgs {
                     stream: &stream,
                     stage_info: Some(ProverArgsStageInfo {
                         num_stages: bench_args.stage_size,
                     }),
+                    _phantom: PhantomData,
                 }),
                 &mut rng,
             );

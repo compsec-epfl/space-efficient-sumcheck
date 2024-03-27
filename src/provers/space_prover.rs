@@ -1,4 +1,5 @@
 use ark_ff::Field;
+use ark_std::marker::PhantomData;
 
 use crate::provers::{
     evaluation_stream::EvaluationStream,
@@ -7,16 +8,16 @@ use crate::provers::{
     prover::{Prover, ProverArgs},
 };
 
-pub struct SpaceProver<'a, F: Field> {
+pub struct SpaceProver<'a, F: Field, S: EvaluationStream<F>> {
     pub claimed_sum: F,
     pub current_round: usize,
-    pub evaluation_stream: &'a dyn EvaluationStream<F>,
+    pub evaluation_stream: &'a S,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
     pub verifier_message_hats: Vec<F>,
 }
 
-impl<'a, F: Field> SpaceProver<'a, F> {
+impl<'a, F: Field, S: EvaluationStream<F>> SpaceProver<'a, F, S> {
     fn cty_evaluate(&self) -> (F, F) {
         // Initialize accumulators for sum_0 and sum_1
         let mut sum_0: F = F::ZERO;
@@ -66,19 +67,20 @@ impl<'a, F: Field> SpaceProver<'a, F> {
     }
 }
 
-impl<'a, F: Field> Prover<'a, F> for SpaceProver<'a, F> {
+impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for SpaceProver<'a, F, S> {
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
 
-    fn generate_default_args(stream: &'a impl EvaluationStream<F>) -> ProverArgs<'a, F> {
+    fn generate_default_args(stream: &'a S) -> ProverArgs<'a, F, S> {
         ProverArgs {
             stream,
             stage_info: None,
+            _phantom: PhantomData,
         }
     }
 
-    fn new(prover_args: ProverArgs<'a, F>) -> Self {
+    fn new(prover_args: ProverArgs<'a, F, S>) -> Self {
         let claimed_sum = prover_args.stream.get_claimed_sum();
         let num_variables = prover_args.stream.get_num_variables();
         Self {

@@ -1,20 +1,20 @@
 use ark_ff::Field;
-use ark_std::vec::Vec;
+use ark_std::{marker::PhantomData, vec::Vec};
 
 use crate::provers::{
     evaluation_stream::EvaluationStream,
     prover::{Prover, ProverArgs},
 };
 
-pub struct TimeProver<'a, F: Field> {
+pub struct TimeProver<'a, F: Field, S: EvaluationStream<F>> {
     pub claimed_sum: F,
     pub current_round: usize,
     pub evaluations: Option<Vec<F>>,
-    pub evaluation_stream: &'a dyn EvaluationStream<F>, // Keep this for now, case we can do some small optimizations of first round etc
+    pub evaluation_stream: &'a S, // Keep this for now, case we can do some small optimizations of first round etc
     pub num_variables: usize,
 }
 
-impl<'a, F: Field> TimeProver<'a, F> {
+impl<'a, F: Field, S: EvaluationStream<F>> TimeProver<'a, F, S> {
     fn num_free_variables(&self) -> usize {
         self.num_variables - self.current_round
     }
@@ -104,19 +104,20 @@ impl<'a, F: Field> TimeProver<'a, F> {
     }
 }
 
-impl<'a, F: Field> Prover<'a, F> for TimeProver<'a, F> {
+impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for TimeProver<'a, F, S> {
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
 
-    fn generate_default_args(stream: &'a impl EvaluationStream<F>) -> ProverArgs<'a, F> {
+    fn generate_default_args(stream: &'a S) -> ProverArgs<'a, F, S> {
         ProverArgs {
             stream,
             stage_info: None,
+            _phantom: PhantomData,
         }
     }
 
-    fn new(prover_args: ProverArgs<'a, F>) -> Self {
+    fn new(prover_args: ProverArgs<'a, F, S>) -> Self {
         let claimed_sum = prover_args.stream.get_claimed_sum();
         let num_variables = prover_args.stream.get_num_variables();
         Self {
