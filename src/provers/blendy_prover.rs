@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
@@ -8,10 +10,10 @@ use crate::provers::{
     prover::{Prover, ProverArgs, ProverArgsStageInfo},
 };
 
-pub struct BlendyProver<'a, F: Field> {
+pub struct BlendyProver<'a, F: Field, S: EvaluationStream<F>> {
     pub claimed_sum: F,
     pub current_round: usize,
-    pub evaluation_stream: Box<&'a dyn EvaluationStream<F>>,
+    pub evaluation_stream: &'a S,
     pub num_stages: usize,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
@@ -22,7 +24,7 @@ pub struct BlendyProver<'a, F: Field> {
     pub stage_size: usize,
 }
 
-impl<'a, F: Field> BlendyProver<'a, F> {
+impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
     const DEFAULT_NUM_STAGES: usize = 2;
 
     fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
@@ -175,21 +177,22 @@ impl<'a, F: Field> BlendyProver<'a, F> {
     }
 }
 
-impl<'a, F: Field> Prover<'a, F> for BlendyProver<'a, F> {
+impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProver<'a, F, S> {
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
 
-    fn generate_default_args(stream: Box<&'a dyn EvaluationStream<F>>) -> ProverArgs<'a, F> {
+    fn generate_default_args(stream: &'a S) -> ProverArgs<'a, F, S> {
         ProverArgs {
             stream,
             stage_info: Some(ProverArgsStageInfo {
-                num_stages: BlendyProver::<F>::DEFAULT_NUM_STAGES,
+                num_stages: BlendyProver::<F, S>::DEFAULT_NUM_STAGES,
             }),
+            _phantom: PhantomData,
         }
     }
 
-    fn new(prover_args: ProverArgs<'a, F>) -> Self {
+    fn new(prover_args: ProverArgs<'a, F, S>) -> Self {
         let claimed_sum: F = prover_args.stream.get_claimed_sum();
         let num_variables: usize = prover_args.stream.get_num_variables();
         let num_stages: usize = prover_args.stage_info.unwrap().num_stages;
@@ -248,6 +251,8 @@ impl<'a, F: Field> Prover<'a, F> for BlendyProver<'a, F> {
 
 #[cfg(test)]
 mod tests {
+    use std::marker::PhantomData;
+
     use crate::provers::{
         prover::{Prover, ProverArgs, ProverArgsStageInfo},
         test_helpers::{
@@ -262,16 +267,17 @@ mod tests {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
         run_boolean_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
-            Box::new(&evaluation_stream),
+            &evaluation_stream,
         )));
         // k=2
         run_basic_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
-            Box::new(&evaluation_stream),
+            &evaluation_stream,
         )));
         // k=1
         run_basic_sumcheck_test(BlendyProver::new(ProverArgs {
-            stream: Box::new(&evaluation_stream),
+            stream: &evaluation_stream,
             stage_info: Some(ProverArgsStageInfo { num_stages: 1 }),
+            _phantom: PhantomData,
         }));
     }
 }
