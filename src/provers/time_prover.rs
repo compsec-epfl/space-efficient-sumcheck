@@ -10,7 +10,7 @@ pub struct TimeProver<'a, F: Field> {
     pub claimed_sum: F,
     pub current_round: usize,
     pub evaluations: Option<Vec<F>>,
-    pub evaluation_stream: Box<&'a dyn EvaluationStream<F>>, // Keep this for now, case we can do some small optimizations of first round etc
+    pub evaluation_stream: &'a dyn EvaluationStream<F>, // Keep this for now, case we can do some small optimizations of first round etc
     pub num_variables: usize,
 }
 
@@ -109,7 +109,7 @@ impl<'a, F: Field> Prover<'a, F> for TimeProver<'a, F> {
         self.claimed_sum
     }
 
-    fn generate_default_args(stream: Box<&'a dyn EvaluationStream<F>>) -> ProverArgs<'a, F> {
+    fn generate_default_args(stream: &'a impl EvaluationStream<F>) -> ProverArgs<'a, F> {
         ProverArgs {
             stream,
             stage_info: None,
@@ -170,13 +170,15 @@ mod tests {
 
     #[test]
     fn sumcheck() {
-        let evaluation_stream: BasicEvaluationStream<TestField> =
+        let evaluation_stream_0: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
         run_boolean_sumcheck_test(TimeProver::new(TimeProver::generate_default_args(
-            Box::new(&evaluation_stream),
+            &evaluation_stream_0,
         )));
+        let evaluation_stream_1: BasicEvaluationStream<TestField> =
+            BasicEvaluationStream::new(test_polynomial());
         run_basic_sumcheck_test(TimeProver::new(TimeProver::generate_default_args(
-            Box::new(&evaluation_stream),
+            &evaluation_stream_1,
         )));
     }
 }

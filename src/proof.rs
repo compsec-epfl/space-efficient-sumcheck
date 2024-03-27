@@ -73,11 +73,11 @@ mod tests {
         let evaluation_stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new(20);
         // initialize the provers
         let mut blendy_k3_prover = BlendyProver::<TestField>::new(ProverArgs {
-            stream: Box::new(&evaluation_stream),
+            stream: &evaluation_stream,
             stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
         });
         let mut time_prover = TimeProver::<TestField>::new(
-            TimeProver::<TestField>::generate_default_args(Box::new(&evaluation_stream)),
+            TimeProver::<TestField>::generate_default_args(&evaluation_stream),
         );
         // run them and get the transcript
         let blendy_prover_transcript =

@@ -11,7 +11,7 @@ use crate::provers::{
 pub struct BlendyProver<'a, F: Field> {
     pub claimed_sum: F,
     pub current_round: usize,
-    pub evaluation_stream: Box<&'a dyn EvaluationStream<F>>,
+    pub evaluation_stream: &'a dyn EvaluationStream<F>,
     pub num_stages: usize,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
@@ -180,7 +180,7 @@ impl<'a, F: Field> Prover<'a, F> for BlendyProver<'a, F> {
         self.claimed_sum
     }
 
-    fn generate_default_args(stream: Box<&'a dyn EvaluationStream<F>>) -> ProverArgs<'a, F> {
+    fn generate_default_args(stream: &'a impl EvaluationStream<F>) -> ProverArgs<'a, F> {
         ProverArgs {
             stream,
             stage_info: Some(ProverArgsStageInfo {
@@ -262,15 +262,15 @@ mod tests {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
         run_boolean_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
-            Box::new(&evaluation_stream),
+            &evaluation_stream,
         )));
         // k=2
         run_basic_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
-            Box::new(&evaluation_stream),
+            &evaluation_stream,
         )));
         // k=1
         run_basic_sumcheck_test(BlendyProver::new(ProverArgs {
-            stream: Box::new(&evaluation_stream),
+            stream: &evaluation_stream,
             stage_info: Some(ProverArgsStageInfo { num_stages: 1 }),
         }));
     }

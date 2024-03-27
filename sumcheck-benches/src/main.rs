@@ -5,8 +5,8 @@ use ark_ff::{
 };
 use space_efficient_sumcheck::{
     provers::{
-        test_helpers::BenchEvaluationStream, BlendyProver, Prover, ProverArgs,
-        ProverArgsStageInfo, SpaceProver, TimeProver,
+        test_helpers::BenchEvaluationStream, BlendyProver, Prover, ProverArgs, ProverArgsStageInfo,
+        SpaceProver, TimeProver,
     },
     Sumcheck,
 };
@@ -129,7 +129,7 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
         AlgorithmLabel::CTY => {
             Sumcheck::prove(
                 &mut SpaceProver::<F>::new(ProverArgs {
-                    stream: Box::new(&stream),
+                    stream: &stream,
                     stage_info: None,
                 }),
                 &mut rng,
@@ -138,7 +138,7 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
         AlgorithmLabel::VSBW => {
             Sumcheck::prove(
                 &mut TimeProver::<F>::new(ProverArgs {
-                    stream: Box::new(&stream),
+                    stream: &stream,
                     stage_info: None,
                 }),
                 &mut rng,
@@ -147,7 +147,7 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
         AlgorithmLabel::Blendy => {
             Sumcheck::prove(
                 &mut BlendyProver::<F>::new(ProverArgs {
-                    stream: Box::new(&stream),
+                    stream: &stream,
                     stage_info: Some(ProverArgsStageInfo {
                         num_stages: bench_args.stage_size,
                     }),

@@ -10,7 +10,7 @@ use crate::provers::{
 pub struct SpaceProver<'a, F: Field> {
     pub claimed_sum: F,
     pub current_round: usize,
-    pub evaluation_stream: Box<&'a dyn EvaluationStream<F>>,
+    pub evaluation_stream: &'a dyn EvaluationStream<F>,
     pub num_variables: usize,
     pub verifier_messages: Vec<F>,
     pub verifier_message_hats: Vec<F>,
@@ -71,7 +71,7 @@ impl<'a, F: Field> Prover<'a, F> for SpaceProver<'a, F> {
         self.claimed_sum
     }
 
-    fn generate_default_args(stream: Box<&'a dyn EvaluationStream<F>>) -> ProverArgs<'a, F> {
+    fn generate_default_args(stream: &'a impl EvaluationStream<F>) -> ProverArgs<'a, F> {
         ProverArgs {
             stream,
             stage_info: None,
@@ -133,10 +133,10 @@ mod tests {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
         run_boolean_sumcheck_test(SpaceProver::new(SpaceProver::generate_default_args(
-            Box::new(&evaluation_stream),
+            &evaluation_stream,
         )));
         run_basic_sumcheck_test(SpaceProver::new(SpaceProver::generate_default_args(
-            Box::new(&evaluation_stream),
+            &evaluation_stream,
         )));
     }
 }
