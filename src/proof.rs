@@ -1,17 +1,18 @@
 use ark_ff::Field;
-use ark_std::{rand::Rng, vec::Vec};
+use ark_std::{marker::PhantomData, rand::Rng, vec::Vec};
 
-use crate::provers::Prover;
+use crate::provers::{evaluation_stream::EvaluationStream, Prover};
 
 #[derive(Debug)]
-pub struct Sumcheck<F: Field> {
+pub struct Sumcheck<F: Field, S: EvaluationStream<F>> {
     pub prover_messages: Vec<(F, F)>,
     pub verifier_messages: Vec<F>,
     pub is_accepted: bool,
+    _phantom: PhantomData<S>,
 }
 
-impl<'a, F: Field> Sumcheck<F> {
-    pub fn prove<P: Prover<'a, F>, R: Rng>(prover: &mut P, rng: &mut R) -> Self {
+impl<'a, F: Field, S: EvaluationStream<F>> Sumcheck<F, S> {
+    pub fn prove<P: Prover<'a, F, S>, R: Rng>(prover: &mut P, rng: &mut R) -> Self {
         // Initialize vectors to store prover and verifier messages
         let mut prover_messages: Vec<(F, F)> = Vec::with_capacity(prover.total_rounds());
         let mut verifier_messages: Vec<F> = Vec::with_capacity(prover.total_rounds());
@@ -55,12 +56,15 @@ impl<'a, F: Field> Sumcheck<F> {
             prover_messages,
             verifier_messages,
             is_accepted,
+            _phantom: PhantomData,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::marker::PhantomData;
+
     use super::Sumcheck;
     use crate::provers::{
         test_helpers::{BenchEvaluationStream, TestField},
@@ -72,18 +76,29 @@ mod tests {
         // take an evaluation stream
         let evaluation_stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new(20);
         // initialize the provers
-        let mut blendy_k3_prover = BlendyProver::<TestField>::new(ProverArgs {
-            stream: Box::new(&evaluation_stream),
-            stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
-        });
-        let mut time_prover = TimeProver::<TestField>::new(
-            TimeProver::<TestField>::generate_default_args(Box::new(&evaluation_stream)),
-        );
+        let mut blendy_k3_prover =
+            BlendyProver::<TestField, BenchEvaluationStream<TestField>>::new(ProverArgs {
+                stream: &evaluation_stream,
+                stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
+                _phantom: PhantomData,
+            });
+        let mut time_prover =
+            TimeProver::<TestField, BenchEvaluationStream<TestField>>::new(TimeProver::<
+                TestField,
+                BenchEvaluationStream<TestField>,
+            >::generate_default_args(
+                &evaluation_stream
+            ));
         // run them and get the transcript
         let blendy_prover_transcript =
-            Sumcheck::<TestField>::prove(&mut blendy_k3_prover, &mut ark_std::test_rng());
-        let time_prover_transcript =
-            Sumcheck::<TestField>::prove(&mut time_prover, &mut ark_std::test_rng());
+            Sumcheck::<TestField, BenchEvaluationStream<TestField>>::prove(
+                &mut blendy_k3_prover,
+                &mut ark_std::test_rng(),
+            );
+        let time_prover_transcript = Sumcheck::<TestField, BenchEvaluationStream<TestField>>::prove(
+            &mut time_prover,
+            &mut ark_std::test_rng(),
+        );
         // ensure the transcript is identical
         assert_eq!(
             time_prover_transcript.prover_messages,

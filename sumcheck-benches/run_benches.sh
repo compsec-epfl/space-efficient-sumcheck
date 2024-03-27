@@ -34,7 +34,7 @@ for algorithm in $algorithms; do
                 *) ;;
             esac
             # NOTE: if you're on mac you might install gnu-time and change next line to "gtime"
-            output=`(gtime -v ./target/release/benches $algorithm_label $field $num_vars $stage_size) 2>&1`
+            output=`(time -v ./target/release/benches $algorithm_label $field $num_vars $stage_size) 2>&1`
             user_time_seconds=$(echo "$output" | grep "User time (seconds):" | awk '{print $4}')
             user_time_ms=$(awk "BEGIN {printf \"%.0f\", $user_time_seconds * 1000}")
             ram_kilobytes=$(echo "$output" | grep "Maximum resident set size (kbytes)" | awk '{print $6}')
