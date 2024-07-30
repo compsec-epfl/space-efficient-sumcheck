@@ -194,11 +194,11 @@ impl<F: Field> TestHelperPolynomial<F> for multivariate::SparsePolynomial<F, Spa
     }
     fn to_evaluations(&self) -> Vec<F> {
         Hypercube::new(DenseMVPolynomial::<F>::num_vars(self))
-            .map(|point: HypercubeMember| {
+            .map(|member: (usize, HypercubeMember)| {
                 TestHelperPolynomial::<F>::evaluate(
                     self,
                     DenseMVPolynomial::<F>::num_vars(self),
-                    point,
+                    member.1,
                 )
                 .unwrap()
             })
