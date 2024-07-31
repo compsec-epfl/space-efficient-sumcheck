@@ -33,29 +33,32 @@ impl<'a, F: Field, S: EvaluationStream<F>> SpaceProver<'a, F, S> {
         // Outer loop over a subset of variables
         for (index_outer, outer) in Hypercube::new(num_vars_outer_loop) {
             // Calculate the weight using Lagrange polynomial
-            let weight: F = LagrangePolynomial::lag_poly(
+            let lag_poly: F = LagrangePolynomial::lag_poly(
                 self.verifier_messages.clone(),
                 self.verifier_message_hats.clone(),
                 outer,
             );
-            println!("o index: {:?}", index_outer);
 
-            // Inner loop over all possible evaluations for the remaining variables
-            for (index_inner, _inner) in Hypercube::new(num_vars_inner_loop) {
-                // Calculate the evaluation index
-                let evaluation_index = index_outer << num_vars_inner_loop | index_inner;
-                println!("i index: {:?}, {}", index_inner, num_vars_inner_loop);
+            if lag_poly != F::ZERO {
+                // Inner loop over all possible evaluations for the remaining variables
+                for (index_inner, _inner) in Hypercube::new(num_vars_inner_loop) {
+                    // Calculate the evaluation index
+                    let evaluation_index = index_outer << num_vars_inner_loop | index_inner;
 
-                // Check if the bit at the position specified by the bitmask is set
-                let is_set: bool = (evaluation_index & bitmask) != 0;
+                    // Check if the bit at the position specified by the bitmask is set
+                    let is_set: bool = (evaluation_index & bitmask) != 0;
 
-                // Use match to accumulate the appropriate value based on whether the bit is set or not
-                match is_set {
-                    false => {
-                        sum_0 += self.evaluation_stream.get_evaluation(evaluation_index) * weight
-                    }
-                    true => {
-                        sum_1 += self.evaluation_stream.get_evaluation(evaluation_index) * weight
+                    // Use match to accumulate the appropriate value based on whether the bit is set or not
+                    match is_set {
+                        false => {
+                            sum_0 +=
+                                self.evaluation_stream.get_evaluation(evaluation_index) * lag_poly
+                        }
+                        true => {
+                            //println!("added to sum_1: {}", self.evaluation_stream.get_evaluation(evaluation_index));
+                            sum_1 +=
+                                self.evaluation_stream.get_evaluation(evaluation_index) * lag_poly
+                        }
                     }
                 }
             }
