@@ -39,27 +39,24 @@ impl<'a, F: Field, S: EvaluationStream<F>> SpaceProver<'a, F, S> {
                 outer,
             );
 
-            if lag_poly != F::ZERO {
-                // Inner loop over all possible evaluations for the remaining variables
-                for (index_inner, _inner) in Hypercube::new(num_vars_inner_loop) {
-                    // Calculate the evaluation index
-                    let evaluation_index = index_outer << num_vars_inner_loop | index_inner;
+            if lag_poly == F::ZERO {
+                // in this case the inner loop does nothing
+                continue;
+            }
 
-                    // Check if the bit at the position specified by the bitmask is set
-                    let is_set: bool = (evaluation_index & bitmask) != 0;
+            // Inner loop over all possible evaluations for the remaining variables
+            for (index_inner, _inner) in Hypercube::new(num_vars_inner_loop) {
+                // Calculate the evaluation index
+                let evaluation_index = index_outer << num_vars_inner_loop | index_inner;
 
-                    // Use match to accumulate the appropriate value based on whether the bit is set or not
-                    match is_set {
-                        false => {
-                            sum_0 +=
-                                self.evaluation_stream.get_evaluation(evaluation_index) * lag_poly
-                        }
-                        true => {
-                            //println!("added to sum_1: {}", self.evaluation_stream.get_evaluation(evaluation_index));
-                            sum_1 +=
-                                self.evaluation_stream.get_evaluation(evaluation_index) * lag_poly
-                        }
-                    }
+                // Check if the bit at the position specified by the bitmask is set
+                let is_set: bool = (evaluation_index & bitmask) != 0;
+
+                // Use match to accumulate the appropriate value based on whether the bit is set or not
+                let inner_sum = self.evaluation_stream.get_evaluation(evaluation_index) * lag_poly;
+                match is_set {
+                    false => sum_0 += inner_sum,
+                    true => sum_1 += inner_sum,
                 }
             }
         }
