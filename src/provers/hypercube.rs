@@ -45,7 +45,7 @@ impl Hypercube {
     pub fn new(num_variables: usize) -> Self {
         let stop_member: usize = Self::stop_member_from_size(num_variables);
         Self {
-            gray_code: GrayCode32::over_range(0..32),
+            gray_code: GrayCode32::over_range(0..stop_member as u32),
             num_variables,
             last_member: None,
             stop_member,
