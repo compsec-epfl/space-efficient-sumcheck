@@ -40,12 +40,12 @@ impl Hypercube {
     pub fn new(num_vars: usize) -> Self {
         Self {
             num_vars,
-            stop_value: Self::stop_member_from_size(num_vars),
+            stop_value: Self::stop_value(num_vars),
             value: 0,
         }
     }
-    pub fn stop_member_from_size(num_variables: usize) -> usize {
-        1 << num_variables
+    pub fn stop_value(num_vars: usize) -> usize {
+        1 << num_vars
     }
     pub fn next_gray_code(value: usize) -> usize {
         let mask = match value.count_ones() & 1 == 0 {

@@ -206,9 +206,9 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProver<'a,
             num_variables,
             verifier_messages: Vec::<F>::with_capacity(num_variables),
             verifier_message_hats: Vec::<F>::with_capacity(num_variables),
-            sums: vec![F::ZERO; Hypercube::stop_member_from_size(stage_size)],
-            lag_polys: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
-            lag_polys_update: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
+            sums: vec![F::ZERO; Hypercube::stop_value(stage_size)],
+            lag_polys: vec![F::ONE; Hypercube::stop_value(stage_size)],
+            lag_polys_update: vec![F::ONE; Hypercube::stop_value(stage_size)],
             stage_size,
         }
     }

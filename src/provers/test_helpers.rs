@@ -70,23 +70,23 @@ pub fn run_boolean_sumcheck_test<
         F::from(7),
         "g1 should evaluate correctly for input 1"
     );
-    // // LAST ROUND x1 fixed to 1
-    // // 110 = 0
-    // // sum g(0) = 0
-    // // 111 = 7
-    // // sum g(1) = 7
-    // let round_2 = prover.next_message(Some(F::ONE)).unwrap(); // x1 fixed to one
-    // assert_eq!(round_1.1, round_2.0 + round_2.1);
-    // assert_eq!(
-    //     round_2.0,
-    //     F::from(0),
-    //     "g2 should evaluate correctly for input 0"
-    // );
-    // assert_eq!(
-    //     round_2.1,
-    //     F::from(7),
-    //     "g2 should evaluate correctly for input 1"
-    // );
+    // LAST ROUND x1 fixed to 1
+    // 110 = 0
+    // sum g(0) = 0
+    // 111 = 7
+    // sum g(1) = 7
+    let round_2 = prover.next_message(Some(F::ONE)).unwrap(); // x1 fixed to one
+    assert_eq!(round_1.1, round_2.0 + round_2.1);
+    assert_eq!(
+        round_2.0,
+        F::from(0),
+        "g2 should evaluate correctly for input 0"
+    );
+    assert_eq!(
+        round_2.1,
+        F::from(7),
+        "g2 should evaluate correctly for input 1"
+    );
 }
 
 pub fn run_basic_sumcheck_test<
@@ -195,7 +195,7 @@ impl<F: Field> TestHelperPolynomial<F> for multivariate::SparsePolynomial<F, Spa
     fn to_evaluations(&self) -> Vec<F> {
         let num_vars = DenseMVPolynomial::<F>::num_vars(self);
         let mut evaluations = vec![];
-        for index in 0..Hypercube::stop_member_from_size(num_vars) {
+        for index in 0..Hypercube::stop_value(num_vars) {
             evaluations.push(
                 TestHelperPolynomial::<F>::evaluate(
                     self,

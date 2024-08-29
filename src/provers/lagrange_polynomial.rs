@@ -33,7 +33,7 @@ impl<F: Field> LagrangePolynomial<F> {
             messages: messages_clone,
             message_hats: message_hats_clone,
             value: *stack.last().unwrap(),
-            stop_position: Hypercube::stop_member_from_size(messages.len()),
+            stop_position: Hypercube::stop_value(messages.len()),
             position: 0,
         }
     }
