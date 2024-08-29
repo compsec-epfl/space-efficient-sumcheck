@@ -32,16 +32,15 @@ impl Iterator for HypercubeMember {
 #[derive(Debug)]
 pub struct Hypercube {
     num_vars: usize,
-    stop_index: usize, // stop at this index (exclusive)
+    stop_value: usize, // stop at this index (exclusive)
     value: usize,
 }
 
 impl Hypercube {
     pub fn new(num_vars: usize) -> Self {
-        let stop_index: usize = Self::stop_member_from_size(num_vars);
         Self {
             num_vars,
-            stop_index,
+            stop_value: Self::stop_member_from_size(num_vars),
             value: 0,
         }
     }
@@ -61,7 +60,7 @@ impl Iterator for Hypercube {
     type Item = (usize, HypercubeMember);
     fn next(&mut self) -> Option<Self::Item> {
         // Check if we reached stop_member
-        if self.value >= self.stop_index {
+        if self.value >= self.stop_value {
             return None;
         }
 
@@ -95,12 +94,11 @@ mod tests {
     #[test]
     fn gray_code_hypercube_members() {
         // https://docs.rs/gray-codes/latest/gray_codes/struct.GrayCode8.html#examples
-        // for 0, should return empty vec first call, none second call
+        // for n=0, should return empty vec first call, none second call
         let mut hypercube_size_0 = Hypercube::new(0);
         is_eq(hypercube_size_0.next().unwrap().1, vec![]);
-        // for 1, should return vec[false] first call, vec[true] second call and None third call
+        // for n=1, should return vec[false] first call, vec[true] second call and None third call
         let mut hypercube_size_1: Hypercube = Hypercube::new(1);
-        println!("{:?}", hypercube_size_1);
         is_eq(hypercube_size_1.next().unwrap().1, vec![false]);
         is_eq(hypercube_size_1.next().unwrap().1, vec![true]);
         assert_eq!(hypercube_size_1.next(), None);
@@ -129,10 +127,10 @@ mod tests {
     #[test]
     fn gray_code_indices() {
         // https://docs.rs/gray-codes/latest/gray_codes/struct.GrayCode8.html#examples
-        // for 0, should return empty vec first call, none second call
+        // for n=0, should return empty vec first call, none second call
         let mut hypercube_size_0 = Hypercube::new(0);
         assert_eq!(hypercube_size_0.next().unwrap().0, 0);
-        // for 1, should return vec[false] first call, vec[true] second call and None third call
+        // for n=1, should return vec[false] first call, vec[true] second call and None third call
         let mut hypercube_size_1: Hypercube = Hypercube::new(1);
         assert_eq!(hypercube_size_1.next().unwrap().0, 0);
         assert_eq!(hypercube_size_1.next().unwrap().0, 1);
