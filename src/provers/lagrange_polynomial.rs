@@ -1,9 +1,11 @@
 use crate::provers::hypercube::{Hypercube, HypercubeMember};
-use ark_ff::Field;
+use ark_ff::{batch_inversion, Field};
 
 pub struct LagrangePolynomial<F: Field> {
     pub messages: Vec<F>,
     pub message_hats: Vec<F>,
+    pub message_hat_inverses: Vec<F>,
+    pub message_inverses: Vec<F>,
     pub stop_position: usize,
     pub position: usize,
     pub value: F,
@@ -25,13 +27,21 @@ impl<F: Field> LagrangePolynomial<F> {
         // Clone and reverse the messages and message_hats vectors
         let mut messages_clone = messages.clone();
         messages_clone.reverse();
+        let mut message_inverses = messages.clone();
+        batch_inversion(&mut message_inverses);
+        message_inverses.reverse();
         let mut message_hats_clone = message_hats.clone();
         message_hats_clone.reverse();
+        let mut message_hat_inverses = message_hats.clone();
+        batch_inversion(&mut message_hat_inverses);
+        message_hat_inverses.reverse();
 
         // Return
         Self {
             messages: messages_clone,
             message_hats: message_hats_clone,
+            message_hat_inverses,
+            message_inverses,
             value: *stack.last().unwrap(),
             stop_position: Hypercube::stop_value(messages.len()),
             position: 0,
@@ -70,8 +80,12 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
             let bit_index = bit_mask.trailing_zeros() as usize;
             let is_mult = current_position & bit_mask == 0;
             self.value = match is_mult {
-                true => (self.value / self.message_hats[bit_index]) * self.messages[bit_index],
-                false => (self.value / self.messages[bit_index]) * self.message_hats[bit_index],
+                true => {
+                    self.value * self.message_hat_inverses[bit_index] * self.messages[bit_index]
+                }
+                false => {
+                    self.value * self.message_inverses[bit_index] * self.message_hats[bit_index]
+                }
             };
         }
         // Return current value
