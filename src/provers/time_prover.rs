@@ -7,11 +7,11 @@ use crate::provers::{
 };
 
 pub struct TimeProver<'a, F: Field, S: EvaluationStream<F>> {
-    pub claimed_sum: F,
-    pub current_round: usize,
-    pub evaluations: Option<Vec<F>>,
-    pub evaluation_stream: &'a S, // Keep this for now, case we can do some small optimizations of first round etc
-    pub num_variables: usize,
+    claimed_sum: F,
+    current_round: usize,
+    evaluations: Option<Vec<F>>,
+    evaluation_stream: &'a S, // Keep this for now, case we can do some small optimizations of first round etc
+    num_variables: usize,
 }
 
 impl<'a, F: Field, S: EvaluationStream<F>> TimeProver<'a, F, S> {

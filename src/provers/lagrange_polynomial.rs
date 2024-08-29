@@ -2,13 +2,13 @@ use crate::provers::hypercube::{Hypercube, HypercubeMember};
 use ark_ff::{batch_inversion, Field};
 
 pub struct LagrangePolynomial<F: Field> {
-    pub messages: Vec<F>,
-    pub message_hats: Vec<F>,
-    pub message_hat_inverses: Vec<F>,
-    pub message_inverses: Vec<F>,
-    pub stop_position: usize,
-    pub position: usize,
-    pub value: F,
+    messages: Vec<F>,
+    message_hats: Vec<F>,
+    message_hat_inverses: Vec<F>,
+    message_inverses: Vec<F>,
+    stop_position: usize,
+    position: usize,
+    value: F,
 }
 
 impl<F: Field> LagrangePolynomial<F> {

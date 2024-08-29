@@ -9,12 +9,12 @@ use crate::provers::{
 };
 
 pub struct SpaceProver<'a, F: Field, S: EvaluationStream<F>> {
-    pub claimed_sum: F,
-    pub current_round: usize,
-    pub evaluation_stream: &'a S,
-    pub num_variables: usize,
-    pub verifier_messages: Vec<F>,
-    pub verifier_message_hats: Vec<F>,
+    claimed_sum: F,
+    current_round: usize,
+    evaluation_stream: &'a S,
+    num_variables: usize,
+    verifier_messages: Vec<F>,
+    verifier_message_hats: Vec<F>,
 }
 
 impl<'a, F: Field, S: EvaluationStream<F>> SpaceProver<'a, F, S> {

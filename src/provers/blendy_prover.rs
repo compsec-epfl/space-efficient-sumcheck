@@ -11,17 +11,17 @@ use crate::provers::{
 };
 
 pub struct BlendyProver<'a, F: Field, S: EvaluationStream<F>> {
-    pub claimed_sum: F,
-    pub current_round: usize,
-    pub evaluation_stream: &'a S,
-    pub num_stages: usize,
-    pub num_variables: usize,
-    pub verifier_messages: Vec<F>,
-    pub verifier_message_hats: Vec<F>,
-    pub sums: Vec<F>,
-    pub lag_polys: Vec<F>,
-    pub lag_polys_update: Vec<F>,
-    pub stage_size: usize,
+    claimed_sum: F,
+    current_round: usize,
+    evaluation_stream: &'a S,
+    num_stages: usize,
+    num_variables: usize,
+    verifier_messages: Vec<F>,
+    verifier_message_hats: Vec<F>,
+    sums: Vec<F>,
+    lag_polys: Vec<F>,
+    lag_polys_update: Vec<F>,
+    stage_size: usize,
 }
 
 impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
