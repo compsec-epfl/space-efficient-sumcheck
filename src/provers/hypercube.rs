@@ -1,16 +1,14 @@
-use gray_codes::GrayCode32;
-
-// basically, this emulates a Vec<bool> as an iterator wrapped over a usize
+// Basically, this works like Vec<bool> as an iterator wrapped over a usize
 #[derive(Debug, PartialEq)]
 pub struct HypercubeMember {
-    last_index: usize,
+    bit_index: usize,
     value: usize,
 }
 
 impl HypercubeMember {
-    pub fn new(num_variables: usize, value: usize) -> Self {
+    pub fn new(num_vars: usize, value: usize) -> Self {
         Self {
-            last_index: num_variables,
+            bit_index: num_vars,
             value,
         }
     }
@@ -19,72 +17,62 @@ impl HypercubeMember {
 impl Iterator for HypercubeMember {
     type Item = bool;
     fn next(&mut self) -> Option<Self::Item> {
-        // Check if in the last iteration we finish iterating
-        if self.last_index == 0 {
+        // Check if n == 0
+        if self.bit_index == 0 {
             return None;
         }
-        // Compute if the bit of self.value is set at current_index
-        let current_index: usize = self.last_index - 1;
-        let is_set_at_index: bool = self.value & (1 << current_index) != 0;
-        // Increment
-        self.last_index = current_index;
-        // Return whether the bit of value at current_index is set
-        Some(is_set_at_index)
+        // Return if the bit of self.value is set at the given index
+        self.bit_index = self.bit_index - 1;
+        let bit_mask = 1 << self.bit_index;
+        Some(self.value & bit_mask != 0)
     }
 }
 
-// this is an iterator that gives back HypercubeMember ^ above on each call to next
+// Basically, on each call to next this gives back a HyperCube member for the current index
+#[derive(Debug)]
 pub struct Hypercube {
-    gray_code: GrayCode32,
-    last_member: Option<usize>,
-    num_variables: usize,
-    stop_member: usize, // stop at this number (exclusive)
+    num_vars: usize,
+    stop_index: usize, // stop at this index (exclusive)
+    value: usize,
 }
 
 impl Hypercube {
-    pub fn new(num_variables: usize) -> Self {
-        let stop_member: usize = Self::stop_member_from_size(num_variables);
+    pub fn new(num_vars: usize) -> Self {
+        let stop_index: usize = Self::stop_member_from_size(num_vars);
         Self {
-            gray_code: GrayCode32::over_range(0..stop_member as u32),
-            num_variables,
-            last_member: None,
-            stop_member,
+            num_vars,
+            stop_index,
+            value: 0,
         }
     }
     pub fn stop_member_from_size(num_variables: usize) -> usize {
         1 << num_variables
+    }
+    pub fn next_gray_code(value: usize) -> usize {
+        let mask = match value.count_ones() & 1 == 0 {
+            true => 1,
+            false => 1 << (value.trailing_zeros() + 1),
+        };
+        value ^ mask
     }
 }
 
 impl Iterator for Hypercube {
     type Item = (usize, HypercubeMember);
     fn next(&mut self) -> Option<Self::Item> {
-        // a) Check if this is the first iteration
-        if self.last_member == None {
-            // Initialize last member and last point
-            self.last_member = Some(0);
-            // Return a member for this point
-            let code = self.gray_code.next().unwrap() as usize;
-            return Some((
-                code,
-                HypercubeMember::new(self.num_variables, code as usize),
-            ));
-        }
-
-        // b) Check if in the last iteration we finished iterating
-        let next_member = self.last_member.unwrap() + 1;
-        if next_member >= self.stop_member {
+        // Check if we reached stop_member
+        if self.value >= self.stop_index {
             return None;
         }
 
-        // c) Everything else, just increment
-        self.last_member = Some(next_member);
+        // Increment
+        let current_code = self.value;
+        self.value = Self::next_gray_code(self.value);
 
-        // return the member
-        let code = self.gray_code.next().unwrap() as usize;
+        // Return current member
         Some((
-            code,
-            HypercubeMember::new(self.num_variables, code as usize),
+            current_code,
+            HypercubeMember::new(self.num_vars, current_code as usize),
         ))
     }
 }
@@ -93,7 +81,7 @@ impl Iterator for Hypercube {
 mod tests {
     use crate::provers::hypercube::{Hypercube, HypercubeMember};
 
-    fn check_eq(given: HypercubeMember, expected: Vec<bool>) {
+    fn is_eq(given: HypercubeMember, expected: Vec<bool>) {
         // check each value in the vec
         for (i, (a, b)) in given.zip(expected.clone()).enumerate() {
             assert_eq!(
@@ -104,67 +92,38 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn basic() {
-    //     // for 0, should return empty vec first call, none second call
-    //     let mut hypercube_size_0 = Hypercube::new(0);
-    //     check_eq(hypercube_size_0.next().unwrap(), vec![]);
-    //     // for 1, should return vec[false] first call, vec[true] second call and None third call
-    //     let mut hypercube_size_1: Hypercube = Hypercube::new(1);
-    //     check_eq(hypercube_size_1.next().unwrap(), vec![false]);
-    //     check_eq(hypercube_size_1.next().unwrap(), vec![true]);
-    //     assert_eq!(hypercube_size_1.next(), None);
-    //     // so on for n=2
-    //     let mut hypercube_size_2: Hypercube = Hypercube::new(2);
-    //     check_eq(hypercube_size_2.next().unwrap(), vec![false, false]);
-    //     check_eq(hypercube_size_2.next().unwrap(), vec![false, true]);
-    //     check_eq(hypercube_size_2.next().unwrap(), vec![true, false]);
-    //     check_eq(hypercube_size_2.next().unwrap(), vec![true, true]);
-    //     assert_eq!(hypercube_size_2.next(), None);
-    //     // so on for n=3
-    //     let mut hypercube_size_3: Hypercube = Hypercube::new(3);
-    //     check_eq(hypercube_size_3.next().unwrap(), vec![false, false, false]);
-    //     check_eq(hypercube_size_3.next().unwrap(), vec![false, false, true]);
-    //     check_eq(hypercube_size_3.next().unwrap(), vec![false, true, false]);
-    //     check_eq(hypercube_size_3.next().unwrap(), vec![false, true, true]);
-    //     check_eq(hypercube_size_3.next().unwrap(), vec![true, false, false]);
-    //     check_eq(hypercube_size_3.next().unwrap(), vec![true, false, true]);
-    //     check_eq(hypercube_size_3.next().unwrap(), vec![true, true, false]);
-    //     check_eq(hypercube_size_3.next().unwrap(), vec![true, true, true]);
-    //     assert_eq!(hypercube_size_3.next(), None);
-    // }
-
     #[test]
-    fn gray_code() {
+    fn gray_code_hypercube_members() {
         // https://docs.rs/gray-codes/latest/gray_codes/struct.GrayCode8.html#examples
         // for 0, should return empty vec first call, none second call
         let mut hypercube_size_0 = Hypercube::new(0);
-        check_eq(hypercube_size_0.next().unwrap().1, vec![]);
+        is_eq(hypercube_size_0.next().unwrap().1, vec![]);
         // for 1, should return vec[false] first call, vec[true] second call and None third call
         let mut hypercube_size_1: Hypercube = Hypercube::new(1);
-        check_eq(hypercube_size_1.next().unwrap().1, vec![false]);
-        check_eq(hypercube_size_1.next().unwrap().1, vec![true]);
+        println!("{:?}", hypercube_size_1);
+        is_eq(hypercube_size_1.next().unwrap().1, vec![false]);
+        is_eq(hypercube_size_1.next().unwrap().1, vec![true]);
         assert_eq!(hypercube_size_1.next(), None);
         // so on for n=2
         let mut hypercube_size_2: Hypercube = Hypercube::new(2);
-        check_eq(hypercube_size_2.next().unwrap().1, vec![false, false]);
-        check_eq(hypercube_size_2.next().unwrap().1, vec![false, true]);
-        check_eq(hypercube_size_2.next().unwrap().1, vec![true, true]);
-        check_eq(hypercube_size_2.next().unwrap().1, vec![true, false]);
+        is_eq(hypercube_size_2.next().unwrap().1, vec![false, false]);
+        is_eq(hypercube_size_2.next().unwrap().1, vec![false, true]);
+        is_eq(hypercube_size_2.next().unwrap().1, vec![true, true]);
+        is_eq(hypercube_size_2.next().unwrap().1, vec![true, false]);
         assert_eq!(hypercube_size_2.next(), None);
         // so on for n=3
         let mut hypercube_size_3: Hypercube = Hypercube::new(3);
-        check_eq(
+        is_eq(
             hypercube_size_3.next().unwrap().1,
             vec![false, false, false],
         );
-        check_eq(hypercube_size_3.next().unwrap().1, vec![false, false, true]);
-        check_eq(hypercube_size_3.next().unwrap().1, vec![false, true, true]);
-        check_eq(hypercube_size_3.next().unwrap().1, vec![false, true, false]);
-        check_eq(hypercube_size_3.next().unwrap().1, vec![true, true, false]);
-        check_eq(hypercube_size_3.next().unwrap().1, vec![true, true, true]);
-        check_eq(hypercube_size_3.next().unwrap().1, vec![true, false, true]);
-        check_eq(hypercube_size_3.next().unwrap().1, vec![true, false, false]);
+        is_eq(hypercube_size_3.next().unwrap().1, vec![false, false, true]);
+        is_eq(hypercube_size_3.next().unwrap().1, vec![false, true, true]);
+        is_eq(hypercube_size_3.next().unwrap().1, vec![false, true, false]);
+        is_eq(hypercube_size_3.next().unwrap().1, vec![true, true, false]);
+        is_eq(hypercube_size_3.next().unwrap().1, vec![true, true, true]);
+        is_eq(hypercube_size_3.next().unwrap().1, vec![true, false, true]);
+        is_eq(hypercube_size_3.next().unwrap().1, vec![true, false, false]);
         assert_eq!(hypercube_size_3.next(), None);
     }
     #[test]
