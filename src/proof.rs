@@ -99,6 +99,8 @@ mod tests {
             &mut time_prover,
             &mut ark_std::test_rng(),
         );
+        println!("{:?}", blendy_prover_transcript);
+        println!("{:?}", time_prover_transcript);
         // ensure the transcript is identical
         assert_eq!(
             time_prover_transcript.prover_messages,
