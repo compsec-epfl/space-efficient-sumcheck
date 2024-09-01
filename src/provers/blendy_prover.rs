@@ -10,14 +10,17 @@ use crate::provers::{
     prover::{Prover, ProverArgs, ProverArgsStageInfo},
 };
 
+use super::verifier_messages::VerifierMessages;
+
 pub struct BlendyProver<'a, F: Field, S: EvaluationStream<F>> {
     claimed_sum: F,
     current_round: usize,
     evaluation_stream: &'a S,
     num_stages: usize,
     num_variables: usize,
-    verifier_messages: Vec<F>,
-    verifier_message_hats: Vec<F>,
+    // verifier_messages: Vec<F>,
+    // verifier_message_hats: Vec<F>,
+    vm: VerifierMessages<F>,
     sums: Vec<F>,
     lag_polys: Vec<F>,
     lag_polys_update: Vec<F>,
@@ -106,8 +109,9 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
 
         // 2. Initialize st := LagInit((s - l)l, r)
         let mut sequential_lag_poly: LagrangePolynomial<F> = LagrangePolynomial::new(
-            self.verifier_messages.clone(),
-            self.verifier_message_hats.clone(),
+            self.vm.clone(),
+            self.vm.messages.clone(),
+            self.vm.message_hats.clone(),
         );
 
         // 3. For each b1 ∈ {0,1}^(s-1)l
@@ -150,8 +154,8 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
                 _ => {
                     let precomputed: F = *self.lag_polys.get(b2_start_index >> 1).unwrap();
                     match b2_start_index & 2 == 2 {
-                        true => precomputed * *self.verifier_messages.last().unwrap(),
-                        false => precomputed * *self.verifier_message_hats.last().unwrap(),
+                        true => precomputed * *self.vm.messages.last().unwrap(),
+                        false => precomputed * *self.vm.message_hats.last().unwrap(),
                     }
                 }
             };
@@ -204,8 +208,9 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProver<'a,
             evaluation_stream: prover_args.stream,
             num_stages,
             num_variables,
-            verifier_messages: Vec::<F>::with_capacity(num_variables),
-            verifier_message_hats: Vec::<F>::with_capacity(num_variables),
+            // verifier_messages: Vec::<F>::with_capacity(num_variables),
+            // verifier_message_hats: Vec::<F>::with_capacity(num_variables),
+            vm: VerifierMessages::new(),
             sums: vec![F::ZERO; Hypercube::stop_value(stage_size)],
             lag_polys: vec![F::ONE; Hypercube::stop_value(stage_size)],
             lag_polys_update: vec![F::ONE; Hypercube::stop_value(stage_size)],
@@ -220,10 +225,11 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProver<'a,
         }
 
         if !self.is_initial_round() {
+            self.vm.receive_message(verifier_message.unwrap());
             // Store the verifier message and its hat
-            self.verifier_messages.push(verifier_message.unwrap());
-            self.verifier_message_hats
-                .push(F::ONE - verifier_message.unwrap());
+            // self.verifier_messages.push(verifier_message.unwrap());
+            // self.verifier_message_hats
+            //     .push(F::ONE - verifier_message.unwrap());
         }
 
         // at start of stage do some stuff

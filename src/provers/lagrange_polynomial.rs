@@ -1,49 +1,55 @@
 use crate::provers::hypercube::{Hypercube, HypercubeMember};
 use ark_ff::{batch_inversion, Field};
 
+use super::verifier_messages::VerifierMessages;
+
 pub struct LagrangePolynomial<F: Field> {
-    messages: Vec<F>,
-    message_hats: Vec<F>,
-    message_hat_inverses: Vec<F>,
-    message_inverses: Vec<F>,
+    vm: VerifierMessages<F>,
     stop_position: usize,
     position: usize,
     value: F,
 }
 
 impl<F: Field> LagrangePolynomial<F> {
-    pub fn new(messages: Vec<F>, message_hats: Vec<F>) -> Self {
+    pub fn new(mut vm: VerifierMessages<F>, _messages: Vec<F>, _message_hats: Vec<F>) -> Self {
         // Initialize a stack with capacity for messages/ message_hats and the identity element
-        let mut stack: Vec<F> = Vec::with_capacity(messages.len() + 1);
+        let mut stack: Vec<F> = Vec::with_capacity(vm.messages.len() + 1);
         stack.push(F::ONE);
 
         // Iterate over the message_hats, update the running product, and push it onto the stack
         let mut running_product: F = F::ONE;
-        for message_hat in &message_hats {
+        for message_hat in &vm.message_hats {
             running_product *= message_hat;
             stack.push(running_product);
         }
 
         // Clone and reverse the messages and message_hats vectors
-        let mut messages_clone = messages.clone();
+        let mut messages_clone = vm.messages.clone();
         messages_clone.reverse();
-        let mut message_inverses = messages.clone();
+        let mut message_inverses = vm.messages.clone();
         batch_inversion(&mut message_inverses);
         message_inverses.reverse();
-        let mut message_hats_clone = message_hats.clone();
+        let mut message_hats_clone = vm.message_hats.clone();
         message_hats_clone.reverse();
-        let mut message_hat_inverses = message_hats.clone();
+        let mut message_hat_inverses = vm.message_hats.clone();
         batch_inversion(&mut message_hat_inverses);
         message_hat_inverses.reverse();
 
+        vm.messages.reverse();
+        vm.message_inverses.reverse();
+        vm.message_hats.reverse();
+        vm.message_hat_inverses.reverse();
+
+        assert_eq!(messages_clone, vm.messages);
+        assert_eq!(message_inverses, vm.message_inverses);
+        assert_eq!(message_hats_clone, vm.message_hats);
+        assert_eq!(message_hat_inverses, vm.message_hat_inverses);
+
         // Return
         Self {
-            messages: messages_clone,
-            message_hats: message_hats_clone,
-            message_hat_inverses,
-            message_inverses,
+            vm: vm.clone(),
             value: *stack.last().unwrap(),
-            stop_position: Hypercube::stop_value(messages.len()),
+            stop_position: Hypercube::stop_value(vm.messages.len()),
             position: 0,
         }
     }
@@ -115,10 +121,10 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
             let is_mult = current_position & bit_mask == 0;
             self.value = match is_mult {
                 true => {
-                    self.value * self.message_hat_inverses[bit_index] * self.messages[bit_index]
+                    self.value * self.vm.message_hat_inverses[bit_index] * self.vm.messages[bit_index]
                 }
                 false => {
-                    self.value * self.message_inverses[bit_index] * self.message_hats[bit_index]
+                    self.value * self.vm.message_inverses[bit_index] * self.vm.message_hats[bit_index]
                 }
             };
         }
@@ -131,7 +137,7 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
 mod tests {
     use crate::provers::{
         hypercube::HypercubeMember, lagrange_polynomial::LagrangePolynomial,
-        test_helpers::TestField,
+        test_helpers::TestField, verifier_messages::VerifierMessages,
     };
 
     #[test]
@@ -165,8 +171,12 @@ mod tests {
             .iter()
             .map(|message| TestField::from(1) - message)
             .collect();
+        let mut vm = VerifierMessages::new();
+        vm.receive_message(TestField::from(13));
+        vm.receive_message(TestField::from(11));
+        vm.receive_message(TestField::from(7));
         let mut lag_poly: LagrangePolynomial<TestField> =
-            LagrangePolynomial::new(messages.clone(), message_hats.clone());
+            LagrangePolynomial::new(vm, messages.clone(), message_hats.clone());
         for gray_code_index in [0, 1, 3, 2, 6, 7, 5, 4] {
             let exp = LagrangePolynomial::lag_poly(
                 messages.clone(),
