@@ -1,16 +1,52 @@
-// Basically, this works like Vec<bool> as an iterator wrapped over a usize
-#[derive(Debug, PartialEq)]
+// Basically this emulates a Vec<bool> as an iterator wrapped over a usize
+#[derive(Clone, Debug, PartialEq)]
 pub struct HypercubeMember {
     bit_index: usize,
+    num_vars: usize,
     value: usize,
 }
 
 impl HypercubeMember {
     pub fn new(num_vars: usize, value: usize) -> Self {
+        assert!(num_vars <= std::mem::size_of::<usize>() * 8);
         Self {
             bit_index: num_vars,
+            num_vars,
             value,
         }
+    }
+    pub fn new_from_vec_bool(num_vars: usize, value: Vec<bool>) -> Self {
+        HypercubeMember::new(num_vars, HypercubeMember::usize_from_vec_bool(value))
+    }
+    pub fn len(&self) -> usize {
+        self.num_vars
+    }
+    pub fn partition(
+        h: HypercubeMember,
+        indices: Vec<usize>,
+    ) -> (HypercubeMember, HypercubeMember) {
+        assert!(h.len() >= indices.len());
+        let mut partition_1: Vec<bool> = Vec::with_capacity(h.len() - indices.len());
+        let mut partition_2: Vec<bool> = Vec::with_capacity(indices.len());
+        let mut partitioned = 0;
+        for (index, bit) in h.clone().into_iter().enumerate() {
+            if partitioned < indices.len() && index == indices[partitioned] {
+                partition_2.push(bit);
+                partitioned += 1;
+            } else {
+                partition_1.push(bit);
+            }
+        }
+        (
+            HypercubeMember::new_from_vec_bool(h.len() - indices.len(), partition_1),
+            HypercubeMember::new_from_vec_bool(indices.len(), partition_2),
+        )
+    }
+    pub fn usize_from_vec_bool(vec: Vec<bool>) -> usize {
+        vec.into_iter()
+            .rev()
+            .enumerate()
+            .fold(0, |acc, (i, bit)| acc | ((bit as usize) << i))
     }
 }
 
@@ -21,18 +57,18 @@ impl Iterator for HypercubeMember {
         if self.bit_index == 0 {
             return None;
         }
-        // Return if the bit of self.value is set at the given index
+        // Return if value is bit high at bit_index
         self.bit_index = self.bit_index - 1;
         let bit_mask = 1 << self.bit_index;
         Some(self.value & bit_mask != 0)
     }
 }
 
-// Basically, on each call to next this gives back a HyperCube member for the current index
+// On each call to next() this gives a HypercubeMember for the value
 #[derive(Debug)]
 pub struct Hypercube {
     num_vars: usize,
-    stop_value: usize, // stop at this index (exclusive)
+    stop_value: usize,
     value: usize,
 }
 
@@ -45,7 +81,7 @@ impl Hypercube {
         }
     }
     pub fn stop_value(num_vars: usize) -> usize {
-        1 << num_vars
+        1 << num_vars // this is exclusive, meaning should stop *before* this value
     }
     pub fn next_gray_code(value: usize) -> usize {
         let mask = match value.count_ones() & 1 == 0 {
@@ -65,13 +101,13 @@ impl Iterator for Hypercube {
         }
 
         // Increment
-        let current_code = self.value;
+        let current_value = self.value;
         self.value = Self::next_gray_code(self.value);
 
         // Return current member
         Some((
-            current_code,
-            HypercubeMember::new(self.num_vars, current_code as usize),
+            current_value,
+            HypercubeMember::new(self.num_vars, current_value),
         ))
     }
 }
@@ -153,5 +189,30 @@ mod tests {
         assert_eq!(hypercube_size_3.next().unwrap().0, 5);
         assert_eq!(hypercube_size_3.next().unwrap().0, 4);
         assert_eq!(hypercube_size_3.next(), None);
+    }
+    #[test]
+    fn partition() {
+        let test_1 = HypercubeMember::new_from_vec_bool(5, vec![true, false, false, false, false]);
+        let indices_1 = vec![2, 3];
+        let result_1 = HypercubeMember::partition(test_1, indices_1);
+        is_eq(result_1.0, vec![true, false, false]);
+        is_eq(result_1.1, vec![false, false]);
+        let test_2 = HypercubeMember::new_from_vec_bool(
+            8,
+            vec![false, true, true, false, false, false, false, true],
+        );
+        let indices_2 = vec![0, 1, 2, 4, 6];
+        let result_2 = HypercubeMember::partition(test_2, indices_2);
+        is_eq(result_2.0, vec![false, false, true]);
+        is_eq(result_2.1, vec![false, true, true, false, false, false]);
+    }
+    #[test]
+    fn vec_bool_to_usize() {
+        let test_1 = vec![true, false, false];
+        let exp_1 = 4;
+        assert_eq!(HypercubeMember::usize_from_vec_bool(test_1), exp_1);
+        let test_2 = vec![false, true, true];
+        let exp_2 = 3;
+        assert_eq!(HypercubeMember::usize_from_vec_bool(test_2), exp_2);
     }
 }

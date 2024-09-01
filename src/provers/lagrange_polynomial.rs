@@ -62,6 +62,40 @@ impl<F: Field> LagrangePolynomial<F> {
             },
         )
     }
+    pub fn partitioned_lag_poly(x: Vec<F>, x_hat: Vec<F>, b: HypercubeMember) -> F {
+        let indices_of_zero_or_one: Vec<usize> = x
+            .iter()
+            .enumerate()
+            .filter_map(|(index, &element)| {
+                if element == F::ZERO || element == F::ONE {
+                    Some(index)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let mut partition_1: Vec<F> = Vec::with_capacity(x.len() - indices_of_zero_or_one.len());
+        let mut partition_2: Vec<F> = Vec::with_capacity(indices_of_zero_or_one.len());
+        let mut partition_1_hat: Vec<F> =
+            Vec::with_capacity(x.len() - indices_of_zero_or_one.len());
+        let mut partition_2_hat: Vec<F> = Vec::with_capacity(indices_of_zero_or_one.len());
+        let mut partitioned = 0;
+        for (index, element) in x.clone().into_iter().enumerate() {
+            if partitioned < indices_of_zero_or_one.len()
+                && index == indices_of_zero_or_one[partitioned]
+            {
+                partition_2.push(element);
+                partition_2_hat.push(*x_hat.get(index).unwrap());
+                partitioned += 1;
+            } else {
+                partition_1.push(element);
+                partition_1_hat.push(*x_hat.get(index).unwrap());
+            }
+        }
+        let (partition_1_b, partition_2_b) = HypercubeMember::partition(b, indices_of_zero_or_one);
+        LagrangePolynomial::lag_poly(partition_1, partition_1_hat, partition_1_b)
+            * LagrangePolynomial::lag_poly(partition_2, partition_2_hat, partition_2_b)
+    }
 }
 
 impl<F: Field> Iterator for LagrangePolynomial<F> {
@@ -99,6 +133,28 @@ mod tests {
         hypercube::HypercubeMember, lagrange_polynomial::LagrangePolynomial,
         test_helpers::TestField,
     };
+
+    #[test]
+    fn partitioned_lag_poly() {
+        let messages: Vec<TestField> =
+            vec![TestField::from(1), TestField::from(0), TestField::from(7)];
+        let message_hats: Vec<TestField> = messages
+            .clone()
+            .iter()
+            .map(|message| TestField::from(1) - message)
+            .collect();
+        let exp = LagrangePolynomial::lag_poly(
+            messages.clone(),
+            message_hats.clone(),
+            HypercubeMember::new(3, 7),
+        );
+        let res = LagrangePolynomial::partitioned_lag_poly(
+            messages.clone(),
+            message_hats.clone(),
+            HypercubeMember::new(3, 7),
+        );
+        assert_eq!(exp, res);
+    }
 
     #[test]
     fn next() {
