@@ -1,5 +1,5 @@
 use crate::provers::hypercube::{Hypercube, HypercubeMember};
-use ark_ff::{batch_inversion, Field};
+use ark_ff::Field;
 
 use super::verifier_messages::VerifierMessages;
 
@@ -11,44 +11,29 @@ pub struct LagrangePolynomial<F: Field> {
 }
 
 impl<F: Field> LagrangePolynomial<F> {
-    pub fn new(mut vm: VerifierMessages<F>, _messages: Vec<F>, _message_hats: Vec<F>) -> Self {
-        // Initialize a stack with capacity for messages/ message_hats and the identity element
-        let mut stack: Vec<F> = Vec::with_capacity(vm.messages.len() + 1);
-        stack.push(F::ONE);
-
+    pub fn new(vm: VerifierMessages<F>) -> Self {
+        let mut vm_copy = vm.clone();
         // Iterate over the message_hats, update the running product, and push it onto the stack
         let mut running_product: F = F::ONE;
         for message_hat in &vm.message_hats {
             running_product *= message_hat;
-            stack.push(running_product);
         }
 
-        // Clone and reverse the messages and message_hats vectors
-        let mut messages_clone = vm.messages.clone();
-        messages_clone.reverse();
-        let mut message_inverses = vm.messages.clone();
-        batch_inversion(&mut message_inverses);
-        message_inverses.reverse();
-        let mut message_hats_clone = vm.message_hats.clone();
-        message_hats_clone.reverse();
-        let mut message_hat_inverses = vm.message_hats.clone();
-        batch_inversion(&mut message_hat_inverses);
-        message_hat_inverses.reverse();
+        // these have to be reversed?
+        vm_copy.messages.reverse();
+        vm_copy.message_inverses.reverse();
+        vm_copy.message_hats.reverse();
+        vm_copy.message_hat_inverses.reverse();
 
-        vm.messages.reverse();
-        vm.message_inverses.reverse();
-        vm.message_hats.reverse();
-        vm.message_hat_inverses.reverse();
-
-        assert_eq!(messages_clone, vm.messages);
-        assert_eq!(message_inverses, vm.message_inverses);
-        assert_eq!(message_hats_clone, vm.message_hats);
-        assert_eq!(message_hat_inverses, vm.message_hat_inverses);
+        vm_copy.messages_partition_1.reverse();
+        vm_copy.message_inverses_partition_1.reverse();
+        vm_copy.message_hats_partition_1.reverse();
+        vm_copy.message_hat_inverses_partition_1.reverse();
 
         // Return
         Self {
-            vm: vm.clone(),
-            value: *stack.last().unwrap(),
+            vm: vm_copy.clone(),
+            value: running_product,
             stop_position: Hypercube::stop_value(vm.messages.len()),
             position: 0,
         }
@@ -68,7 +53,7 @@ impl<F: Field> LagrangePolynomial<F> {
             },
         )
     }
-    pub fn partitioned_lag_poly(x: Vec<F>, x_hat: Vec<F>, b: HypercubeMember) -> F {
+    pub fn _partitioned_lag_poly(x: Vec<F>, x_hat: Vec<F>, b: HypercubeMember) -> F {
         let indices_of_zero_or_one: Vec<usize> = x
             .iter()
             .enumerate()
@@ -115,16 +100,28 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
         let current_position = self.position;
         // Increment
         self.position = Hypercube::next_gray_code(self.position);
-        if self.position < self.stop_position {
+        let h = HypercubeMember::new(self.vm.messages.len(), self.position);
+        let b = HypercubeMember::partition(h, self.vm.indices_of_zero_and_ones.clone()).1;
+        let z_s: Vec<bool> = self
+            .vm
+            .messages_partition_2
+            .iter()
+            .map(|&x| x == F::ONE)
+            .collect();
+        if self.position < self.stop_position && b == HypercubeMember::new_from_vec_bool(self.vm.indices_of_zero_and_ones.len(), z_s) {
             let bit_mask = current_position ^ self.position;
             let bit_index = bit_mask.trailing_zeros() as usize;
             let is_mult = current_position & bit_mask == 0;
             self.value = match is_mult {
                 true => {
-                    self.value * self.vm.message_hat_inverses[bit_index] * self.vm.messages[bit_index]
+                    self.value
+                        * self.vm.message_hat_inverses_partition_1[bit_index]
+                        * self.vm.messages_partition_1[bit_index]
                 }
                 false => {
-                    self.value * self.vm.message_inverses[bit_index] * self.vm.message_hats[bit_index]
+                    self.value
+                        * self.vm.message_inverses_partition_1[bit_index]
+                        * self.vm.message_hats_partition_1[bit_index]
                 }
             };
         }
@@ -154,7 +151,7 @@ mod tests {
             message_hats.clone(),
             HypercubeMember::new(3, 7),
         );
-        let res = LagrangePolynomial::partitioned_lag_poly(
+        let res = LagrangePolynomial::_partitioned_lag_poly(
             messages.clone(),
             message_hats.clone(),
             HypercubeMember::new(3, 7),
@@ -175,8 +172,7 @@ mod tests {
         vm.receive_message(TestField::from(13));
         vm.receive_message(TestField::from(11));
         vm.receive_message(TestField::from(7));
-        let mut lag_poly: LagrangePolynomial<TestField> =
-            LagrangePolynomial::new(vm, messages.clone(), message_hats.clone());
+        let mut lag_poly: LagrangePolynomial<TestField> = LagrangePolynomial::new(vm);
         for gray_code_index in [0, 1, 3, 2, 6, 7, 5, 4] {
             let exp = LagrangePolynomial::lag_poly(
                 messages.clone(),

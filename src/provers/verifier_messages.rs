@@ -9,15 +9,15 @@ pub struct VerifierMessages<F: Field> {
     pub message_inverses: Vec<F>,
     pub message_hat_inverses: Vec<F>,
     // partitions of all (eight additional)
-    indices_of_zero_and_ones: Vec<usize>,
-    messages_partition_1: Vec<F>,
-    messages_partition_2: Vec<F>,
-    message_hats_partition_1: Vec<F>,
-    message_hats_partition_2: Vec<F>,
-    message_inverses_partition_1: Vec<F>,
-    message_inverses_partition_2: Vec<F>,
-    message_hat_inverses_partition_1: Vec<F>,
-    message_hat_inverses_partition_2: Vec<F>,
+    pub indices_of_zero_and_ones: Vec<usize>,
+    pub messages_partition_1: Vec<F>,
+    pub messages_partition_2: Vec<F>,
+    pub message_hats_partition_1: Vec<F>,
+    pub message_hats_partition_2: Vec<F>,
+    pub message_inverses_partition_1: Vec<F>,
+    pub message_inverses_partition_2: Vec<F>,
+    pub message_hat_inverses_partition_1: Vec<F>,
+    pub message_hat_inverses_partition_2: Vec<F>,
 }
 
 impl<F: Field> VerifierMessages<F> {

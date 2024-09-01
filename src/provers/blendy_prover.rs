@@ -18,8 +18,6 @@ pub struct BlendyProver<'a, F: Field, S: EvaluationStream<F>> {
     evaluation_stream: &'a S,
     num_stages: usize,
     num_variables: usize,
-    // verifier_messages: Vec<F>,
-    // verifier_message_hats: Vec<F>,
     vm: VerifierMessages<F>,
     sums: Vec<F>,
     lag_polys: Vec<F>,
@@ -108,11 +106,8 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
         // we reuse self.sums we just have to zero out on the first access SEE BELOW
 
         // 2. Initialize st := LagInit((s - l)l, r)
-        let mut sequential_lag_poly: LagrangePolynomial<F> = LagrangePolynomial::new(
-            self.vm.clone(),
-            self.vm.messages.clone(),
-            self.vm.message_hats.clone(),
-        );
+        let mut sequential_lag_poly: LagrangePolynomial<F> =
+            LagrangePolynomial::new(self.vm.clone());
 
         // 3. For each b1 ∈ {0,1}^(s-1)l
         let len_sums: usize = self.sums.len();
