@@ -18,7 +18,7 @@ pub struct BlendyProver<'a, F: Field, S: EvaluationStream<F>> {
     evaluation_stream: &'a S,
     num_stages: usize,
     num_variables: usize,
-    vm: VerifierMessages<F>,
+    verifier_messages: VerifierMessages<F>,
     sums: Vec<F>,
     lag_polys: Vec<F>,
     lag_polys_update: Vec<F>,
@@ -107,7 +107,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
 
         // 2. Initialize st := LagInit((s - l)l, r)
         let mut sequential_lag_poly: LagrangePolynomial<F> =
-            LagrangePolynomial::new(self.vm.clone());
+            LagrangePolynomial::new(self.verifier_messages.clone());
 
         // 3. For each b1 ∈ {0,1}^(s-1)l
         let len_sums: usize = self.sums.len();
@@ -149,8 +149,8 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
                 _ => {
                     let precomputed: F = *self.lag_polys.get(b2_start_index >> 1).unwrap();
                     match b2_start_index & 2 == 2 {
-                        true => precomputed * *self.vm.messages.last().unwrap(),
-                        false => precomputed * *self.vm.message_hats.last().unwrap(),
+                        true => precomputed * *self.verifier_messages.messages.last().unwrap(),
+                        false => precomputed * *self.verifier_messages.message_hats.last().unwrap(),
                     }
                 }
             };
@@ -203,9 +203,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProver<'a,
             evaluation_stream: prover_args.stream,
             num_stages,
             num_variables,
-            // verifier_messages: Vec::<F>::with_capacity(num_variables),
-            // verifier_message_hats: Vec::<F>::with_capacity(num_variables),
-            vm: VerifierMessages::new(&vec![]),
+            verifier_messages: VerifierMessages::new(&vec![]),
             sums: vec![F::ZERO; Hypercube::stop_value(stage_size)],
             lag_polys: vec![F::ONE; Hypercube::stop_value(stage_size)],
             lag_polys_update: vec![F::ONE; Hypercube::stop_value(stage_size)],
@@ -220,11 +218,8 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProver<'a,
         }
 
         if !self.is_initial_round() {
-            self.vm.receive_message(verifier_message.unwrap());
-            // Store the verifier message and its hat
-            // self.verifier_messages.push(verifier_message.unwrap());
-            // self.verifier_message_hats
-            //     .push(F::ONE - verifier_message.unwrap());
+            self.verifier_messages
+                .receive_message(verifier_message.unwrap());
         }
 
         // at start of stage do some stuff
@@ -257,8 +252,8 @@ mod tests {
     use crate::provers::{
         prover::{Prover, ProverArgs, ProverArgsStageInfo},
         test_helpers::{
-            run_boolean_sumcheck_test,
-            run_basic_sumcheck_test, test_polynomial, BasicEvaluationStream, TestField,
+            run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
+            BasicEvaluationStream, TestField,
         },
         BlendyProver,
     };
@@ -267,9 +262,9 @@ mod tests {
     fn sumcheck() {
         let evaluation_stream: BasicEvaluationStream<TestField> =
             BasicEvaluationStream::new(test_polynomial());
-        // run_boolean_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
-        //     &evaluation_stream,
-        // )));
+        run_boolean_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
+            &evaluation_stream,
+        )));
         // k=2
         run_basic_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
             &evaluation_stream,
