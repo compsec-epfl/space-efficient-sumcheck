@@ -111,13 +111,6 @@ impl Hypercube {
         };
         value ^ mask
     }
-    pub fn last_gray_code(value: usize) -> usize {
-        let mask = match value.count_ones() & 1 == 0 {
-            true => 1,
-            false => 1 << (value.trailing_zeros() + 1),
-        };
-        value ^ mask
-    }
 }
 
 impl Iterator for Hypercube {

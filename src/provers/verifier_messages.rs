@@ -16,8 +16,8 @@ pub struct VerifierMessages<F: Field> {
 }
 
 impl<F: Field> VerifierMessages<F> {
-    pub fn new() -> Self {
-        Self {
+    pub fn new(messages: &Vec<F>) -> Self {
+        let mut verifier_messages = Self {
             // messages and hats
             messages: vec![],
             message_hats: vec![],
@@ -29,7 +29,11 @@ impl<F: Field> VerifierMessages<F> {
             message_hats_partition_1: vec![],
             message_inverses_partition_1: vec![],
             message_hat_inverses_partition_1: vec![],
+        };
+        for message in messages {
+            verifier_messages.receive_message(*message);
         }
+        verifier_messages
     }
     pub fn receive_message(&mut self, message: F) {
         // calculate
@@ -59,7 +63,7 @@ mod tests {
 
     #[test]
     fn receive_message_test_1() {
-        let mut m = VerifierMessages::new();
+        let mut m = VerifierMessages::new(&vec![]);
 
         // ## receive 13
         m.receive_message(TestField::from(13));
@@ -209,7 +213,7 @@ mod tests {
 
     #[test]
     fn receive_message_test_2() {
-        let mut m = VerifierMessages::new();
+        let mut m = VerifierMessages::new(&vec![]);
 
         // ## receive zero
         m.receive_message(TestField::from(0));
