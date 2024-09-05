@@ -1,8 +1,8 @@
 #[doc(hidden)]
 pub mod test_helpers; // expose to use in benches etc
 
-pub mod lagrange_polynomial;
 pub mod hypercube;
+pub mod lagrange_polynomial;
 pub mod prover;
 pub mod verifier_messages;
 
