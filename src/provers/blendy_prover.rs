@@ -10,18 +10,19 @@ use crate::provers::{
     prover::{Prover, ProverArgs, ProverArgsStageInfo},
 };
 
+use super::verifier_messages::VerifierMessages;
+
 pub struct BlendyProver<'a, F: Field, S: EvaluationStream<F>> {
-    pub claimed_sum: F,
-    pub current_round: usize,
-    pub evaluation_stream: &'a S,
-    pub num_stages: usize,
-    pub num_variables: usize,
-    pub verifier_messages: Vec<F>,
-    pub verifier_message_hats: Vec<F>,
-    pub sums: Vec<F>,
-    pub lag_polys: Vec<F>,
-    pub lag_polys_update: Vec<F>,
-    pub stage_size: usize,
+    claimed_sum: F,
+    current_round: usize,
+    evaluation_stream: &'a S,
+    num_stages: usize,
+    num_variables: usize,
+    verifier_messages: VerifierMessages<F>,
+    sums: Vec<F>,
+    lag_polys: Vec<F>,
+    lag_polys_update: Vec<F>,
+    stage_size: usize,
 }
 
 impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
@@ -41,7 +42,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
         let j_prime = self.current_round - stage_start_index;
 
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
-        for b2_start_index in 0..Hypercube::stop_member_from_size(j_prime + 1) {
+        for (b2_start_index, _) in Hypercube::new(j_prime + 1) {
             // Calculate b2_start_index_0 and b2_start_index_1 for indexing partial_sums
             let shift_amount = if self.num_variables - stage_start_index < self.stage_size {
                 // this is the oddly sized last stage when k doesn't divide num_vars
@@ -105,20 +106,18 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
         // we reuse self.sums we just have to zero out on the first access SEE BELOW
 
         // 2. Initialize st := LagInit((s - l)l, r)
-        let mut sequential_lag_poly: LagrangePolynomial<F> = LagrangePolynomial::new(
-            self.verifier_messages.clone(),
-            self.verifier_message_hats.clone(),
-        );
+        let mut sequential_lag_poly: LagrangePolynomial<F> =
+            LagrangePolynomial::new(self.verifier_messages.clone());
 
         // 3. For each b1 ∈ {0,1}^(s-1)l
         let len_sums: usize = self.sums.len();
-        for b1_index in 0..Hypercube::stop_member_from_size(b1_num_vars) {
+        for (b1_index, _) in Hypercube::new(b1_num_vars) {
             // (a) Compute (LagPoly, st) := LagNext(st)
             let lag_poly = sequential_lag_poly.next().unwrap();
 
             // (b) For each b2 ∈ {0,1}^l, for each b2 ∈ {0,1}^(k-s)l
-            for b2_index in 0..Hypercube::stop_member_from_size(b2_num_vars) {
-                for b3_index in 0..Hypercube::stop_member_from_size(b3_num_vars) {
+            for (b2_index, _) in Hypercube::new(b2_num_vars) {
+                for (b3_index, _) in Hypercube::new(b3_num_vars) {
                     // Calculate the index for the current combination of b1, b2, and b3
                     let index = b1_index << (b2_num_vars + b3_num_vars)
                         | b2_index << b3_num_vars
@@ -143,15 +142,15 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProver<'a, F, S> {
         let j_prime = self.current_round - (self.current_stage() * self.stage_size);
 
         // Iterate through b2_start indices using Hypercube::new(j_prime + 1)
-        for b2_start_index in 0..Hypercube::stop_member_from_size(j_prime + 1) {
+        for (b2_start_index, _) in Hypercube::new(j_prime + 1) {
             // calculate lag_poly from precomputed
             let lag_poly = match j_prime {
                 0 => F::ONE,
                 _ => {
                     let precomputed: F = *self.lag_polys.get(b2_start_index >> 1).unwrap();
                     match b2_start_index & 2 == 2 {
-                        true => precomputed * *self.verifier_messages.last().unwrap(),
-                        false => precomputed * *self.verifier_message_hats.last().unwrap(),
+                        true => precomputed * *self.verifier_messages.messages.last().unwrap(),
+                        false => precomputed * *self.verifier_messages.message_hats.last().unwrap(),
                     }
                 }
             };
@@ -204,11 +203,10 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProver<'a,
             evaluation_stream: prover_args.stream,
             num_stages,
             num_variables,
-            verifier_messages: Vec::<F>::with_capacity(num_variables),
-            verifier_message_hats: Vec::<F>::with_capacity(num_variables),
-            sums: vec![F::ZERO; Hypercube::stop_member_from_size(stage_size)],
-            lag_polys: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
-            lag_polys_update: vec![F::ONE; Hypercube::stop_member_from_size(stage_size)],
+            verifier_messages: VerifierMessages::new(&vec![]),
+            sums: vec![F::ZERO; Hypercube::stop_value(stage_size)],
+            lag_polys: vec![F::ONE; Hypercube::stop_value(stage_size)],
+            lag_polys_update: vec![F::ONE; Hypercube::stop_value(stage_size)],
             stage_size,
         }
     }
@@ -220,10 +218,8 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProver<'a,
         }
 
         if !self.is_initial_round() {
-            // Store the verifier message and its hat
-            self.verifier_messages.push(verifier_message.unwrap());
-            self.verifier_message_hats
-                .push(F::ONE - verifier_message.unwrap());
+            self.verifier_messages
+                .receive_message(verifier_message.unwrap());
         }
 
         // at start of stage do some stuff

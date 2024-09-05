@@ -4,6 +4,7 @@ pub mod test_helpers; // expose to use in benches etc
 mod hypercube;
 mod lagrange_polynomial;
 mod prover;
+mod verifier_messages;
 
 pub mod blendy_prover;
 pub mod evaluation_stream;

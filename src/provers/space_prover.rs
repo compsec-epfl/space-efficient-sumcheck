@@ -9,12 +9,12 @@ use crate::provers::{
 };
 
 pub struct SpaceProver<'a, F: Field, S: EvaluationStream<F>> {
-    pub claimed_sum: F,
-    pub current_round: usize,
-    pub evaluation_stream: &'a S,
-    pub num_variables: usize,
-    pub verifier_messages: Vec<F>,
-    pub verifier_message_hats: Vec<F>,
+    claimed_sum: F,
+    current_round: usize,
+    evaluation_stream: &'a S,
+    num_variables: usize,
+    verifier_messages: Vec<F>,
+    verifier_message_hats: Vec<F>,
 }
 
 impl<'a, F: Field, S: EvaluationStream<F>> SpaceProver<'a, F, S> {
@@ -31,16 +31,21 @@ impl<'a, F: Field, S: EvaluationStream<F>> SpaceProver<'a, F, S> {
         let num_vars_inner_loop = self.num_variables - num_vars_outer_loop;
 
         // Outer loop over a subset of variables
-        for (index_outer, outer) in Hypercube::new(num_vars_outer_loop).enumerate() {
+        for (index_outer, outer) in Hypercube::new(num_vars_outer_loop) {
             // Calculate the weight using Lagrange polynomial
-            let weight: F = LagrangePolynomial::lag_poly(
+            let lag_poly: F = LagrangePolynomial::lag_poly(
                 self.verifier_messages.clone(),
                 self.verifier_message_hats.clone(),
                 outer,
             );
 
+            if lag_poly == F::ZERO {
+                // in this case the inner loop does nothing
+                continue;
+            }
+
             // Inner loop over all possible evaluations for the remaining variables
-            for index_inner in 0..2_usize.pow(num_vars_inner_loop as u32) {
+            for (index_inner, _inner) in Hypercube::new(num_vars_inner_loop) {
                 // Calculate the evaluation index
                 let evaluation_index = index_outer << num_vars_inner_loop | index_inner;
 
@@ -48,13 +53,10 @@ impl<'a, F: Field, S: EvaluationStream<F>> SpaceProver<'a, F, S> {
                 let is_set: bool = (evaluation_index & bitmask) != 0;
 
                 // Use match to accumulate the appropriate value based on whether the bit is set or not
+                let inner_sum = self.evaluation_stream.get_evaluation(evaluation_index) * lag_poly;
                 match is_set {
-                    false => {
-                        sum_0 += self.evaluation_stream.get_evaluation(evaluation_index) * weight
-                    }
-                    true => {
-                        sum_1 += self.evaluation_stream.get_evaluation(evaluation_index) * weight
-                    }
+                    false => sum_0 += inner_sum,
+                    true => sum_1 += inner_sum,
                 }
             }
         }
