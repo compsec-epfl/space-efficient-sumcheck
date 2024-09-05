@@ -3,3 +3,4 @@
 /sumcheck-benches/Cargo.lock
 **/sumcheck-benches/target/
 .vscode
+.DS_Store

@@ -193,19 +193,23 @@ impl<F: Field> TestHelperPolynomial<F> for multivariate::SparsePolynomial<F, Spa
         DenseMVPolynomial::num_vars(self)
     }
     fn to_evaluations(&self) -> Vec<F> {
-        Hypercube::new(DenseMVPolynomial::<F>::num_vars(self))
-            .map(|point: HypercubeMember| {
+        let num_vars = DenseMVPolynomial::<F>::num_vars(self);
+        let mut evaluations = vec![];
+        for index in 0..Hypercube::stop_value(num_vars) {
+            evaluations.push(
                 TestHelperPolynomial::<F>::evaluate(
                     self,
-                    DenseMVPolynomial::<F>::num_vars(self),
-                    point,
+                    num_vars,
+                    HypercubeMember::new(num_vars, index),
                 )
-                .unwrap()
-            })
-            .collect()
+                .unwrap(),
+            );
+        }
+        evaluations
     }
 }
 
+#[derive(Debug)]
 pub struct BasicEvaluationStream<F: Field> {
     pub evaluations: Vec<F>,
     pub num_variables: usize,
@@ -254,6 +258,7 @@ impl<F: Field> EvaluationStream<F> for BasicEvaluationStream<F> {
 }
 
 // BenchEvaluationStream just returns the field value of the index and uses constant memory
+#[derive(Debug)]
 pub struct BenchEvaluationStream<F: Field> {
     pub num_variables: usize,
     pub claimed_sum: F,
