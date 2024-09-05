@@ -2,5 +2,7 @@
 /Cargo.lock
 /sumcheck-benches/Cargo.lock
 **/sumcheck-benches/target/
+/lag-poly-benches/Cargo.lock
+**/lag-poly-benches/target/
 .vscode
 .DS_Store
