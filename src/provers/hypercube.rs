@@ -21,27 +21,6 @@ impl HypercubeMember {
     pub fn len(&self) -> usize {
         self.num_vars
     }
-    // pub fn partition(
-    //     h: HypercubeMember,
-    //     indices: Vec<usize>,
-    // ) -> (HypercubeMember, HypercubeMember) {
-    //     assert!(h.len() >= indices.len());
-    //     let mut partition_1: Vec<bool> = Vec::with_capacity(h.len() - indices.len());
-    //     let mut partition_2: Vec<bool> = Vec::with_capacity(indices.len());
-    //     let mut partitioned = 0;
-    //     for (index, bit) in h.clone().into_iter().enumerate() {
-    //         if partitioned < indices.len() && index == indices[partitioned] {
-    //             partition_2.push(bit);
-    //             partitioned += 1;
-    //         } else {
-    //             partition_1.push(bit);
-    //         }
-    //     }
-    //     (
-    //         HypercubeMember::new_from_vec_bool(partition_1),
-    //         HypercubeMember::new_from_vec_bool(partition_2),
-    //     )
-    // }
     pub fn usize_from_vec_bool(vec: Vec<bool>) -> usize {
         vec.into_iter()
             .rev()
@@ -211,21 +190,6 @@ mod tests {
         assert_eq!(hypercube_size_3.next().unwrap().0, 4);
         assert_eq!(hypercube_size_3.next(), None);
     }
-    // #[test]
-    // fn partition() {
-    //     let test_1 = HypercubeMember::new_from_vec_bool(vec![true, false, false, false, false]);
-    //     let indices_1 = vec![2, 3];
-    //     let result_1 = HypercubeMember::partition(test_1, indices_1);
-    //     is_eq(result_1.0, vec![true, false, false]);
-    //     is_eq(result_1.1, vec![false, false]);
-    //     let test_2 = HypercubeMember::new_from_vec_bool(vec![
-    //         false, true, true, false, false, false, false, true,
-    //     ]);
-    //     let indices_2 = vec![0, 1, 2, 4, 6];
-    //     let result_2 = HypercubeMember::partition(test_2, indices_2);
-    //     is_eq(result_2.0, vec![false, false, true]);
-    //     is_eq(result_2.1, vec![false, true, true, false, false, false]);
-    // }
     #[test]
     fn elements_at_indices() {
         let test_1 = vec![true, false, false, false, false];
