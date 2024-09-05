@@ -43,12 +43,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> Sumcheck<F, S> {
                 break;
             }
 
-            // Resample if randomness happens to be 1 or 0
-            let mut random_message: F = F::rand(rng);
-            while random_message == F::ONE || random_message == F::ZERO {
-                random_message = F::rand(rng);
-            }
-            verifier_message = Some(random_message);
+            verifier_message = Some(F::rand(rng));
         }
 
         // Return a Sumcheck struct with the collected messages and acceptance status
