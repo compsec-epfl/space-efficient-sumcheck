@@ -48,6 +48,9 @@ impl HypercubeMember {
         }
         b
     }
+    pub fn value(&self) -> usize {
+        self.value
+    }
 }
 
 impl Iterator for HypercubeMember {

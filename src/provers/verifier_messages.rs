@@ -3,12 +3,14 @@ use ark_ff::Field;
 #[derive(Clone, Debug)]
 pub struct VerifierMessages<F: Field> {
     pub messages: Vec<F>,
-    pub message_hats: Vec<F>, // TODO (z-tech): can probably do this differently in blendy
+    pub message_hats: Vec<F>,
     pub product_of_message_hats: F,
     pub product_of_message_and_message_hat_inverses: Vec<F>,
     pub product_of_message_hat_and_message_inverses: Vec<F>,
     pub indices_of_zero_and_ones: Vec<usize>,
     pub messages_zeros_and_ones: Vec<bool>,
+    pub messages_zeros_and_ones_usize: usize,
+    pub mask: usize,
 }
 
 impl<F: Field> VerifierMessages<F> {
@@ -21,6 +23,8 @@ impl<F: Field> VerifierMessages<F> {
             product_of_message_hat_and_message_inverses: vec![],
             indices_of_zero_and_ones: vec![],
             messages_zeros_and_ones: vec![],
+            messages_zeros_and_ones_usize: 0, // the highest bit serves as a marker, not a value
+            mask: 0,
         };
         for message in messages {
             verifier_messages.receive_message(*message);
@@ -46,10 +50,18 @@ impl<F: Field> VerifierMessages<F> {
         self.product_of_message_hat_and_message_inverses
             .push(message_hat * message_inverse);
         if message == F::ZERO || message_hat == F::ZERO {
+            self.mask = (self.mask << 1) | 1;
+            self.messages_zeros_and_ones_usize = if message == F::ONE {
+                self.messages_zeros_and_ones_usize << 1 | 1
+            } else {
+                self.messages_zeros_and_ones_usize << 1
+            };
             self.indices_of_zero_and_ones.push(self.messages.len() - 1);
             self.messages_zeros_and_ones
                 .push(if message == F::ONE { true } else { false });
         } else {
+            self.mask = self.mask << 1;
+            self.messages_zeros_and_ones_usize = self.messages_zeros_and_ones_usize << 1;
             self.product_of_message_hats = self.product_of_message_hats * message_hat;
         }
     }
