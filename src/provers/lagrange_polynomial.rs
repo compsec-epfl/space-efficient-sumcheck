@@ -49,13 +49,9 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
         }
 
         // Step 2: check if this iteration yields zero, in which case we skip processing
-        let s: Vec<bool> = self.verifier_messages.messages_zeros_and_ones.clone();
-        let b: Vec<bool> = HypercubeMember::elements_at_indices(
-            HypercubeMember::new(self.verifier_messages.messages.len(), self.position)
-                .to_vec_bool(),
-            self.verifier_messages.indices_of_zero_and_ones.clone(),
-        );
-        if s != b {
+        let all_agreement = !(self.verifier_messages.messages_zeros_and_ones_usize ^ self.position);
+        let zero_one_agreement = all_agreement & self.verifier_messages.mask;
+        if zero_one_agreement != self.verifier_messages.mask {
             // NOTICE! we do not update last_position in this case
             self.position = Hypercube::next_gray_code(self.position);
             return Some(F::ZERO);
