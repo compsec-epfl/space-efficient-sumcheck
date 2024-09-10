@@ -4,7 +4,9 @@ use ark_ff::{
 };
 use std::env;
 
-use space_efficient_sumcheck::provers::{lagrange_polynomial::LagrangePolynomial, verifier_messages::VerifierMessages};
+use space_efficient_sumcheck::provers::{
+    lagrange_polynomial::LagrangePolynomial, verifier_messages::VerifierMessages,
+};
 
 #[derive(MontConfig)]
 #[modulus = "143244528689204659050391023439224324689"] // q = 143244528689204659050391023439224324689
@@ -15,7 +17,7 @@ pub type Field128 = Fp128<MontBackend<FieldConfig128, 2>>;
 fn random_field_elements<F: Field>(n: usize) -> Vec<F> {
     // Create a random number generator
     let mut rng = ark_std::test_rng();
-    
+
     // Generate n random field elements
     (0..n).map(|_| F::rand(&mut rng)).collect()
 }
@@ -23,8 +25,8 @@ fn random_field_elements<F: Field>(n: usize) -> Vec<F> {
 fn main() {
     let argsv: Vec<String> = env::args().collect();
     let num_vars = argsv[1].parse::<usize>().unwrap();
-    let mut lag_poly = LagrangePolynomial::new(VerifierMessages::new(&random_field_elements::<Field128>(num_vars)));
-    while let Some(_element) = lag_poly.next() {
-        
-    }
+    let mut lag_poly = LagrangePolynomial::new(VerifierMessages::new(&random_field_elements::<
+        Field128,
+    >(num_vars)));
+    while let Some(_element) = lag_poly.next() {}
 }
