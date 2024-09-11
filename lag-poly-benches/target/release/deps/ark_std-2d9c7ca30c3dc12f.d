@@ -1,0 +1,11 @@
+/Users/zitek/Documents/GitHub/space-efficient-sumcheck/lag-poly-benches/target/release/deps/libark_std-2d9c7ca30c3dc12f.rmeta: /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/lib.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/rand_helper.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/perf_trace.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/iterable/mod.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/iterable/rev.rs
+
+/Users/zitek/Documents/GitHub/space-efficient-sumcheck/lag-poly-benches/target/release/deps/libark_std-2d9c7ca30c3dc12f.rlib: /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/lib.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/rand_helper.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/perf_trace.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/iterable/mod.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/iterable/rev.rs
+
+/Users/zitek/Documents/GitHub/space-efficient-sumcheck/lag-poly-benches/target/release/deps/ark_std-2d9c7ca30c3dc12f.d: /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/lib.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/rand_helper.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/perf_trace.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/iterable/mod.rs /Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/iterable/rev.rs
+
+/Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/lib.rs:
+/Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/rand_helper.rs:
+/Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/perf_trace.rs:
+/Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/iterable/mod.rs:
+/Users/zitek/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ark-std-0.4.0/src/iterable/rev.rs:

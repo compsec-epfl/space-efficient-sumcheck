@@ -15,6 +15,102 @@ use crate::field_32::{Field32, FIELD_32_MODULUS};
 //     }
 // }
 
+impl<'a> DivAssign<&'a mut Field32> for Field32 {
+    fn div_assign(&mut self, other: &'a mut Field32) {
+        // if other.value == 0 {
+        //     panic!("Division by zero");
+        // }
+
+        // // Perform division in the field
+        // let modulus = self.modulus;
+        // let inverse = mod_inverse(other.value, modulus).expect("No modular inverse exists");
+
+        // self.value = (self.value.wrapping_mul(inverse)) % modulus;
+    }
+}
+
+impl<'a> MulAssign<&'a mut Field32> for Field32 {
+    fn mul_assign(&mut self, other: &'a mut Field32) {
+        // Ensure modulus consistency
+        if self.modulus != other.modulus {
+            panic!("Cannot multiply field elements with different moduli");
+        }
+
+        let modulus = self.modulus;
+        self.value = (self.value.wrapping_mul(other.value)) % modulus;
+    }
+}
+
+impl<'a> SubAssign<&'a mut Field32> for Field32 {
+    fn sub_assign(&mut self, other: &'a mut Field32) {
+        // Ensure modulus consistency
+        if self.modulus != other.modulus {
+            panic!("Cannot subtract field elements with different moduli");
+        }
+
+        let modulus = self.modulus;
+        self.value = (self.value.wrapping_sub(other.value)) % modulus;
+        
+        // Handle negative results by adding modulus
+        if self.value > modulus {
+            self.value += modulus;
+        }
+    }
+}
+
+impl<'a> AddAssign<&'a mut Field32> for Field32 {
+    fn add_assign(&mut self, other: &'a mut Field32) {
+        // Ensure modulus consistency
+        if self.modulus != other.modulus {
+            panic!("Cannot add field elements with different moduli");
+        }
+
+        let modulus = self.modulus;
+        self.value = (self.value.wrapping_add(other.value)) % modulus;
+    }
+}
+
+impl<'a> MulAssign<&'a Field32> for Field32 {
+    fn mul_assign(&mut self, other: &'a Field32) {
+        // Ensure modulus consistency
+        if self.modulus != other.modulus {
+            panic!("Cannot multiply field elements with different moduli");
+        }
+
+        let modulus = self.modulus;
+        self.value = (self.value.wrapping_mul(other.value)) % modulus;
+    }
+}
+
+impl<'a> SubAssign<&'a Field32> for Field32 {
+    fn sub_assign(&mut self, other: &'a Field32) {
+        // Ensure modulus consistency
+        if self.modulus != other.modulus {
+            panic!("Cannot subtract field elements with different moduli");
+        }
+
+        let modulus = self.modulus;
+        self.value = (self.value.wrapping_sub(other.value)) % modulus;
+        
+        // Handle negative results by adding modulus
+        if self.value > modulus {
+            self.value += modulus;
+        }
+    }
+}
+
+impl<'a> AddAssign<&'a Field32> for Field32 {
+    fn add_assign(&mut self, other: &'a Field32) {
+        // Ensure modulus consistency
+        if self.modulus != other.modulus {
+            panic!("Cannot add field elements with different moduli");
+        }
+
+        let modulus = self.modulus;
+        self.value = (self.value.wrapping_add(other.value)) % modulus;
+    }
+}
+
 // Basic
 impl Add for Field32 {
     type Output = Self;

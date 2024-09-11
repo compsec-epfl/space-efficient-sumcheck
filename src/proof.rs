@@ -66,10 +66,10 @@ mod tests {
     use std::marker::PhantomData;
 
     use super::Sumcheck;
-    use crate::provers::{
+    use crate::{field_32::Field32, provers::{
         test_helpers::{BenchEvaluationStream, TestField},
         BlendyProver, Prover, ProverArgs, ProverArgsStageInfo, TimeProver,
-    };
+    }};
 
     #[test]
     fn algorithm_consistency() {
