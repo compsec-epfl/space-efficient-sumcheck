@@ -4,13 +4,11 @@ use ark_ff::Field;
 pub struct VerifierMessages<F: Field> {
     pub messages: Vec<F>,
     pub message_hats: Vec<F>,
-    pub product_of_message_hats: F,
-    pub product_of_message_and_message_hat_inverses: Vec<F>,
-    pub product_of_message_hat_and_message_inverses: Vec<F>,
-    pub indices_of_zero_and_ones: Vec<usize>,
-    pub messages_zeros_and_ones: Vec<bool>,
+    pub message_and_message_hat_inverses: Vec<F>,
+    pub message_hat_and_message_inverses: Vec<F>,
     pub messages_zeros_and_ones_usize: usize,
-    pub mask: usize,
+    pub zero_ones_mask: usize,
+    pub product_of_message_hats: F,
 }
 
 impl<F: Field> VerifierMessages<F> {
@@ -19,12 +17,10 @@ impl<F: Field> VerifierMessages<F> {
             messages: vec![],
             message_hats: vec![],
             product_of_message_hats: F::ONE,
-            product_of_message_and_message_hat_inverses: vec![],
-            product_of_message_hat_and_message_inverses: vec![],
-            indices_of_zero_and_ones: vec![],
-            messages_zeros_and_ones: vec![],
-            messages_zeros_and_ones_usize: 0, // the highest bit serves as a marker, not a value
-            mask: 0,
+            message_and_message_hat_inverses: vec![],
+            message_hat_and_message_inverses: vec![],
+            messages_zeros_and_ones_usize: 0,
+            zero_ones_mask: 0,
         };
         for message in messages {
             verifier_messages.receive_message(*message);
@@ -32,35 +28,32 @@ impl<F: Field> VerifierMessages<F> {
         verifier_messages
     }
     pub fn receive_message(&mut self, message: F) {
+        // Step 1: compute some things
         let message_hat = F::ONE - message;
-        let message_inverse = if message == F::ZERO {
-            F::ONE
-        } else {
-            message.inverse().unwrap()
+        let message_inverse = match message.inverse() {
+            Some(inverse) => inverse,
+            None => F::ONE,
         };
-        let message_hat_inverse = if message_hat == F::ZERO {
-            F::ONE
-        } else {
-            message_hat.inverse().unwrap()
+        let message_hat_inverse = match message_hat.inverse() {
+            Some(inverse) => inverse,
+            None => F::ONE,
         };
+        // Step 2: store some things
         self.messages.push(message);
         self.message_hats.push(message_hat);
-        self.product_of_message_and_message_hat_inverses
+        self.message_and_message_hat_inverses
             .push(message * message_hat_inverse);
-        self.product_of_message_hat_and_message_inverses
+        self.message_hat_and_message_inverses
             .push(message_hat * message_inverse);
         if message == F::ZERO || message_hat == F::ZERO {
-            self.mask = (self.mask << 1) | 1;
+            self.zero_ones_mask = (self.zero_ones_mask << 1) | 1;
             self.messages_zeros_and_ones_usize = if message == F::ONE {
                 self.messages_zeros_and_ones_usize << 1 | 1
             } else {
                 self.messages_zeros_and_ones_usize << 1
             };
-            self.indices_of_zero_and_ones.push(self.messages.len() - 1);
-            self.messages_zeros_and_ones
-                .push(if message == F::ONE { true } else { false });
         } else {
-            self.mask = self.mask << 1;
+            self.zero_ones_mask = self.zero_ones_mask << 1;
             self.messages_zeros_and_ones_usize = self.messages_zeros_and_ones_usize << 1;
             self.product_of_message_hats = self.product_of_message_hats * message_hat;
         }
@@ -83,8 +76,6 @@ mod tests {
             m0.message_hats,
             vec![TestField::one() - TestField::from(13)]
         );
-        assert_eq!(m0.indices_of_zero_and_ones, vec![]);
-        assert_eq!(m0.messages_zeros_and_ones, vec![]);
 
         // ## receive 0
         m0.receive_message(TestField::zero());
@@ -93,8 +84,6 @@ mod tests {
             m0.message_hats,
             vec![TestField::one() - TestField::from(13), TestField::one()]
         );
-        assert_eq!(m0.indices_of_zero_and_ones, vec![1]);
-        assert_eq!(m0.messages_zeros_and_ones, vec![false]);
 
         // ## receive 7
         m0.receive_message(TestField::from(7));
@@ -110,8 +99,6 @@ mod tests {
                 TestField::one() - TestField::from(7)
             ]
         );
-        assert_eq!(m0.indices_of_zero_and_ones, vec![1]);
-        assert_eq!(m0.messages_zeros_and_ones, vec![false]);
 
         // ## receive 1
         m0.receive_message(TestField::one());
@@ -133,8 +120,6 @@ mod tests {
                 TestField::zero()
             ]
         );
-        assert_eq!(m0.indices_of_zero_and_ones, vec![1, 3]);
-        assert_eq!(m0.messages_zeros_and_ones, vec![false, true]);
 
         let mut m1 = VerifierMessages::new(&vec![]);
 
@@ -142,14 +127,10 @@ mod tests {
         m1.receive_message(TestField::from(0));
         assert_eq!(m1.messages, vec![TestField::from(0)]);
         assert_eq!(m1.message_hats, vec![TestField::one()]);
-        assert_eq!(m1.indices_of_zero_and_ones, vec![0]);
-        assert_eq!(m1.messages_zeros_and_ones, vec![false]);
 
         // receive 1
         m1.receive_message(TestField::from(1));
         assert_eq!(m1.messages, vec![TestField::from(0), TestField::one()]);
         assert_eq!(m1.message_hats, vec![TestField::one(), TestField::zero()]);
-        assert_eq!(m1.indices_of_zero_and_ones, vec![0, 1]);
-        assert_eq!(m1.messages_zeros_and_ones, vec![false, true]);
     }
 }
