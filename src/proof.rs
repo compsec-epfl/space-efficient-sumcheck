@@ -67,37 +67,37 @@ mod tests {
 
     use super::Sumcheck;
     use crate::{
-        fields::m31::Field32,
+        fields::m31::M31,
         provers::{
-            test_helpers::{BenchEvaluationStream, TestField},
-            BlendyProver, Prover, ProverArgs, ProverArgsStageInfo, TimeProver,
+            test_helpers::BenchEvaluationStream, BlendyProver, Prover, ProverArgs,
+            ProverArgsStageInfo, TimeProver,
         },
     };
 
     #[test]
     fn algorithm_consistency() {
         // take an evaluation stream
-        let evaluation_stream: BenchEvaluationStream<Field32> = BenchEvaluationStream::new(20);
+        let evaluation_stream: BenchEvaluationStream<M31> = BenchEvaluationStream::new(20);
         // initialize the provers
         let mut blendy_k3_prover =
-            BlendyProver::<Field32, BenchEvaluationStream<Field32>>::new(ProverArgs {
+            BlendyProver::<M31, BenchEvaluationStream<M31>>::new(ProverArgs {
                 stream: &evaluation_stream,
                 stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
                 _phantom: PhantomData,
             });
         let mut time_prover =
-            TimeProver::<Field32, BenchEvaluationStream<Field32>>::new(TimeProver::<
-                Field32,
-                BenchEvaluationStream<Field32>,
+            TimeProver::<M31, BenchEvaluationStream<M31>>::new(TimeProver::<
+                M31,
+                BenchEvaluationStream<M31>,
             >::generate_default_args(
                 &evaluation_stream
             ));
         // run them and get the transcript
-        let blendy_prover_transcript = Sumcheck::<Field32, BenchEvaluationStream<Field32>>::prove(
+        let blendy_prover_transcript = Sumcheck::<M31, BenchEvaluationStream<M31>>::prove(
             &mut blendy_k3_prover,
             &mut ark_std::test_rng(),
         );
-        let time_prover_transcript = Sumcheck::<Field32, BenchEvaluationStream<Field32>>::prove(
+        let time_prover_transcript = Sumcheck::<M31, BenchEvaluationStream<M31>>::prove(
             &mut time_prover,
             &mut ark_std::test_rng(),
         );

@@ -10,7 +10,6 @@ use zeroize::Zeroize;
 
 use std::simd::u64x4;
 use std::{
-    self,
     fmt::{self, Display, Formatter},
     io::{Read, Write},
     num::ParseIntError,
@@ -20,7 +19,8 @@ use std::{
 pub mod froms;
 pub mod ops;
 
-pub const FIELD_32_MODULUS: u32 = (1 << 31) - 1;
+/// Mersenne prime 31
+pub const M31_MODULUS: u32 = (1 << 31) - 1;
 
 #[derive(
     Copy,
@@ -34,35 +34,26 @@ pub const FIELD_32_MODULUS: u32 = (1 << 31) - 1;
     CanonicalDeserialize,
     CanonicalSerialize,
 )]
-pub struct Field32 {
-    pub value: u32,
+pub struct M31 {
+    value: u32,
 }
 
-impl Field32 {
-    pub fn new(value: u32) -> Self {
-        Field32 {
-            value: value % FIELD_32_MODULUS,
-        }
-    }
-    pub fn accumulate_sums(vec: Vec<Self>) -> Self {
+impl M31 {
+    pub fn reduce_sum(vec: Vec<Self>) -> Self {
         let mut sums = u64x4::from_array([
             vec[0].value as u64,
             vec[1].value as u64,
             vec[2].value as u64,
             vec[3].value as u64,
         ]);
-        let modulus = u64x4::from_array([
-            FIELD_32_MODULUS as u64,
-            FIELD_32_MODULUS as u64,
-            FIELD_32_MODULUS as u64,
-            FIELD_32_MODULUS as u64,
-        ]);
+        let modulus = u64x4::from_array([M31_MODULUS as u64; 4]);
+
         for (i, chunk) in vec.chunks(4).enumerate() {
             if i == 0 {
                 continue;
             }
 
-            let mut next_4: [u64; 4] = match chunk.len() {
+            let next_4: [u64; 4] = match chunk.len() {
                 1 => [chunk[0].value as u64, 0, 0, 0],
                 2 => [chunk[0].value as u64, chunk[1].value as u64, 0, 0],
                 3 => [
@@ -77,129 +68,106 @@ impl Field32 {
                     chunk[2].value as u64,
                     chunk[3].value as u64,
                 ],
-                _ => todo!(), // this results in error
+                _ => todo!(),
             };
 
             sums = sums + u64x4::from_array(next_4);
             sums = sums % modulus;
         }
 
-        let mut sum: usize = (sums[0] + sums[1] + sums[2] + sums[3]).try_into().unwrap();
-        sum = sum % FIELD_32_MODULUS as usize;
+        let sum: usize = (sums[0] + sums[1] + sums[2] + sums[3]).try_into().unwrap();
+        let sum = sum % M31_MODULUS as usize;
 
         Self { value: sum as u32 }
     }
 }
 
-impl Zero for Field32 {
+impl Zero for M31 {
     fn zero() -> Self {
-        Field32::new(0)
+        M31::from(0_u32)
     }
-
     fn is_zero(&self) -> bool {
-        self.value == 0
+        self.value == 0_u32
     }
 }
 
-impl One for Field32 {
+impl One for M31 {
     fn one() -> Self {
-        Field32::new(1)
+        M31::from(1_u32)
+    }
+    fn is_one(&self) -> bool {
+        self.value == 1_u32
     }
 }
 
-impl Zeroize for Field32 {
+impl Zeroize for M31 {
     fn zeroize(&mut self) {
         // Overwrite the sensitive fields with zero
         // self.value.zeroize();
-        // // Optionally, you can zero out modulus as well if it's considered sensitive
-        // self.modulus.zeroize();
     }
 }
 
-impl Distribution<Field32> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Field32 {
-        let modulus = 97; // Example modulus, you can customize this
-        let value = rng.gen_range(0..modulus);
-        Field32::new(value)
+impl Distribution<M31> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> M31 {
+        let value = rng.gen_range(0..M31_MODULUS);
+        M31::from(value)
     }
 }
 
-impl From<Field32> for BigInt<4> {
-    fn from(field: Field32) -> BigInt<4> {
-        // Place the value in the first limb, and leave the rest as zero
+impl From<M31> for BigInt<4> {
+    fn from(field: M31) -> BigInt<4> {
         BigInt::<4>([field.value as u64, 0, 0, 0])
     }
 }
 
-impl From<BigUint> for Field32 {
+impl From<BigUint> for M31 {
     fn from(biguint: BigUint) -> Self {
-        // Convert BigUint to u32, ensuring it fits within the modulus
-        let modulus = 97; // Example modulus, should match the Field32's modulus
-
-        // Reduce the BigUint value modulo the field's modulus
-        let reduced_value = biguint % BigUint::from(FIELD_32_MODULUS);
-
-        // Convert reduced BigUint to u32 (check for overflow)
-        let value = 1;
-
-        Field32::new(value)
+        let reduced_value = biguint % BigUint::from(M31_MODULUS);
+        let value = reduced_value.to_u32_digits().get(0).copied().unwrap_or(0);
+        M31::from(value)
     }
 }
 
-impl From<BigInteger256> for Field32 {
+impl From<BigInteger256> for M31 {
     fn from(bigint: BigInteger256) -> Self {
-        let modulus = 97; // Example modulus, should match your field's modulus
-
-        // Convert BigInteger256 to a u64
         let bigint_u64 = bigint.0[0];
-
-        // Reduce the BigInteger256 value modulo the field's modulus
-        let reduced_value = bigint_u64 % (modulus as u64);
-
-        // Convert reduced value to u32
+        let reduced_value = bigint_u64 % (M31_MODULUS as u64);
         let value = reduced_value as u32;
-
-        Field32::new(value)
+        M31::from(value)
     }
 }
 
-impl FromStr for Field32 {
+impl FromStr for M31 {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // Define modulus for the field
-        let modulus = 97; // Example modulus, should match your field's modulus
-
-        // Parse the string to a u32
         let value = usize::from_str(s)?;
-
-        // Reduce the parsed value modulo the field's modulus
-        let reduced_value = value % modulus;
-
-        Ok(Field32::new(reduced_value as u32))
+        let reduced_value = value % M31_MODULUS as usize;
+        Ok(M31::from(reduced_value as u32))
     }
 }
 
-impl Display for Field32 {
+impl Display for M31 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", 1, 1)
+        Display::fmt(&self.value, f)
     }
 }
 
-impl PrimeField for Field32 {
+impl PrimeField for M31 {
     type BigInt = BigInteger256;
 
-    const MODULUS: Self::BigInt = BigInteger256::one();
+    // TODO: fix this
+    const MODULUS: Self::BigInt = BigInteger256::one(); // ark_ff::BigInt::<4>::from(M31_MODULUS);
 
     const MODULUS_MINUS_ONE_DIV_TWO: Self::BigInt = BigInteger256::one();
 
-    const MODULUS_BIT_SIZE: u32 = 1;
+    const MODULUS_BIT_SIZE: u32 = 31;
 
     const TRACE: Self::BigInt = BigInteger256::one();
 
     const TRACE_MINUS_ONE_DIV_TWO: Self::BigInt = BigInteger256::one();
 
-    fn from_bigint(repr: Self::BigInt) -> Option<Self> {
+    fn from_bigint(_repr: Self::BigInt) -> Option<Self> {
         todo!()
     }
 
@@ -207,21 +175,21 @@ impl PrimeField for Field32 {
         todo!()
     }
 
-    fn from_be_bytes_mod_order(bytes: &[u8]) -> Self {
+    fn from_be_bytes_mod_order(_bytes: &[u8]) -> Self {
         Self { value: 0 }
     }
 
-    fn from_le_bytes_mod_order(bytes: &[u8]) -> Self {
+    fn from_le_bytes_mod_order(_bytes: &[u8]) -> Self {
         Self { value: 0 }
     }
 }
 
-impl FftField for Field32 {
-    const GENERATOR: Self = Field32 { value: 5 };
+impl FftField for M31 {
+    const GENERATOR: Self = M31 { value: 5 };
 
     const TWO_ADICITY: u32 = 1;
 
-    const TWO_ADIC_ROOT_OF_UNITY: Self = Field32 { value: 5 };
+    const TWO_ADIC_ROOT_OF_UNITY: Self = M31 { value: 5 };
 
     const SMALL_SUBGROUP_BASE: Option<u32> = None;
 
@@ -229,26 +197,26 @@ impl FftField for Field32 {
 
     const LARGE_SUBGROUP_ROOT_OF_UNITY: Option<Self> = None;
 
-    fn get_root_of_unity(n: u64) -> Option<Self> {
+    fn get_root_of_unity(_n: u64) -> Option<Self> {
         None
     }
 }
 
-impl CanonicalDeserializeWithFlags for Field32 {
+impl CanonicalDeserializeWithFlags for M31 {
     #[inline]
     fn deserialize_with_flags<R: Read, F: Flags>(
-        mut reader: R,
+        _reader: R,
     ) -> Result<(Self, F), SerializationError> {
         Ok((Self { value: 1 }, F::from_u8(1).unwrap()))
     }
 }
 
-impl CanonicalSerializeWithFlags for Field32 {
+impl CanonicalSerializeWithFlags for M31 {
     #[inline]
     fn serialize_with_flags<W: Write, F: Flags>(
         &self,
-        mut writer: W,
-        flags: F,
+        _writer: W,
+        _flags: F,
     ) -> Result<(), SerializationError> {
         Ok(())
     }
@@ -259,16 +227,14 @@ impl CanonicalSerializeWithFlags for Field32 {
     }
 }
 
-impl Default for Field32 {
+impl Default for M31 {
     fn default() -> Self {
-        // Define what the default value should be
-        // Here, we use `0` as the default value and `1` as the modulus.
-        Field32::new(0)
+        M31::from(1_u32)
     }
 }
 
 // Implement the Field trait
-impl Field for Field32 {
+impl Field for M31 {
     type BasePrimeField = Self;
 
     type BasePrimeFieldIter = std::iter::Empty<Self>;
@@ -280,18 +246,17 @@ impl Field for Field32 {
     const ONE: Self = Self { value: 1 };
 
     fn double(&self) -> Self {
-        Field32::new((2 * self.value) % FIELD_32_MODULUS)
+        M31::from((2 * self.value) % M31_MODULUS)
     }
 
     fn inverse(&self) -> Option<Self> {
         if self.value == 0 {
             return None;
         }
-        Some(Self::new((1 / self.value) % FIELD_32_MODULUS))
+        Some(Self::from((1 / self.value) % M31_MODULUS))
     }
 
-    fn frobenius_map(&self, _: usize) -> Field32 {
-        // This is a no-op for prime fields
+    fn frobenius_map(&self, _: usize) -> M31 {
         Self { value: self.value }
     }
 
@@ -303,11 +268,11 @@ impl Field for Field32 {
         todo!()
     }
 
-    fn from_base_prime_field_elems(elems: &[Self::BasePrimeField]) -> Option<Self> {
+    fn from_base_prime_field_elems(_elems: &[Self::BasePrimeField]) -> Option<Self> {
         todo!()
     }
 
-    fn from_base_prime_field(elem: Self::BasePrimeField) -> Self {
+    fn from_base_prime_field(_elem: Self::BasePrimeField) -> Self {
         todo!()
     }
 
@@ -319,7 +284,7 @@ impl Field for Field32 {
         todo!()
     }
 
-    fn from_random_bytes_with_flags<F: Flags>(bytes: &[u8]) -> Option<(Self, F)> {
+    fn from_random_bytes_with_flags<F: Flags>(_bytes: &[u8]) -> Option<(Self, F)> {
         todo!()
     }
 
@@ -339,7 +304,7 @@ impl Field for Field32 {
         todo!()
     }
 
-    fn frobenius_map_in_place(&mut self, power: usize) {
+    fn frobenius_map_in_place(&mut self, _power: usize) {
         todo!()
     }
 
@@ -347,16 +312,16 @@ impl Field for Field32 {
         &[]
     }
 
-    fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
+    fn from_random_bytes(_bytes: &[u8]) -> Option<Self> {
         std::unimplemented!()
     }
 
     fn sqrt(&self) -> Option<Self> {
-        std::unimplemented!();
+        std::unimplemented!()
     }
 
     fn sqrt_in_place(&mut self) -> Option<&mut Self> {
-        std::unimplemented!();
+        std::unimplemented!()
     }
 
     fn sum_of_products<const T: usize>(a: &[Self; T], b: &[Self; T]) -> Self {
@@ -367,35 +332,33 @@ impl Field for Field32 {
         sum
     }
 
-    fn pow<S: AsRef<[u64]>>(&self, exp: S) -> Self {
+    fn pow<S: AsRef<[u64]>>(&self, _exp: S) -> Self {
         *self
     }
 
-    fn pow_with_table<S: AsRef<[u64]>>(powers_of_2: &[Self], exp: S) -> Option<Self> {
+    fn pow_with_table<S: AsRef<[u64]>>(_powers_of_2: &[Self], _exp: S) -> Option<Self> {
         std::unimplemented!()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use ark_ff::Field;
-
-    use crate::fields::m31::Field32;
+    use crate::fields::m31::M31;
 
     #[test]
     fn accumulate() {
         let v = vec![
-            Field32::from(0_u32),
-            Field32::from(1_u32),
-            Field32::from(2_u32),
-            Field32::from(3_u32),
-            Field32::from(4_u32),
-            Field32::from(5_u32),
-            Field32::from(6_u32),
-            Field32::from(7_u32),
-            Field32::from(8_u32),
+            M31::from(0_u32),
+            M31::from(1_u32),
+            M31::from(2_u32),
+            M31::from(3_u32),
+            M31::from(4_u32),
+            M31::from(5_u32),
+            M31::from(6_u32),
+            M31::from(7_u32),
+            M31::from(8_u32),
         ];
-        let accumulated = Field32::accumulate_sums(v);
-        println!("{:?}", accumulated);
+        let accumulated = M31::reduce_sum(v);
+        assert_eq!(accumulated, M31::from(36_u32))
     }
 }
