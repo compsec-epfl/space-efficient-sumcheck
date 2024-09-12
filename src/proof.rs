@@ -66,36 +66,38 @@ mod tests {
     use std::marker::PhantomData;
 
     use super::Sumcheck;
-    use crate::{field_32::Field32, provers::{
-        test_helpers::{BenchEvaluationStream, TestField},
-        BlendyProver, Prover, ProverArgs, ProverArgsStageInfo, TimeProver,
-    }};
+    use crate::{
+        fields::m31::Field32,
+        provers::{
+            test_helpers::{BenchEvaluationStream, TestField},
+            BlendyProver, Prover, ProverArgs, ProverArgsStageInfo, TimeProver,
+        },
+    };
 
     #[test]
     fn algorithm_consistency() {
         // take an evaluation stream
-        let evaluation_stream: BenchEvaluationStream<TestField> = BenchEvaluationStream::new(20);
+        let evaluation_stream: BenchEvaluationStream<Field32> = BenchEvaluationStream::new(20);
         // initialize the provers
         let mut blendy_k3_prover =
-            BlendyProver::<TestField, BenchEvaluationStream<TestField>>::new(ProverArgs {
+            BlendyProver::<Field32, BenchEvaluationStream<Field32>>::new(ProverArgs {
                 stream: &evaluation_stream,
                 stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
                 _phantom: PhantomData,
             });
         let mut time_prover =
-            TimeProver::<TestField, BenchEvaluationStream<TestField>>::new(TimeProver::<
-                TestField,
-                BenchEvaluationStream<TestField>,
+            TimeProver::<Field32, BenchEvaluationStream<Field32>>::new(TimeProver::<
+                Field32,
+                BenchEvaluationStream<Field32>,
             >::generate_default_args(
                 &evaluation_stream
             ));
         // run them and get the transcript
-        let blendy_prover_transcript =
-            Sumcheck::<TestField, BenchEvaluationStream<TestField>>::prove(
-                &mut blendy_k3_prover,
-                &mut ark_std::test_rng(),
-            );
-        let time_prover_transcript = Sumcheck::<TestField, BenchEvaluationStream<TestField>>::prove(
+        let blendy_prover_transcript = Sumcheck::<Field32, BenchEvaluationStream<Field32>>::prove(
+            &mut blendy_k3_prover,
+            &mut ark_std::test_rng(),
+        );
+        let time_prover_transcript = Sumcheck::<Field32, BenchEvaluationStream<Field32>>::prove(
             &mut time_prover,
             &mut ark_std::test_rng(),
         );

@@ -1,6 +1,6 @@
 use num_bigint::BigUint;
 
-use crate::field_32::{Field32, FIELD_32_MODULUS};
+use crate::fields::m31::{Field32, FIELD_32_MODULUS};
 
 impl From<Field32> for BigUint {
     fn from(field: Field32) -> BigUint {
@@ -12,26 +12,19 @@ impl From<bool> for Field32 {
     fn from(b: bool) -> Self {
         Field32 {
             value: if b { 1 } else { 0 },
-            modulus: FIELD_32_MODULUS,
         }
     }
 }
 
 impl From<u8> for Field32 {
     fn from(u: u8) -> Self {
-        Field32 {
-            value: u as u32,
-            modulus: FIELD_32_MODULUS,
-        }
+        Field32 { value: u as u32 }
     }
 }
 
 impl From<u16> for Field32 {
     fn from(u: u16) -> Self {
-        Field32 {
-            value: u as u32,
-            modulus: FIELD_32_MODULUS,
-        }
+        Field32 { value: u as u32 }
     }
 }
 
@@ -44,10 +37,7 @@ impl From<u32> for Field32 {
         } else {
             u
         };
-        Field32 {
-            value,
-            modulus: FIELD_32_MODULUS,
-        }
+        Field32 { value }
     }
 }
 
@@ -60,10 +50,7 @@ impl From<u64> for Field32 {
         } else {
             u as u32
         };
-        Field32 {
-            value,
-            modulus: FIELD_32_MODULUS,
-        }
+        Field32 { value }
     }
 }
 
@@ -76,9 +63,6 @@ impl From<u128> for Field32 {
         } else {
             u as u32
         };
-        Field32 {
-            value,
-            modulus: FIELD_32_MODULUS,
-        }
+        Field32 { value }
     }
 }

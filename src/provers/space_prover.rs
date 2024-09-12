@@ -124,6 +124,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for SpaceProver<'a, 
 
 #[cfg(test)]
 mod tests {
+    use crate::fields::m31::Field32;
     use crate::provers::{
         test_helpers::{
             run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
@@ -134,13 +135,13 @@ mod tests {
 
     #[test]
     fn sumcheck() {
-        let evaluation_stream: BasicEvaluationStream<TestField> =
-            BasicEvaluationStream::new(test_polynomial());
-        run_boolean_sumcheck_test(SpaceProver::new(SpaceProver::generate_default_args(
-            &evaluation_stream,
-        )));
-        run_basic_sumcheck_test(SpaceProver::new(SpaceProver::generate_default_args(
-            &evaluation_stream,
-        )));
+        let evaluation_stream: BasicEvaluationStream<Field32> =
+            BasicEvaluationStream::new(test_polynomial::<Field32>());
+        run_boolean_sumcheck_test(SpaceProver::<Field32, BasicEvaluationStream<Field32>>::new(
+            SpaceProver::generate_default_args(&evaluation_stream),
+        ));
+        run_basic_sumcheck_test(SpaceProver::<Field32, BasicEvaluationStream<Field32>>::new(
+            SpaceProver::generate_default_args(&evaluation_stream),
+        ));
     }
 }
