@@ -1,26 +1,30 @@
-use ark_ff::biginteger::BigInteger256;
-use ark_ff::{BigInt, FftField, Field, One, PrimeField, Zero};
+use ark_ff::biginteger::{BigInt, BigInteger256};
+use ark_ff::{FftField, Field, One, PrimeField, Zero};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalDeserializeWithFlags, CanonicalSerialize,
     CanonicalSerializeWithFlags, Flags, SerializationError,
 };
 use ark_std::rand::{distributions::Standard, prelude::Distribution, Rng};
-use num_bigint::BigUint;
 use zeroize::Zeroize;
 
-use std::simd::u64x4;
+use std::simd;
+use std::simd::{u64x4, LaneCount};
 use std::{
     fmt::{self, Display, Formatter},
     io::{Read, Write},
-    num::ParseIntError,
-    str::FromStr,
 };
 
 pub mod froms;
 pub mod ops;
 
-/// Mersenne prime 31
-pub const M31_MODULUS: u32 = (1 << 31) - 1;
+// Mersenne prime 31
+pub const M31_MODULUS_U32: u32 = (1 << 31) - 1;
+pub const M31_MODULUS_I32: i32 = M31_MODULUS_U32 as i32;
+pub const M31_MODULUS_U64: u64 = (1 << 31) - 1;
+pub const M31_MODULUS_I64: i64 = (1 << 31) - 1;
+pub const M31_MODULUS_U128: u128 = (1 << 31) - 1;
+pub const M31_MODULUS_USIZE: usize = (1 << 31) - 1;
+pub const M31_MODULUS_BIGINT4: BigInt<4> = BigInt::new([M31_MODULUS_U64, 0, 0, 0]);
 
 #[derive(
     Copy,
@@ -39,35 +43,15 @@ pub struct M31 {
 }
 
 impl M31 {
-    pub fn reduce_sum(vec: Vec<Self>) -> Self {
-        let mut sums = u64x4::from_array([
-            vec[0].value as u64,
-            vec[1].value as u64,
-            vec[2].value as u64,
-            vec[3].value as u64,
-        ]);
-        let modulus = u64x4::from_array([M31_MODULUS as u64; 4]);
-
-        for (i, chunk) in vec.chunks(4).enumerate() {
-            if i == 0 {
-                continue;
-            }
-
+    pub fn reduce_sum(vec: &[u64]) -> Self {
+        let mut sums = u64x4::from_array([0, 0, 0, 0]);
+        let modulus = u64x4::from_array([M31_MODULUS_U64; 4]);
+        for chunk in vec.chunks(4) {
             let next_4: [u64; 4] = match chunk.len() {
-                1 => [chunk[0].value as u64, 0, 0, 0],
-                2 => [chunk[0].value as u64, chunk[1].value as u64, 0, 0],
-                3 => [
-                    chunk[0].value as u64,
-                    chunk[1].value as u64,
-                    chunk[2].value as u64,
-                    0,
-                ],
-                4 => [
-                    chunk[0].value as u64,
-                    chunk[1].value as u64,
-                    chunk[2].value as u64,
-                    chunk[3].value as u64,
-                ],
+                1 => [chunk[0], 0, 0, 0],
+                2 => [chunk[0], chunk[1], 0, 0],
+                3 => [chunk[0], chunk[1], chunk[2], 0],
+                4 => [chunk[0], chunk[1], chunk[2], chunk[3]],
                 _ => todo!(),
             };
 
@@ -75,10 +59,39 @@ impl M31 {
             sums = sums % modulus;
         }
 
-        let sum: usize = (sums[0] + sums[1] + sums[2] + sums[3]).try_into().unwrap();
-        let sum = sum % M31_MODULUS as usize;
+        let mut sum: u64 = (sums[0] + sums[1] + sums[2] + sums[3]).try_into().unwrap();
+        sum = sum % M31_MODULUS_U64;
 
         Self { value: sum as u32 }
+    }
+    // pub fn reduce_sum_2(data: &[u32]) -> u32 {
+    //     // TODO: if we're adding less than 4 billion values < 2^32 can we be sure we won't overflow u64?
+    //     // Chunk the data into sections that SIMD can process
+    //     let chunk_size = 32;
+
+    //     // Use parallel iterator over chunks
+    //     let simd_sum = data
+    //         .par_chunks(chunk_size)
+    //         .map(|chunk| {
+    //             // Load into SIMD registers
+    //             let mut simd_chunk = u64x4::splat(0);
+    //             for &value in chunk {
+    //                 simd_chunk += u64x4::from(value);
+    //             }
+    //             // Reduce the SIMD vector into a scalar sum
+    //             simd_chunk.wrapping_sum()
+    //         })
+    //         .reduce(|| 0, |acc, x| acc.wrapping_add(x));
+
+    //     // Calculate the final result modulo n
+    //     simd_sum % modulo
+    // }
+    fn exp_power_of_2(&self, power_log: usize) -> Self {
+        let mut res = self.clone();
+        for _ in 0..power_log {
+            res = res.square();
+        }
+        res
     }
 }
 
@@ -102,48 +115,14 @@ impl One for M31 {
 
 impl Zeroize for M31 {
     fn zeroize(&mut self) {
-        // Overwrite the sensitive fields with zero
-        // self.value.zeroize();
+        todo!()
     }
 }
 
 impl Distribution<M31> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> M31 {
-        let value = rng.gen_range(0..M31_MODULUS);
+        let value = rng.gen_range(0..M31_MODULUS_U32);
         M31::from(value)
-    }
-}
-
-impl From<M31> for BigInt<4> {
-    fn from(field: M31) -> BigInt<4> {
-        BigInt::<4>([field.value as u64, 0, 0, 0])
-    }
-}
-
-impl From<BigUint> for M31 {
-    fn from(biguint: BigUint) -> Self {
-        let reduced_value = biguint % BigUint::from(M31_MODULUS);
-        let value = reduced_value.to_u32_digits().get(0).copied().unwrap_or(0);
-        M31::from(value)
-    }
-}
-
-impl From<BigInteger256> for M31 {
-    fn from(bigint: BigInteger256) -> Self {
-        let bigint_u64 = bigint.0[0];
-        let reduced_value = bigint_u64 % (M31_MODULUS as u64);
-        let value = reduced_value as u32;
-        M31::from(value)
-    }
-}
-
-impl FromStr for M31 {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let value = usize::from_str(s)?;
-        let reduced_value = value % M31_MODULUS as usize;
-        Ok(M31::from(reduced_value as u32))
     }
 }
 
@@ -156,15 +135,15 @@ impl Display for M31 {
 impl PrimeField for M31 {
     type BigInt = BigInteger256;
 
-    // TODO: fix this
-    const MODULUS: Self::BigInt = BigInteger256::one(); // ark_ff::BigInt::<4>::from(M31_MODULUS);
+    const MODULUS: Self::BigInt = M31_MODULUS_BIGINT4;
 
     const MODULUS_MINUS_ONE_DIV_TWO: Self::BigInt = BigInteger256::one();
 
     const MODULUS_BIT_SIZE: u32 = 31;
 
+    // TODO: what is this?
     const TRACE: Self::BigInt = BigInteger256::one();
-
+    // TODO: what is this?
     const TRACE_MINUS_ONE_DIV_TWO: Self::BigInt = BigInteger256::one();
 
     fn from_bigint(_repr: Self::BigInt) -> Option<Self> {
@@ -246,14 +225,24 @@ impl Field for M31 {
     const ONE: Self = Self { value: 1 };
 
     fn double(&self) -> Self {
-        M31::from((2 * self.value) % M31_MODULUS)
+        M31::from((2 * self.value) % M31_MODULUS_U32)
     }
 
     fn inverse(&self) -> Option<Self> {
-        if self.value == 0 {
+        if self.is_zero() {
             return None;
         }
-        Some(Self::from((1 / self.value) % M31_MODULUS))
+
+        let x = *self;
+        let y = x.exp_power_of_2(2) * x;
+        let z = y.square() * y;
+        let a = z.exp_power_of_2(4) * z;
+        let b = a.exp_power_of_2(4);
+        let c = b * z;
+        let d = b.exp_power_of_2(4) * a;
+        let e = d.exp_power_of_2(12) * c;
+        let f = e.exp_power_of_2(3) * y;
+        Some(f)
     }
 
     fn frobenius_map(&self, _: usize) -> M31 {
@@ -293,7 +282,7 @@ impl Field for M31 {
     }
 
     fn square(&self) -> Self {
-        todo!()
+        self.clone() * self.clone()
     }
 
     fn square_in_place(&mut self) -> &mut Self {
@@ -346,19 +335,10 @@ mod tests {
     use crate::fields::m31::M31;
 
     #[test]
-    fn accumulate() {
-        let v = vec![
-            M31::from(0_u32),
-            M31::from(1_u32),
-            M31::from(2_u32),
-            M31::from(3_u32),
-            M31::from(4_u32),
-            M31::from(5_u32),
-            M31::from(6_u32),
-            M31::from(7_u32),
-            M31::from(8_u32),
-        ];
-        let accumulated = M31::reduce_sum(v);
-        assert_eq!(accumulated, M31::from(36_u32))
+    fn reduce_sum() {
+        assert_eq!(
+            M31::reduce_sum(&[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+            M31::from(36_u32)
+        )
     }
 }
