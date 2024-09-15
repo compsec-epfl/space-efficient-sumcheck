@@ -20,12 +20,7 @@ pub struct TestFieldConfig;
 pub type TestField = Fp64<MontBackend<TestFieldConfig, 1>>;
 pub type TestPolynomial = multivariate::SparsePolynomial<TestField, SparseTerm>;
 
-pub fn run_boolean_sumcheck_test<
-    'a,
-    F: Field + std::convert::From<i32>,
-    S: EvaluationStream<F>,
-    P: Prover<'a, F, S>,
->(
+pub fn run_boolean_sumcheck_test<'a, F: Field, S: EvaluationStream<F>, P: Prover<'a, F, S>>(
     mut prover: P,
 ) {
     // ZEROTH ROUND
@@ -43,12 +38,12 @@ pub fn run_boolean_sumcheck_test<
     let round_0 = prover.next_message(None).unwrap();
     assert_eq!(
         round_0.0,
-        F::from(14),
+        F::from(14_u32),
         "g0 should evaluate correctly for input 0"
     );
     assert_eq!(
         round_0.1,
-        F::from(11),
+        F::from(11_u32),
         "g0 should evaluate correctly for input 1"
     );
     // FIRST ROUND x0 fixed to 0
@@ -62,12 +57,12 @@ pub fn run_boolean_sumcheck_test<
     assert_eq!(round_0.1, round_1.0 + round_1.1);
     assert_eq!(
         round_1.0,
-        F::from(4),
+        F::from(4_u32),
         "g1 should evaluate correctly for input 0"
     );
     assert_eq!(
         round_1.1,
-        F::from(7),
+        F::from(7_u32),
         "g1 should evaluate correctly for input 1"
     );
     // LAST ROUND x1 fixed to 1
@@ -79,22 +74,17 @@ pub fn run_boolean_sumcheck_test<
     assert_eq!(round_1.1, round_2.0 + round_2.1);
     assert_eq!(
         round_2.0,
-        F::from(0),
+        F::from(0_u32),
         "g2 should evaluate correctly for input 0"
     );
     assert_eq!(
         round_2.1,
-        F::from(7),
+        F::from(7_u32),
         "g2 should evaluate correctly for input 1"
     );
 }
 
-pub fn run_basic_sumcheck_test<
-    'a,
-    F: Field + std::convert::From<i32>,
-    S: EvaluationStream<F>,
-    P: Prover<'a, F, S>,
->(
+pub fn run_basic_sumcheck_test<'a, F: Field, S: EvaluationStream<F>, P: Prover<'a, F, S>>(
     mut prover: P,
 ) {
     // FIRST ROUND x0 fixed to 3
@@ -105,19 +95,19 @@ pub fn run_basic_sumcheck_test<
     // 3,1,0 = 31 = 12 mod 19
     // sum g1(1) = 12
     let round_0 = prover.next_message(None).unwrap();
-    let round_1 = prover.next_message(Some(F::from(3))).unwrap(); // x0 fixed to 3
+    let round_1 = prover.next_message(Some(F::from(3_u32))).unwrap(); // x0 fixed to 3
     assert_eq!(
-        round_0.0 - (round_0.0 - round_0.1) * F::from(3),
+        round_0.0 - (round_0.0 - round_0.1) * F::from(3 as u32),
         round_1.0 + round_1.1
     );
     assert_eq!(
         round_1.0,
-        F::from(12),
+        F::from(12_u32),
         "g1 should evaluate correctly for input 0"
     );
     assert_eq!(
         round_1.1,
-        F::from(12),
+        F::from(12_u32),
         "g1 should evaluate correctly for input 1"
     );
     // LAST ROUND x1 fixed to 4
@@ -125,44 +115,38 @@ pub fn run_basic_sumcheck_test<
     // sum g(0) = 11
     // 3,4,1 = 134 = 1 mod 19
     // sum g(1) = 1
-    let round_2 = prover.next_message(Some(F::from(4))).unwrap(); // x1 fixed to 4
+    let round_2 = prover.next_message(Some(F::from(4_u32))).unwrap(); // x1 fixed to 4
     assert_eq!(
-        round_1.0 - (round_1.0 - round_1.1) * F::from(4),
+        round_1.0 - (round_1.0 - round_1.1) * F::from(4_u32),
         round_2.0 + round_2.1
     );
     assert_eq!(
         round_2.0,
-        F::from(11),
+        F::from(11_u32),
         "g2 should evaluate correctly for input 0"
     );
     assert_eq!(
         round_2.1,
-        F::from(1),
+        F::from(1_u32),
         "g2 should evaluate correctly for input 1"
     );
 }
 
-pub fn test_polynomial() -> Vec<TestField> {
+pub fn test_polynomial<F: Field>() -> Vec<F> {
     // 4*x_1*x_2 + 7*x_2*x_3 + 2*x_1 + 13*x_2
-    return TestPolynomial::from_coefficients_slice(
+    return multivariate::SparsePolynomial::<F, SparseTerm>::from_coefficients_slice(
         3,
         &[
             (
-                TestField::from(4),
+                F::from(4_u32),
                 multivariate::SparseTerm::new(vec![(0, 1), (1, 1)]),
             ),
             (
-                TestField::from(7),
+                F::from(7_u32),
                 multivariate::SparseTerm::new(vec![(1, 1), (2, 1)]),
             ),
-            (
-                TestField::from(2),
-                multivariate::SparseTerm::new(vec![(0, 1)]),
-            ),
-            (
-                TestField::from(13),
-                multivariate::SparseTerm::new(vec![(1, 1)]),
-            ),
+            (F::from(2_u32), multivariate::SparseTerm::new(vec![(0, 1)])),
+            (F::from(13_u32), multivariate::SparseTerm::new(vec![(1, 1)])),
         ],
     )
     .to_evaluations();
