@@ -18,3 +18,10 @@ ark-serialize = "0.4.2"
 ark-std ="0.4.0"
 num-bigint = "0.4"
 zeroize = "1.8.1"
+
+[dev-dependencies]
+criterion = "0.4"
+
+[[bench]]
+harness = false
+name = "reduce_sum_benches"

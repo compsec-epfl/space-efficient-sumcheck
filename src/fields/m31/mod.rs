@@ -7,7 +7,8 @@ use ark_serialize::{
 use ark_std::rand::{distributions::Standard, prelude::Distribution, Rng};
 use zeroize::Zeroize;
 
-use std::simd;
+use std::simd::num::SimdUint;
+use std::simd::{self, u32x4, Simd};
 use std::simd::{u64x4, LaneCount};
 use std::{
     fmt::{self, Display, Formatter},
@@ -43,24 +44,35 @@ pub struct M31 {
 }
 
 impl M31 {
-    pub fn reduce_sum(vec: &[u64]) -> Self {
-        let mut sums = u64x4::from_array([0, 0, 0, 0]);
-        let modulus = u64x4::from_array([M31_MODULUS_U64; 4]);
-        for chunk in vec.chunks(4) {
-            let next_4: [u64; 4] = match chunk.len() {
-                1 => [chunk[0], 0, 0, 0],
-                2 => [chunk[0], chunk[1], 0, 0],
-                3 => [chunk[0], chunk[1], chunk[2], 0],
-                4 => [chunk[0], chunk[1], chunk[2], chunk[3]],
-                _ => todo!(),
-            };
-
-            sums = sums + u64x4::from_array(next_4);
-            sums = sums % modulus;
-        }
-
-        let mut sum: u64 = (sums[0] + sums[1] + sums[2] + sums[3]).try_into().unwrap();
+    pub fn reduce_sum_naive(vec: &[u64]) -> Self {
+        let mut sum: u64 = vec.iter().sum();
         sum = sum % M31_MODULUS_U64;
+        Self { value: sum as u32 }
+    }
+    pub fn reduce_sum(
+        _sums: &mut Simd<u64, 64>,
+        _modulus: &Simd<u64, 64>,
+        values: &[u32],
+    ) -> Self {
+        assert!(values.len() % 4 == 0);
+        let mut sums = u32x4::splat(0);
+        for i in (0..values.len()).step_by(4) {
+            sums += u32x4::from_slice(&values[i..]);
+        }
+        let sum = sums.reduce_sum();
+        // for chunk in vec.chunks(4) {
+        //     let next_4: [u64; 4] = match chunk.len() {
+        //         1 => [chunk[0], 0, 0, 0],
+        //         2 => [chunk[0], chunk[1], 0, 0],
+        //         3 => [chunk[0], chunk[1], chunk[2], 0],
+        //         4 => [chunk[0], chunk[1], chunk[2], chunk[3]],
+        //         _ => todo!(),
+        //     };
+
+        //     sums = sums + u64x4::from_array(next_4);
+        //     sums = sums % modulus;
+        // }
+        // sum = sum % M31_MODULUS_U64;
 
         Self { value: sum as u32 }
     }
@@ -332,13 +344,26 @@ impl Field for M31 {
 
 #[cfg(test)]
 mod tests {
-    use crate::fields::m31::M31;
+    use std::simd::{u64x4, u64x64, Simd};
+
+    use crate::fields::m31::{M31, M31_MODULUS_U64};
 
     #[test]
     fn reduce_sum() {
+        let mut sums: Simd<u64, 64> = u64x64::from_array([0; 64]);
+        let modulus: Simd<u64, 64> = u64x64::from_array([M31_MODULUS_U64; 64]);
+        let values: Simd<u64, 64> = u64x64::from_array([
+            0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4,
+            5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1,
+            2, 3, 4, 5, 6, 7,
+        ]);
         assert_eq!(
-            M31::reduce_sum(&[0, 1, 2, 3, 4, 5, 6, 7, 8]),
-            M31::from(36_u32)
+            M31::reduce_sum(&mut sums, &modulus, &[
+                0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4,
+                5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1,
+                2, 3, 4, 5, 6, 7,
+            ]),
+            M31::from(224_u32)
         )
     }
 }

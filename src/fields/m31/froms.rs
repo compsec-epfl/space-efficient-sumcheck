@@ -6,6 +6,12 @@ use crate::fields::m31::{
     M31, M31_MODULUS_I32, M31_MODULUS_U128, M31_MODULUS_U32, M31_MODULUS_U64, M31_MODULUS_USIZE,
 };
 
+impl M31 {
+    pub fn to_u64(&self) -> u64 {
+        self.value as u64
+    }
+}
+
 impl From<M31> for BigInt<4> {
     fn from(field: M31) -> BigInt<4> {
         BigInt::<4>([field.value as u64, 0, 0, 0])

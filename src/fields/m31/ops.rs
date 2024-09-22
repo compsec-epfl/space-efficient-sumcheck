@@ -149,7 +149,6 @@ impl DivAssign for M31 {
     }
 }
 
-
 impl<'a> AddAssign<&'a mut M31> for M31 {
     fn add_assign(&mut self, other: &'a mut M31) {
         self.value = (self.value.wrapping_add(other.value)) % M31_MODULUS_U32;
@@ -179,7 +178,6 @@ impl<'a> DivAssign<&'a mut M31> for M31 {
             ((self.value as u64 * rhs.inverse().unwrap().value as u64) % M31_MODULUS_U64) as u32;
     }
 }
-
 
 impl<'a> AddAssign<&'a M31> for M31 {
     fn add_assign(&mut self, other: &'a M31) {
@@ -256,7 +254,6 @@ impl<'a> DivAssign<&'a M31> for M31 {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
