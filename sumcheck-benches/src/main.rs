@@ -1,11 +1,11 @@
 use ark_bn254::Fr as BN254Field;
 use ark_ff::{
-    fields::{Fp128, Fp64, MontBackend, MontConfig},
-    Field,
+    fields::{Fp64, MontBackend, MontConfig},
+    Field, Fp128,
 };
 use ark_std::marker::PhantomData;
 use space_efficient_sumcheck::{
-    field_32::M31,
+    fields::BabyBear::BabyBear,
     provers::{
         test_helpers::BenchEvaluationStream, BlendyProver, Prover, ProverArgs, ProverArgsStageInfo,
         SpaceProver, TimeProver,
@@ -28,7 +28,7 @@ pub type Field128 = Fp128<MontBackend<FieldConfig128, 2>>;
 
 #[derive(Debug)]
 enum FieldLabel {
-    M31,
+    BabyBear,
     Field64,
     Field128,
     FieldBn254,
@@ -79,7 +79,7 @@ fn validate_and_format_command_line_args(argsv: Vec<String>) -> BenchArgs {
         _ => AlgorithmLabel::Blendy, // this is checked in previous line
     };
     // field_label
-    if !(argsv[2] == "M31" || argsv[2] == "Field64" || argsv[2] == "Field128" || argsv[2] == "FieldBn254") {
+    if !(argsv[2] == "BabyBear" || argsv[2] == "Field64" || argsv[2] == "Field128" || argsv[2] == "FieldBn254") {
         eprintln!(
             "Usage: {} field_label algorithm_label num_variables stage_size",
             argsv[0]
@@ -88,7 +88,7 @@ fn validate_and_format_command_line_args(argsv: Vec<String>) -> BenchArgs {
         std::process::exit(1);
     }
     let field_label = match argsv[2].as_str() {
-        "M31" => FieldLabel::M31,
+        "BabyBear" => FieldLabel::BabyBear,
         "Field64" => FieldLabel::Field64,
         "Field128" => FieldLabel::Field128,
         _ => FieldLabel::FieldBn254, // this is checked in previous line
@@ -170,8 +170,8 @@ fn main() {
     let bench_args: BenchArgs = validate_and_format_command_line_args(env::args().collect());
     // Run the requested bench
     match bench_args.field_label {
-        FieldLabel::M31 => {
-            run_bench_on_field::<M31>(bench_args);
+        FieldLabel::BabyBear => {
+            run_bench_on_field::<BabyBear>(bench_args);
         }
         FieldLabel::Field64 => {
             run_bench_on_field::<Field64>(bench_args);

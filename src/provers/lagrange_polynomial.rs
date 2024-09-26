@@ -103,7 +103,7 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::fields::m31::M31;
+    use crate::fields::baby_bear::BabyBear;
     use crate::provers::{
         hypercube::HypercubeMember, lagrange_polynomial::LagrangePolynomial,
         test_helpers::TestField, verifier_messages::VerifierMessages,
@@ -112,17 +112,21 @@ mod tests {
     #[test]
     fn next() {
         // remember this is gray code ordering!
-        let messages: Vec<M31> = vec![M31::from(13_u32), M31::from(0_u32), M31::from(7_u32)];
-        let message_hats: Vec<M31> = messages
+        let messages: Vec<BabyBear> = vec![
+            BabyBear::from(13_u32),
+            BabyBear::from(0_u32),
+            BabyBear::from(7_u32),
+        ];
+        let message_hats: Vec<BabyBear> = messages
             .clone()
             .iter()
-            .map(|message| M31::from(1_u32) - message)
+            .map(|message| BabyBear::from(1_u32) - message)
             .collect();
-        let mut lag_poly: LagrangePolynomial<M31> =
+        let mut lag_poly: LagrangePolynomial<BabyBear> =
             LagrangePolynomial::new(VerifierMessages::new(&vec![
-                M31::from(13_u32),
-                M31::from(0_u32),
-                M31::from(7_u32),
+                BabyBear::from(13_u32),
+                BabyBear::from(0_u32),
+                BabyBear::from(7_u32),
             ]));
         for gray_code_index in [0, 1, 3, 2, 6, 7, 5, 4] {
             let exp = LagrangePolynomial::lag_poly(

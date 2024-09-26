@@ -67,7 +67,7 @@ mod tests {
 
     use super::Sumcheck;
     use crate::{
-        fields::m31::M31,
+        fields::baby_bear::BabyBear,
         provers::{
             test_helpers::BenchEvaluationStream, BlendyProver, Prover, ProverArgs,
             ProverArgsStageInfo, TimeProver,
@@ -77,27 +77,27 @@ mod tests {
     #[test]
     fn algorithm_consistency() {
         // take an evaluation stream
-        let evaluation_stream: BenchEvaluationStream<M31> = BenchEvaluationStream::new(20);
+        let evaluation_stream: BenchEvaluationStream<BabyBear> = BenchEvaluationStream::new(20);
         // initialize the provers
         let mut blendy_k3_prover =
-            BlendyProver::<M31, BenchEvaluationStream<M31>>::new(ProverArgs {
+            BlendyProver::<BabyBear, BenchEvaluationStream<BabyBear>>::new(ProverArgs {
                 stream: &evaluation_stream,
                 stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
                 _phantom: PhantomData,
             });
         let mut time_prover =
-            TimeProver::<M31, BenchEvaluationStream<M31>>::new(TimeProver::<
-                M31,
-                BenchEvaluationStream<M31>,
+            TimeProver::<BabyBear, BenchEvaluationStream<BabyBear>>::new(TimeProver::<
+                BabyBear,
+                BenchEvaluationStream<BabyBear>,
             >::generate_default_args(
                 &evaluation_stream
             ));
         // run them and get the transcript
-        let blendy_prover_transcript = Sumcheck::<M31, BenchEvaluationStream<M31>>::prove(
+        let blendy_prover_transcript = Sumcheck::<BabyBear, BenchEvaluationStream<BabyBear>>::prove(
             &mut blendy_k3_prover,
             &mut ark_std::test_rng(),
         );
-        let time_prover_transcript = Sumcheck::<M31, BenchEvaluationStream<M31>>::prove(
+        let time_prover_transcript = Sumcheck::<BabyBear, BenchEvaluationStream<BabyBear>>::prove(
             &mut time_prover,
             &mut ark_std::test_rng(),
         );
