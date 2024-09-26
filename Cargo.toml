@@ -17,6 +17,7 @@ ark-poly = "0.4.0"
 ark-serialize = "0.4.2"
 ark-std ="0.4.0"
 num-bigint = "0.4"
+num-traits = "0.2"
 zeroize = "1.8.1"
 
 [dev-dependencies]

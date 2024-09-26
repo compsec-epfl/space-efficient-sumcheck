@@ -1,7 +1,7 @@
 use ark_ff::{Field, Zero};
 use ark_serialize::Flags;
 
-use crate::fields::baby_bear::{BabyBear, BB_MODULUS_U32};
+use crate::fields::baby_bear::BabyBear;
 
 impl Field for BabyBear {
     type BasePrimeField = Self;
@@ -10,12 +10,12 @@ impl Field for BabyBear {
 
     const SQRT_PRECOMP: Option<ark_ff::SqrtPrecomputation<Self>> = None;
 
-    const ZERO: Self = Self { value: 0 };
+    const ZERO: Self = Self { mod_value: 0_u32 };
 
-    const ONE: Self = Self { value: 1 };
+    const ONE: Self = Self { mod_value: 1_u32 };
 
     fn double(&self) -> Self {
-        BabyBear::from((2 * self.value) % BB_MODULUS_U32)
+        BabyBear::from(2_u32) * self
     }
 
     fn inverse(&self) -> Option<Self> {
@@ -41,7 +41,9 @@ impl Field for BabyBear {
     }
 
     fn frobenius_map(&self, _: usize) -> BabyBear {
-        Self { value: self.value }
+        Self {
+            mod_value: self.mod_value,
+        }
     }
 
     fn extension_degree() -> u64 {
@@ -77,7 +79,7 @@ impl Field for BabyBear {
     }
 
     fn square(&self) -> Self {
-        self.clone() * self.clone()
+        *self * self
     }
 
     fn square_in_place(&mut self) -> &mut Self {

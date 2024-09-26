@@ -1,5 +1,4 @@
-use ark_ff::biginteger::{BigInt, BigInteger256};
-use ark_ff::{FftField, Field, One, PrimeField, Zero};
+use ark_ff::{FftField, Field, One, Zero};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalDeserializeWithFlags, CanonicalSerialize,
     CanonicalSerializeWithFlags, Flags, SerializationError,
@@ -14,20 +13,17 @@ use std::{
     io::{Read, Write},
 };
 
-pub mod froms;
-pub mod ops;
 mod field;
+pub mod ops;
 mod prime_field;
+pub mod transmute;
 
 pub const BB_MODULUS_U32: u32 = 0x78000001;
+pub const BB_MODULUS_U64: u64 = BB_MODULUS_U32 as u64;
+pub const BB_MODULUS_U128: u128 = BB_MODULUS_U32 as u128;
+pub const BB_MODULUS_USIZE: usize = BB_MODULUS_U32 as usize;
 pub const BB_MODULUS_I32: i32 = BB_MODULUS_U32 as i32;
-pub const BB_MODULUS_U64: u64 = 0x78000001;
-pub const BB_MODULUS_I64: i64 = 0x78000001;
-pub const BB_MODULUS_U128: u128 = 0x78000001;
-pub const BB_MODULUS_USIZE: usize = 0x78000001;
-pub const BB_MODULUS_BIGINT4: BigInt<4> = BigInt::new([BB_MODULUS_U64, 0, 0, 0]);
-pub const BB_MODULUS_MINUS_ONE_DIV_TWO_BIGINT4: BigInt<4> =
-    BigInt::new([(BB_MODULUS_U64 - 1) / 2, 0, 0, 0]);
+pub const BB_MODULUS_I64: i64 = BB_MODULUS_U32 as i64;
 
 #[derive(
     Copy,
@@ -42,12 +38,19 @@ pub const BB_MODULUS_MINUS_ONE_DIV_TWO_BIGINT4: BigInt<4> =
     CanonicalSerialize,
 )]
 pub struct BabyBear {
-    value: u32,
+    mod_value: u32,
 }
 
 const LANES: usize = 64;
 
 impl BabyBear {
+    fn exp_power_of_2(&self, power_log: usize) -> Self {
+        let mut res = self.clone();
+        for _ in 0..power_log {
+            res = res.square();
+        }
+        res
+    }
     pub fn reduce_sum(vec: &[u32]) -> Self {
         let sum: u32 = vec.iter().fold(0, |acc, &x| {
             let tmp = acc + x;
@@ -57,7 +60,7 @@ impl BabyBear {
                 return tmp - BB_MODULUS_U32;
             }
         });
-        Self { value: sum }
+        Self { mod_value: sum }
     }
     pub fn reduce_sum_packed(values: &[u32]) -> Self {
         assert!(values.len() % LANES == 0);
@@ -70,30 +73,38 @@ impl BabyBear {
         }
         Self::reduce_sum(&packed_sums.to_array())
     }
-    fn exp_power_of_2(&self, power_log: usize) -> Self {
-        let mut res = self.clone();
-        for _ in 0..power_log {
-            res = res.square();
-        }
-        res
+
+    fn convert_u32_to_u64(slice: &[u32]) -> Vec<u64> {
+        slice.iter().map(|&num| num as u64).collect()
     }
+    // pub fn batch_mult_packed(values: &mut [u32]) -> Self {
+    //     assert!(values.len() % LANES == 0);
+    //     let packed_modulus: Simd<u32, LANES> = u32x64::splat(BB_MODULUS_U32);
+    //     for i in (0..values.len()).step_by(64) {
+    //         let slice = Self::convert_u32_to_u64(&values[i..]).as_slice();
+    //         let tmp_packed_sums = packed_sums + u64x64::from_slice(slice);
+    //         let is_mod_needed = tmp_packed_sums.simd_ge(packed_modulus);
+    //         packed_sums = is_mod_needed.select(tmp_packed_sums - packed_modulus, tmp_packed_sums);
+    //     }
+    //     Self::reduce_sum(&packed_sums.to_array())
+    // }
 }
 
 impl Zero for BabyBear {
     fn zero() -> Self {
-        BabyBear::from(0)
+        BabyBear::from(0_u8)
     }
     fn is_zero(&self) -> bool {
-        self.value == 0
+        self.mod_value == 0
     }
 }
 
 impl One for BabyBear {
     fn one() -> Self {
-        BabyBear::from(1)
+        BabyBear::from(1_u8)
     }
     fn is_one(&self) -> bool {
-        self.value == 1
+        self.to_u32() == 1_u32
     }
 }
 
@@ -112,16 +123,16 @@ impl Distribution<BabyBear> for Standard {
 
 impl Display for BabyBear {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.value, f)
+        Display::fmt(&self.mod_value, f)
     }
 }
 
 impl FftField for BabyBear {
-    const GENERATOR: Self = BabyBear { value: 5 };
+    const GENERATOR: Self = BabyBear { mod_value: 5 };
 
     const TWO_ADICITY: u32 = 1;
 
-    const TWO_ADIC_ROOT_OF_UNITY: Self = BabyBear { value: 5 };
+    const TWO_ADIC_ROOT_OF_UNITY: Self = BabyBear { mod_value: 5 };
 
     const SMALL_SUBGROUP_BASE: Option<u32> = None;
 
@@ -139,7 +150,7 @@ impl CanonicalDeserializeWithFlags for BabyBear {
     fn deserialize_with_flags<R: Read, F: Flags>(
         _reader: R,
     ) -> Result<(Self, F), SerializationError> {
-        Ok((Self { value: 1 }, F::from_u8(1).unwrap()))
+        Ok((Self { mod_value: 1 }, F::from_u8(1).unwrap()))
     }
 }
 
@@ -161,7 +172,7 @@ impl CanonicalSerializeWithFlags for BabyBear {
 
 impl Default for BabyBear {
     fn default() -> Self {
-        BabyBear::from(1_u32)
+        BabyBear::from(1_u8)
     }
 }
 
@@ -172,10 +183,8 @@ mod tests {
 
     use crate::fields::baby_bear::{BabyBear, BB_MODULUS_U32};
 
-    // Notice: there are no two field elements that added together could overflow u32
-    pub fn reduce_sum_sanity_check(vec: &[u32]) -> BabyBear {
-        let sum: u32 = vec.iter().fold(0, |acc, &x| (acc + x) % BB_MODULUS_U32);
-        BabyBear { value: sum }
+    pub fn reduce_sum_sanity(vec: &[u32]) -> BabyBear {
+        BabyBear::from(vec.iter().fold(0, |acc, &x| (acc + x) % BB_MODULUS_U32))
     }
 
     #[test]
@@ -187,11 +196,9 @@ mod tests {
     #[test]
     fn reduce_sum_correctness() {
         let random_values: Vec<u32> = (0..2_i32.pow(13))
-            .map(|_| BabyBear::rand(&mut test_rng()).to_u64() as u32)
+            .map(|_| BabyBear::rand(&mut test_rng()).to_u32())
             .collect();
-        // assert_eq!(M31_MODULUS_U32, M31_MODULUS_U32 - 1);
-        // let random_values: Vec<u32> = vec![M31_MODULUS_U32 - 1, M31_MODULUS_U32 - 1];
-        let exp = reduce_sum_sanity_check(&random_values);
+        let exp = reduce_sum_sanity(&random_values);
         assert_eq!(exp, BabyBear::reduce_sum(&random_values));
         assert_eq!(exp, BabyBear::reduce_sum_packed(&random_values));
     }
