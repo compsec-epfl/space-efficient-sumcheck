@@ -5,14 +5,14 @@ use ark_std::{
 };
 
 use crate::fields::baby_bear::{
-    transmute::mod_transmute_unsigned, BabyBear, BB_MODULUS_U32, BB_MODULUS_U64,
+    transmute::mod_transmute_unsigned, BabyBear, BB_MODULUS, BB_MODULUS_U64,
 };
 
 impl Add for BabyBear {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
         Self {
-            mod_value: mod_transmute_unsigned(self.to_u32() + rhs.to_u32(), BB_MODULUS_U32),
+            mod_value: mod_transmute_unsigned(self.to_u32() + rhs.to_u32(), BB_MODULUS),
         }
     }
 }
@@ -21,11 +21,10 @@ impl Sub for BabyBear {
     fn sub(self, rhs: Self) -> Self {
         Self {
             mod_value: match self.mod_value < rhs.mod_value {
-                true => mod_transmute_unsigned(
-                    BB_MODULUS_U32 + self.to_u32() - rhs.to_u32(),
-                    BB_MODULUS_U32,
-                ),
-                false => mod_transmute_unsigned(self.to_u32() - rhs.to_u32(), BB_MODULUS_U32),
+                true => {
+                    mod_transmute_unsigned(BB_MODULUS + self.to_u32() - rhs.to_u32(), BB_MODULUS)
+                }
+                false => mod_transmute_unsigned(self.to_u32() - rhs.to_u32(), BB_MODULUS),
             },
         }
     }
@@ -33,7 +32,9 @@ impl Sub for BabyBear {
 impl Mul for BabyBear {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self {
-        Self::from(((self.mod_value as u64 * rhs.mod_value as u64) % BB_MODULUS_U64) as u32)
+        Self {
+            mod_value: mod_transmute_unsigned(self.to_u64() * rhs.to_u64(), BB_MODULUS_U64),
+        }
     }
 }
 impl Div for BabyBear {
@@ -43,8 +44,10 @@ impl Div for BabyBear {
             panic!("Division by zero");
         }
         Self {
-            mod_value: ((self.mod_value as u64 * rhs.inverse().unwrap().mod_value as u64)
-                % BB_MODULUS_U64) as u32,
+            mod_value: mod_transmute_unsigned(
+                self.to_u64() * rhs.inverse().unwrap().to_u64(),
+                BB_MODULUS_U64,
+            ),
         }
     }
 }
@@ -53,7 +56,7 @@ impl Div for BabyBear {
 impl<'a> Add<&'a BabyBear> for BabyBear {
     type Output = Self;
     fn add(self, rhs: &'a Self) -> Self {
-        Self::from((self.mod_value + rhs.mod_value) % BB_MODULUS_U32)
+        Self::from((self.mod_value + rhs.mod_value) % BB_MODULUS)
     }
 }
 impl<'a> Sub<&'a BabyBear> for BabyBear {
@@ -61,9 +64,9 @@ impl<'a> Sub<&'a BabyBear> for BabyBear {
     fn sub(self, rhs: &'a Self) -> Self {
         if self.mod_value < rhs.mod_value {
             // add the modulus
-            return Self::from((self.mod_value + BB_MODULUS_U32 - rhs.mod_value) % BB_MODULUS_U32);
+            return Self::from((self.mod_value + BB_MODULUS - rhs.mod_value) % BB_MODULUS);
         }
-        Self::from((self.mod_value - rhs.mod_value) % BB_MODULUS_U32)
+        Self::from((self.mod_value - rhs.mod_value) % BB_MODULUS)
     }
 }
 impl<'a> Mul<&'a BabyBear> for BabyBear {
@@ -89,7 +92,7 @@ impl<'a> Div<&'a BabyBear> for BabyBear {
 impl Add<&mut BabyBear> for BabyBear {
     type Output = BabyBear;
     fn add(self, rhs: &mut Self) -> Self::Output {
-        Self::from((self.mod_value + rhs.mod_value) % BB_MODULUS_U32)
+        Self::from((self.mod_value + rhs.mod_value) % BB_MODULUS)
     }
 }
 impl Sub<&mut BabyBear> for BabyBear {
@@ -97,9 +100,9 @@ impl Sub<&mut BabyBear> for BabyBear {
     fn sub(self, rhs: &mut Self) -> Self::Output {
         if self.mod_value < rhs.mod_value {
             // add the modulus
-            return Self::from((self.mod_value + BB_MODULUS_U32 - rhs.mod_value) % BB_MODULUS_U32);
+            return Self::from((self.mod_value + BB_MODULUS - rhs.mod_value) % BB_MODULUS);
         }
-        Self::from((self.mod_value - rhs.mod_value) % BB_MODULUS_U32)
+        Self::from((self.mod_value - rhs.mod_value) % BB_MODULUS)
     }
 }
 impl Mul<&mut BabyBear> for BabyBear {
@@ -127,29 +130,29 @@ impl Div<&mut BabyBear> for BabyBear {
 impl AddAssign for BabyBear {
     fn add_assign(&mut self, rhs: BabyBear) {
         // Add the values and reduce modulo `modulus`
-        self.mod_value = (self.mod_value + rhs.mod_value) % BB_MODULUS_U32;
+        self.mod_value = (self.mod_value + rhs.mod_value) % BB_MODULUS;
     }
 }
 impl SubAssign for BabyBear {
     fn sub_assign(&mut self, rhs: BabyBear) {
         // Perform subtraction and ensure it's non-negative by adding modulus if necessary
         if self.mod_value >= rhs.mod_value {
-            self.mod_value = (self.mod_value - rhs.mod_value) % BB_MODULUS_U32;
+            self.mod_value = (self.mod_value - rhs.mod_value) % BB_MODULUS;
         } else {
-            self.mod_value = (self.mod_value + BB_MODULUS_U32 - rhs.mod_value) % BB_MODULUS_U32;
+            self.mod_value = (self.mod_value + BB_MODULUS - rhs.mod_value) % BB_MODULUS;
         }
     }
 }
 impl MulAssign for BabyBear {
     fn mul_assign(&mut self, rhs: BabyBear) {
         // Multiply the values and reduce modulo `modulus`
-        self.mod_value = (self.mod_value * rhs.mod_value) % BB_MODULUS_U32;
+        self.mod_value = (self.mod_value * rhs.mod_value) % BB_MODULUS;
     }
 }
 impl DivAssign for BabyBear {
     fn div_assign(&mut self, rhs: BabyBear) {
         if rhs.mod_value != 0 {
-            self.mod_value = (self.mod_value / rhs.mod_value) % BB_MODULUS_U32;
+            self.mod_value = (self.mod_value / rhs.mod_value) % BB_MODULUS;
         } else {
             panic!("Division by zero or no modular inverse exists");
         }
@@ -158,16 +161,16 @@ impl DivAssign for BabyBear {
 
 impl<'a> AddAssign<&'a mut BabyBear> for BabyBear {
     fn add_assign(&mut self, rhs: &'a mut BabyBear) {
-        self.mod_value = (self.mod_value.wrapping_add(rhs.mod_value)) % BB_MODULUS_U32;
+        self.mod_value = (self.mod_value.wrapping_add(rhs.mod_value)) % BB_MODULUS;
     }
 }
 impl<'a> SubAssign<&'a mut BabyBear> for BabyBear {
     fn sub_assign(&mut self, rhs: &'a mut BabyBear) {
         if self.mod_value < rhs.mod_value {
             // add the modulus
-            self.mod_value = (self.mod_value + BB_MODULUS_U32 - rhs.mod_value) % BB_MODULUS_U32;
+            self.mod_value = (self.mod_value + BB_MODULUS - rhs.mod_value) % BB_MODULUS;
         } else {
-            self.mod_value = (self.mod_value - rhs.mod_value) % BB_MODULUS_U32;
+            self.mod_value = (self.mod_value - rhs.mod_value) % BB_MODULUS;
         }
     }
 }
@@ -188,22 +191,22 @@ impl<'a> DivAssign<&'a mut BabyBear> for BabyBear {
 
 impl<'a> AddAssign<&'a BabyBear> for BabyBear {
     fn add_assign(&mut self, rhs: &'a BabyBear) {
-        self.mod_value = (self.mod_value.wrapping_add(rhs.mod_value)) % BB_MODULUS_U32;
+        self.mod_value = (self.mod_value.wrapping_add(rhs.mod_value)) % BB_MODULUS;
     }
 }
 impl<'a> SubAssign<&'a BabyBear> for BabyBear {
     fn sub_assign(&mut self, rhs: &'a BabyBear) {
-        self.mod_value = (self.mod_value.wrapping_sub(rhs.mod_value)) % BB_MODULUS_U32;
+        self.mod_value = (self.mod_value.wrapping_sub(rhs.mod_value)) % BB_MODULUS;
 
         // Handle negative results by adding modulus
-        if self.mod_value > BB_MODULUS_U32 {
-            self.mod_value += BB_MODULUS_U32;
+        if self.mod_value > BB_MODULUS {
+            self.mod_value += BB_MODULUS;
         }
     }
 }
 impl<'a> MulAssign<&'a BabyBear> for BabyBear {
     fn mul_assign(&mut self, rhs: &'a BabyBear) {
-        self.mod_value = (self.mod_value.wrapping_mul(rhs.mod_value)) % BB_MODULUS_U32;
+        self.mod_value = (self.mod_value.wrapping_mul(rhs.mod_value)) % BB_MODULUS;
     }
 }
 
@@ -211,7 +214,7 @@ impl Neg for BabyBear {
     type Output = Self;
 
     fn neg(self) -> Self {
-        Self::from(BB_MODULUS_U32 - self.mod_value)
+        Self::from(BB_MODULUS - self.mod_value)
     }
 }
 impl Product<BabyBear> for BabyBear {
@@ -255,7 +258,7 @@ impl<'a> Sum<&'a BabyBear> for BabyBear {
 impl<'a> DivAssign<&'a BabyBear> for BabyBear {
     fn div_assign(&mut self, other: &'a BabyBear) {
         if other.mod_value != 0 {
-            self.mod_value = (self.mod_value / other.mod_value) % BB_MODULUS_U32;
+            self.mod_value = (self.mod_value / other.mod_value) % BB_MODULUS;
         } else {
             panic!("Division by zero or no modular inverse exists");
         }
@@ -264,7 +267,7 @@ impl<'a> DivAssign<&'a BabyBear> for BabyBear {
 
 #[cfg(test)]
 mod tests {
-    use crate::fields::baby_bear::{BabyBear, BB_MODULUS_U32};
+    use crate::fields::baby_bear::{BabyBear, BB_MODULUS};
     use ark_ff::Field;
 
     #[test]
@@ -274,7 +277,7 @@ mod tests {
         let b = BabyBear::from(22);
         assert_eq!(a + b, BabyBear::from(32));
         // larger than modulus
-        let c = BabyBear::from(BB_MODULUS_U32);
+        let c = BabyBear::from(BB_MODULUS);
         let d = BabyBear::from(1);
         assert_eq!(c + d, BabyBear::from(1));
         // doesn't overflow
@@ -282,8 +285,8 @@ mod tests {
         let f = BabyBear::from(3);
         assert_eq!(e + f, BabyBear::from(268435454));
         // doesn't overflow
-        let g = BabyBear::from(BB_MODULUS_U32 - 1);
-        let h = BabyBear::from(BB_MODULUS_U32 - 1);
+        let g = BabyBear::from(BB_MODULUS - 1);
+        let h = BabyBear::from(BB_MODULUS - 1);
         assert_eq!(g + h, BabyBear::from(2013265919));
     }
 
@@ -306,7 +309,7 @@ mod tests {
         let b = BabyBear::from(22);
         assert_eq!(a * b, BabyBear::from(220));
         // doesn't overflow
-        let c = BabyBear::from(BB_MODULUS_U32 - 1);
+        let c = BabyBear::from(BB_MODULUS - 1);
         let d = BabyBear::from(30000);
         assert_eq!(c * d, BabyBear::from(2013235921));
     }

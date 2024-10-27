@@ -4,7 +4,7 @@ use num_bigint::BigUint;
 use num_traits::{PrimInt, Unsigned};
 
 use crate::fields::baby_bear::{
-    BabyBear, BB_MODULUS_I32, BB_MODULUS_U128, BB_MODULUS_U32, BB_MODULUS_U64, BB_MODULUS_USIZE,
+    BabyBear, BB_MODULUS, BB_MODULUS_I32, BB_MODULUS_U128, BB_MODULUS_U64, BB_MODULUS_USIZE,
 };
 
 fn mod_transmute_signed<S, T>(source: S, modulus: S) -> T
@@ -54,7 +54,7 @@ impl From<BabyBear> for BigInt<4> {
 
 impl From<BigUint> for BabyBear {
     fn from(source: BigUint) -> Self {
-        let reduced_value = source % BigUint::from(BB_MODULUS_U32);
+        let reduced_value = source % BigUint::from(BB_MODULUS);
         let value = reduced_value.to_u32_digits().get(0).copied().unwrap_or(0);
         BabyBear::from(value)
     }
@@ -125,7 +125,7 @@ impl From<u16> for BabyBear {
 impl From<u32> for BabyBear {
     fn from(source: u32) -> Self {
         BabyBear {
-            mod_value: mod_transmute_unsigned::<u32, u32>(source, BB_MODULUS_U32),
+            mod_value: mod_transmute_unsigned::<u32, u32>(source, BB_MODULUS),
         }
     }
 }

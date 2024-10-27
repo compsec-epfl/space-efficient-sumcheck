@@ -1,4 +1,5 @@
 #![feature(portable_simd)]
+#![feature(core_intrinsics)]
 
 pub mod fields;
 pub mod proof;

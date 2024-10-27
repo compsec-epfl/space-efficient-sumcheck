@@ -7,6 +7,12 @@ use crate::fields::m31::{
 };
 
 impl M31 {
+    pub fn to_u32(&self) -> u32 {
+        self.value as u32
+    }
+}
+
+impl M31 {
     pub fn to_u64(&self) -> u64 {
         self.value as u64
     }

@@ -7,29 +7,33 @@ use ark_serialize::{
 use ark_std::rand::{distributions::Standard, prelude::Distribution, Rng};
 use zeroize::Zeroize;
 
-use std::mem;
-use std::simd::cmp::{SimdPartialEq, SimdPartialOrd};
-use std::simd::num::SimdUint;
-use std::simd::{self, i32x64, u32x32, u32x4, u32x64, u64x32, Simd};
-use std::simd::{u64x4, LaneCount};
+use std::arch::aarch64::{
+    uint32x4_t, vaddq_u32, vbslq_u32, vcgeq_u32, vdupq_n_u32, vld1q_u32, vst1q_u32, vsubq_u32,
+};
+use std::intrinsics::simd::simd_cast;
+use std::simd::{cmp::SimdPartialOrd, u32x64, Simd};
+use std::simd::{u64x64, Mask};
 use std::{
     fmt::{self, Display, Formatter},
     io::{Read, Write},
 };
 
-pub mod froms;
+pub mod fft_field;
+pub mod field;
 pub mod ops;
+pub mod prime_field;
+pub mod transmute;
 
 // Mersenne prime 31
+pub const M31_MODULUS: u32 = 2147483647;
 pub const M31_MODULUS_U32: u32 = (1 << 31) - 1;
 pub const M31_MODULUS_I32: i32 = M31_MODULUS_U32 as i32;
 pub const M31_MODULUS_U64: u64 = (1 << 31) - 1;
 pub const M31_MODULUS_I64: i64 = (1 << 31) - 1;
 pub const M31_MODULUS_U128: u128 = (1 << 31) - 1;
 pub const M31_MODULUS_USIZE: usize = (1 << 31) - 1;
-pub const M31_MODULUS_BIGINT4: BigInt<4> = BigInt::new([M31_MODULUS_U64, 0, 0, 0]);
-pub const M31_MODULUS_MINUS_ONE_DIV_TWO_BIGINT4: BigInt<4> =
-    BigInt::new([(M31_MODULUS_U64 - 1) / 2, 0, 0, 0]);
+
+const LANES: usize = 64;
 
 #[derive(
     Copy,
@@ -48,62 +52,232 @@ pub struct M31 {
 }
 
 impl M31 {
-    pub fn reduce_sum_naive(vec: &[u32]) -> Self {
-        let mut sum: u32 = vec.iter().fold(0, |acc, &x| match acc.checked_add(x) {
-            Some(result) => {
-                if result >= M31_MODULUS_U32 {
-                    return result - M31_MODULUS_U32;
-                } else {
-                    return result;
-                }
-            }
-            None => {
-                let diff = M31_MODULUS_U32 - acc;
-                return x - diff;
+    pub fn batch_mult_normal(values: &mut [u32], multipland: u32) {
+        for elem in values.iter_mut() {
+            *elem = ((*elem as u64 * multipland as u64) % M31_MODULUS_U64) as u32;
+        }
+    }
+
+    pub fn batch_mult_trick(values: &mut [u32], multipland: u32) {
+        for elem in values.iter_mut() {
+            let mut product = *elem as u64 * multipland as u64;
+            product = (product & M31_MODULUS_U64) + (product >> 31);
+            product = (product & M31_MODULUS_U64) + (product >> 31);
+            *elem = product as u32;
+        }
+    }
+
+    pub fn batch_mult_parts(values: &mut [u32], multiplicand: u32) {
+        let multiplicand_lo = multiplicand & 0xFFFF;
+        let multiplicand_hi = multiplicand >> 16;
+        for elem in values.iter_mut() {
+            // split the value
+            let lo = *elem & 0xFFFF;
+            let hi = *elem >> 16;
+
+            // carry out the multiplication
+            let mut hi_hi = hi * multiplicand_hi;
+            let mut hi_lo = hi * multiplicand_lo;
+            let mut lo_hi = lo * multiplicand_hi;
+            let mut lo_lo = lo * multiplicand_lo;
+
+            // reduce into M31
+            hi_hi = hi_hi << 1;
+            hi_lo = ((hi_lo << 16) & M31_MODULUS) + (hi_lo >> 15);
+            lo_hi = ((lo_hi << 16) & M31_MODULUS) + (lo_hi >> 15);
+            lo_lo = (lo_lo & M31_MODULUS) + (lo_lo >> 31);
+
+            *elem = Self::reduce_sum(&[hi_hi, hi_lo, lo_hi, lo_lo]).to_u32();
+        }
+    }
+
+    pub fn batch_sum_packed(values: &mut [u32]) {
+        assert!(values.len() % LANES == 0);
+        let packed_modulus: Simd<u32, LANES> = u32x64::splat(M31_MODULUS);
+        let x = u32x64::splat(9999999);
+        // let mut packed_sums: Simd<u32, LANES> = u32x64::splat(0);
+        for i in (0..values.len()).step_by(LANES) {
+            let mut tmp_packed_sums: Simd<u32, LANES> =
+                x + u32x64::from_slice(&values[i..i + LANES]);
+            let is_mod_needed: Mask<i32, LANES> = tmp_packed_sums.simd_ge(packed_modulus);
+            tmp_packed_sums =
+                is_mod_needed.select(tmp_packed_sums - packed_modulus, tmp_packed_sums);
+            unsafe {
+                tmp_packed_sums.store_select_ptr(
+                    values.as_mut_ptr().wrapping_add(i),
+                    Mask::<i32, LANES>::splat(true),
+                )
+            };
+        }
+    }
+
+    // pub fn batch_mult_trick_packed(values: &mut [u32], multiplicand: u32) {
+    //     assert!(values.len() % LANES == 0);
+    //     let multiplicand: Simd<u64, LANES> = u64x64::splat(multiplicand as u64);
+    //     let modulus: Simd<u64, LANES> = u64x64::splat(M31_MODULUS_U64);
+    //     for i in (0..values.len()).step_by(64) {
+    //         // widen
+    //         let widened: &[u64] = &values[i..i + 64].to_vec().iter().map(|a| { *a as u64}).collect::<Vec<u64>>();
+    //         // multiply
+    //         let mut product = u64x64::from_slice(widened) * multiplicand;
+    //         // reduce
+    //         product = (product & modulus) + (product >> 31);
+    //         product = (product & modulus) + (product >> 31);
+    //         // narrow
+    //         let narrowed: &[u32] = &product.to_array().iter().map(|a| { *a as u32}).collect::<Vec<u32>>();
+    //         // write back in
+    //         values[i..i + 64].copy_from_slice(&narrowed);
+    //     }
+    // }
+
+    pub fn batch_mult_trick_packed(values: &mut [u32], multiplicand: u32) {
+        assert!(values.len() % LANES == 0);
+        let multiplicand: Simd<u64, LANES> = u64x64::splat(multiplicand as u64);
+        let modulus: Simd<u64, LANES> = u64x64::splat(M31_MODULUS_U64);
+        for i in (0..values.len()).step_by(64) {
+            // widen
+            let widened: Simd<u64, 64> =
+                unsafe { simd_cast(u32x64::from_slice(&values[i..i + 64])) };
+            // multiply
+            let mut product = widened * multiplicand;
+            // reduce
+            product = (product & modulus) + (product >> 31);
+            product = (product & modulus) + (product >> 31);
+            // narrow
+            let narrowed: Simd<u32, 64> = unsafe { simd_cast(product) };
+            // write back in
+            values[i..i + 64].copy_from_slice(&narrowed.to_array());
+        }
+    }
+
+    pub fn batch_mult_trick_parts_packed(values: &mut [u32], multiplicand: u32) {
+        assert!(values.len() % LANES == 0);
+        let multiplicand_lo: Simd<u32, LANES> = u32x64::splat(multiplicand & 0xFFFF);
+        let multiplicand_hi: Simd<u32, LANES> = u32x64::splat(multiplicand >> 16);
+        let modulus: Simd<u32, LANES> = u32x64::splat(M31_MODULUS);
+        for i in (0..values.len()).step_by(64) {
+            // split the value
+            let tmp_values: Simd<u32, 64> = u32x64::from_slice(&values[i..i + 64]);
+            let lo = tmp_values & u32x64::splat(0xFFFF);
+            let hi = tmp_values >> 16;
+
+            // carry out the multiplication
+            let mut hi_hi = hi * multiplicand_hi;
+            let mut hi_lo = hi * multiplicand_lo;
+            let mut lo_hi = lo * multiplicand_hi;
+            let mut lo_lo = lo * multiplicand_lo;
+
+            // reduce into M31
+            hi_hi = hi_hi << 1;
+            hi_lo = ((hi_lo << 16) & modulus) + (hi_lo >> 15);
+            lo_hi = ((lo_hi << 16) & modulus) + (lo_hi >> 15);
+            lo_lo = (lo_lo & modulus) + (lo_lo >> 31);
+
+            // combine
+            let mut full_product = hi_hi + hi_lo;
+            full_product = (full_product & modulus) + (full_product >> 31);
+            full_product = full_product + lo_hi;
+            full_product = (full_product & modulus) + (full_product >> 31);
+            full_product = full_product + lo_lo;
+            full_product = (full_product & modulus) + (full_product >> 31);
+
+            // write back in
+            values[i..i + 64].copy_from_slice(&full_product.to_array());
+        }
+    }
+
+    pub fn reduce_sum(vec: &[u32]) -> Self {
+        let reduced_sum: u32 = vec.iter().fold(0, |acc, &x| {
+            let sum = acc + x;
+            if sum < M31_MODULUS {
+                return sum;
+            } else {
+                return sum - M31_MODULUS;
             }
         });
-        Self { value: sum }
+        Self { value: reduced_sum }
     }
-    pub fn reduce_sum(modulus: &Simd<u32, 64>, values: &[u32]) -> Self {
-        const LANES: usize = 64;
+
+    pub fn reduce_sum_packed(values: &[u32]) -> Self {
         assert!(values.len() % LANES == 0);
-        let zero: Simd<u32, LANES> = u32x64::splat(0);
-        let mut sums: Simd<u32, LANES> = u32x64::splat(0);
-        for i in (0..values.len()).step_by(64) {
-            let mut results = sums + u32x64::from_slice(&values[i..]);
-            let is_zero = zero.simd_eq(u32x64::from_slice(&values[i..]));
-            let is_ge: simd::Mask<i32, 64> = results.simd_ge(u32x64::from_slice(&values[i..]));
-            let is_overflowed = !is_zero & is_ge;
-            let diff = modulus - sums;
-
-            sums = results;
+        let packed_modulus: Simd<u32, LANES> = u32x64::splat(M31_MODULUS);
+        let mut packed_sums: Simd<u32, LANES> = u32x64::splat(0);
+        for i in (0..values.len()).step_by(LANES) {
+            let tmp_packed_sums: Simd<u32, LANES> =
+                packed_sums + u32x64::from_slice(&values[i..i + LANES]);
+            let is_mod_needed: Mask<i32, LANES> = tmp_packed_sums.simd_ge(packed_modulus);
+            packed_sums = is_mod_needed.select(tmp_packed_sums - packed_modulus, tmp_packed_sums);
         }
-        let mut sum = sums.reduce_sum();
-        sum = sum % M31_MODULUS_U32;
-        Self { value: sum as u32 }
+        Self::reduce_sum(&packed_sums.to_array())
     }
-    // pub fn reduce_sum_2(data: &[u32]) -> u32 {
-    //     // TODO: if we're adding less than 4 billion values < 2^32 can we be sure we won't overflow u64?
-    //     // Chunk the data into sections that SIMD can process
-    //     let chunk_size = 32;
 
-    //     // Use parallel iterator over chunks
-    //     let simd_sum = data
-    //         .par_chunks(chunk_size)
-    //         .map(|chunk| {
-    //             // Load into SIMD registers
-    //             let mut simd_chunk = u64x4::splat(0);
-    //             for &value in chunk {
-    //                 simd_chunk += u64x4::from(value);
-    //             }
-    //             // Reduce the SIMD vector into a scalar sum
-    //             simd_chunk.wrapping_sum()
-    //         })
-    //         .reduce(|| 0, |acc, x| acc.wrapping_add(x));
+    /*
+        NOTE questions here are:
+            (a) How wide is the largest register?
+                - SVE (Scalable Vector Extension) support means 256-bits
+                - Otherwise 128-bits
+            (b) How many of these registers does the system have?
+                - ARMv8-A and higher (64-bit ARM processors): 32 registers (v0 to v31).
+                - ARMv7-A and lower (32-bit ARM processors): 16 registers (d0 to d15).
+    */
+    pub fn reduce_sum_packed_neon(values: &[u32]) -> Self {
+        assert!(values.len() % LANES == 0);
+        let packed_modulus: uint32x4_t = unsafe { vdupq_n_u32(M31_MODULUS) };
+        let mut packed_sums: uint32x4_t = unsafe { vdupq_n_u32(0) };
+        for i in (0..values.len()).step_by(64) {
+            for j in (0..64).step_by(4) {
+                let tmp_packed_sums: uint32x4_t =
+                    unsafe { vaddq_u32(packed_sums, vld1q_u32(values.as_ptr().add(i + j))) };
+                let is_mod_needed: uint32x4_t =
+                    unsafe { vcgeq_u32(tmp_packed_sums, packed_modulus) };
+                packed_sums = unsafe {
+                    vbslq_u32(
+                        is_mod_needed,
+                        vsubq_u32(tmp_packed_sums, packed_modulus),
+                        tmp_packed_sums,
+                    )
+                };
+            }
+        }
 
-    //     // Calculate the final result modulo n
-    //     simd_sum % modulo
-    // }
+        // TODO: use all 16 registers at once
+        // pub fn reduce_sum_packed_neon(values: &[u32]) -> Self {
+        //     assert!(values.len() % LANES == 0);
+        //     let packed_modulus: &[uint32x4_t; 16] = &[ unsafe { vdupq_n_u32(M31_MODULUS) }; 16];
+        //     let packed_sums: &mut [uint32x4_t; 16] = &mut [ unsafe { vdupq_n_u32(0) }; 16];
+        //     for i in (0..values.len()).step_by(64) {
+        //         for j in (0..64).step_by(4) {
+        //             let tmp_packed_sums: uint32x4_t = unsafe { vaddq_u32(packed_sums[j], vld1q_u32(values.as_ptr().add(i + j))) };
+        //             let is_mod_needed: uint32x4_t = unsafe { vcgeq_u32(tmp_packed_sums, packed_modulus[j]) };
+        //             packed_sums[j] = unsafe { vbslq_u32(is_mod_needed, vsubq_u32(tmp_packed_sums, packed_modulus[j]), tmp_packed_sums) };
+        //         }
+        //     }
+
+        //     // Sum up the remaining values in the vector and reduce to a single value
+        //     let mut result_outer = [0u32; 64];
+        //     for j in (0..64).step_by(4) {
+        //         let mut result = [0u32; 4];
+        //         unsafe {
+        //             vst1q_u32(result.as_mut_ptr(), packed_sums[j]);
+        //         }
+        //         result_outer[j] = result[0];
+        //         result_outer[j+1] = result[1];
+        //         result_outer[j+2] = result[2];
+        //         result_outer[j+3] = result[3];
+        //     }
+
+        //     Self::reduce_sum(&result_outer)
+        // }
+
+        // Sum up the remaining values in the vector and reduce to a single value
+        let mut result = [0u32; 4];
+        unsafe {
+            vst1q_u32(result.as_mut_ptr(), packed_sums);
+        }
+
+        Self::reduce_sum(&result)
+    }
+
     fn exp_power_of_2(&self, power_log: usize) -> Self {
         let mut res = self.clone();
         for _ in 0..power_log {
@@ -150,55 +324,6 @@ impl Display for M31 {
     }
 }
 
-impl PrimeField for M31 {
-    type BigInt = BigInteger256;
-
-    const MODULUS: Self::BigInt = M31_MODULUS_BIGINT4;
-
-    const MODULUS_MINUS_ONE_DIV_TWO: Self::BigInt = M31_MODULUS_MINUS_ONE_DIV_TWO_BIGINT4;
-
-    const MODULUS_BIT_SIZE: u32 = 32;
-
-    // TODO: what is this?
-    const TRACE: Self::BigInt = BigInteger256::one();
-    // TODO: what is this?
-    const TRACE_MINUS_ONE_DIV_TWO: Self::BigInt = BigInteger256::one();
-
-    fn from_bigint(_repr: Self::BigInt) -> Option<Self> {
-        todo!()
-    }
-
-    fn into_bigint(self) -> Self::BigInt {
-        todo!()
-    }
-
-    fn from_be_bytes_mod_order(_bytes: &[u8]) -> Self {
-        Self { value: 0 }
-    }
-
-    fn from_le_bytes_mod_order(_bytes: &[u8]) -> Self {
-        Self { value: 0 }
-    }
-}
-
-impl FftField for M31 {
-    const GENERATOR: Self = M31 { value: 5 };
-
-    const TWO_ADICITY: u32 = 1;
-
-    const TWO_ADIC_ROOT_OF_UNITY: Self = M31 { value: 5 };
-
-    const SMALL_SUBGROUP_BASE: Option<u32> = None;
-
-    const SMALL_SUBGROUP_BASE_ADICITY: Option<u32> = None;
-
-    const LARGE_SUBGROUP_ROOT_OF_UNITY: Option<Self> = None;
-
-    fn get_root_of_unity(_n: u64) -> Option<Self> {
-        None
-    }
-}
-
 impl CanonicalDeserializeWithFlags for M31 {
     #[inline]
     fn deserialize_with_flags<R: Read, F: Flags>(
@@ -230,161 +355,61 @@ impl Default for M31 {
     }
 }
 
-// Implement the Field trait
-impl Field for M31 {
-    type BasePrimeField = Self;
-
-    type BasePrimeFieldIter = std::iter::Empty<Self>;
-
-    const SQRT_PRECOMP: Option<ark_ff::SqrtPrecomputation<Self>> = None;
-
-    const ZERO: Self = Self { value: 0 };
-
-    const ONE: Self = Self { value: 1 };
-
-    fn double(&self) -> Self {
-        M31::from((2 * self.value) % M31_MODULUS_U32)
-    }
-
-    fn inverse(&self) -> Option<Self> {
-        if self.is_zero() {
-            return None;
-        }
-
-        let x = *self;
-        let y = x.exp_power_of_2(2) * x;
-        let z = y.square() * y;
-        let a = z.exp_power_of_2(4) * z;
-        let b = a.exp_power_of_2(4);
-        let c = b * z;
-        let d = b.exp_power_of_2(4) * a;
-        let e = d.exp_power_of_2(12) * c;
-        let f = e.exp_power_of_2(3) * y;
-        Some(f)
-    }
-
-    fn frobenius_map(&self, _: usize) -> M31 {
-        Self { value: self.value }
-    }
-
-    fn extension_degree() -> u64 {
-        todo!()
-    }
-
-    fn to_base_prime_field_elements(&self) -> Self::BasePrimeFieldIter {
-        todo!()
-    }
-
-    fn from_base_prime_field_elems(_elems: &[Self::BasePrimeField]) -> Option<Self> {
-        todo!()
-    }
-
-    fn from_base_prime_field(_elem: Self::BasePrimeField) -> Self {
-        todo!()
-    }
-
-    fn double_in_place(&mut self) -> &mut Self {
-        todo!()
-    }
-
-    fn neg_in_place(&mut self) -> &mut Self {
-        todo!()
-    }
-
-    fn from_random_bytes_with_flags<F: Flags>(_bytes: &[u8]) -> Option<(Self, F)> {
-        todo!()
-    }
-
-    fn legendre(&self) -> ark_ff::LegendreSymbol {
-        todo!()
-    }
-
-    fn square(&self) -> Self {
-        self.clone() * self.clone()
-    }
-
-    fn square_in_place(&mut self) -> &mut Self {
-        todo!()
-    }
-
-    fn inverse_in_place(&mut self) -> Option<&mut Self> {
-        todo!()
-    }
-
-    fn frobenius_map_in_place(&mut self, _power: usize) {
-        todo!()
-    }
-
-    fn characteristic() -> &'static [u64] {
-        &[]
-    }
-
-    fn from_random_bytes(_bytes: &[u8]) -> Option<Self> {
-        std::unimplemented!()
-    }
-
-    fn sqrt(&self) -> Option<Self> {
-        std::unimplemented!()
-    }
-
-    fn sqrt_in_place(&mut self) -> Option<&mut Self> {
-        std::unimplemented!()
-    }
-
-    fn sum_of_products<const T: usize>(a: &[Self; T], b: &[Self; T]) -> Self {
-        let mut sum = Self::zero();
-        for i in 0..a.len() {
-            sum += a[i] * b[i];
-        }
-        sum
-    }
-
-    fn pow<S: AsRef<[u64]>>(&self, _exp: S) -> Self {
-        *self
-    }
-
-    fn pow_with_table<S: AsRef<[u64]>>(_powers_of_2: &[Self], _exp: S) -> Option<Self> {
-        std::unimplemented!()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::simd::{u32x4, u32x64, Simd};
 
-    use crate::fields::m31::{M31, M31_MODULUS_U32, M31_MODULUS_U64};
+    use ark_ff::{Field, UniformRand};
+    use ark_std::test_rng;
 
-    // #[test]
-    // fn reduce_sum() {
-    //     let modulus: Simd<u32, 64> = u32x64::from_array([M31_MODULUS_U32; 64]);
-    //     let a = M31::reduce_sum(&modulus, &[M31_MODULUS_U32; 64]);
-    //     let values: Simd<u32, 64> = u32x64::from_array([
-    //         0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4,
-    //         5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1,
-    //         2, 3, 4, 5, 6, 7,
-    //     ]);
-    //     assert_eq!(
-    //         a,
-    //         // M31::reduce_sum(&modulus, &[
-    //         //     0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4,
-    //         //     5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1,
-    //         //     2, 3, 4, 5, 6, 7,
-    //         // ]),
-    //         M31 {
-    //             value: M31_MODULUS_U32
-    //         }
-    //     )
-    // }
-    // #[test]
-    // fn test_overflow() {
-    //     let mut sum = M31_MODULUS_U64;
-    //     let mut i: usize = 0;
-    //     let (mut result, mut overflowed) = sum.overflowing_add(sum);
-    //     while overflowed == false {
-    //         i+=1;
-    //         sum = result;
-    //         (result, overflowed) = sum.overflowing_add(sum);
-    //     }
-    //     assert_eq!(i, M31_MODULUS_U32 as usize);
-    // }
+    use crate::fields::m31::{M31, M31_MODULUS};
+
+    #[test]
+    fn inverse_correctness() {
+        let a = M31::from(2);
+        assert_eq!(M31::from(1073741824), a.inverse().unwrap());
+    }
+
+    #[test]
+    fn reduce_sum_correctness() {
+        fn reduce_sum_sanity(vec: &[u32]) -> M31 {
+            M31::from(vec.iter().fold(0, |acc, &x| (acc + x) % M31_MODULUS))
+        }
+
+        let mut rng = test_rng();
+        let random_field_values: Vec<u32> =
+            (0..1 << 13).map(|_| M31::rand(&mut rng).to_u32()).collect();
+        let exp = reduce_sum_sanity(&random_field_values);
+        assert_eq!(exp, M31::reduce_sum(&random_field_values));
+        assert_eq!(exp, M31::reduce_sum_packed(&random_field_values));
+        assert_eq!(exp, M31::reduce_sum_packed_neon(&random_field_values));
+    }
+
+    #[test]
+    fn batch_mult_correctness() {
+        // get some random field values and be sure to add some suspicious ones (make len divisible by LANES=64)
+        let mut rng = test_rng();
+        let mut exp: Vec<u32> = (0..(1 << 13) - 4)
+            .map(|_| M31::rand(&mut rng).to_u32())
+            .collect();
+        exp.push(M31_MODULUS - 1);
+        exp.push(M31_MODULUS - 2);
+        exp.push(0);
+        exp.push(1);
+        let mut act: Vec<u32> = exp.clone();
+        for _ in 0..(1 << 8) {
+            // try many multiplicands
+            let multiplicand = M31::rand(&mut rng).to_u32();
+            M31::batch_mult_normal(&mut exp, multiplicand);
+            M31::batch_mult_trick_packed(&mut act, multiplicand);
+            assert_eq!(exp, act);
+        }
+        // let multiplicand = 9999999_u32;
+        // let mut exp: Vec<u32> = (0..1 << 13).map(|_| M31::rand(&mut rng).to_u32()).collect();
+        // exp.push(M31_MODULUS - 1);
+        // let mut act: Vec<u32> = exp.clone();
+        // M31::batch_mult_normal(&mut exp, multiplicand);
+        // M31::batch_mult_parts(&mut act, multiplicand);
+        // assert_eq!(exp, act);
+    }
 }
