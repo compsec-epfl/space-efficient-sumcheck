@@ -186,6 +186,7 @@ impl M31 {
         }
     }
 
+    #[inline]
     pub fn reduce_sum(vec: &[u32]) -> Self {
         let reduced_sum: u32 = vec.iter().fold(0, |acc, &x| {
             let sum = acc + x;
@@ -362,7 +363,41 @@ mod tests {
     use ark_ff::{Field, UniformRand};
     use ark_std::test_rng;
 
-    use crate::fields::m31::{M31, M31_MODULUS};
+    use crate::fields::m31::{M31, M31_MODULUS, M31_MODULUS_U64};
+
+    #[test]
+    fn is_5_a_generator() {
+        fn mod_exp(mut base: u64, mut exp: u64, modulus: u64) -> u64 {
+            if modulus == 1 {
+                return 0;
+            }
+            let mut result = 1;
+            base = base % modulus;
+            while exp > 0 {
+                if exp % 2 == 1 {
+                    result = (result * base) % modulus;
+                }
+                exp = exp >> 1;
+                base = (base * base) % modulus;
+            }
+            result
+        }
+        for i in (M31_MODULUS - 3)..=M31_MODULUS {
+            if mod_exp(i as u64, (2) as u64, M31_MODULUS_U64) == 1
+                && mod_exp(i as u64, (1) as u64, M31_MODULUS_U64) != 1
+            {
+                println!("{} is two adic root of unity", i);
+            }
+        }
+        // assert_eq!(mod_exp(7 as u64, (2) as u64, M31_MODULUS_U64), 1);
+        // assert_ne!(mod_exp(7 as u64, (2) as u64, M31_MODULUS_U64), 1);
+        // let p_minus_one = M31_MODULUS - 1;
+        // let factors_of_p_minus_one = vec![2, 3, 7, 11, 31, 151, 331];
+        // for d in &factors_of_p_minus_one {
+        //     assert_eq!(mod_exp(7 as u64, (2) as u64, M31_MODULUS_U64), 1);
+        //     assert_ne!(mod_exp(7 as u64, (2) as u64, M31_MODULUS_U64), 1);
+        // }
+    }
 
     #[test]
     fn inverse_correctness() {
