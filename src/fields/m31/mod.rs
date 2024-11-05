@@ -12,7 +12,7 @@ use std::arch::aarch64::{
 };
 use std::intrinsics::simd::simd_cast;
 use std::simd::{cmp::SimdPartialOrd, u32x64, Simd};
-use std::simd::{u64x64, Mask};
+use std::simd::{u32x16, u32x4, u32x8, u64x16, u64x4, u64x64, u64x8, Mask};
 use std::{
     fmt::{self, Display, Formatter},
     io::{Read, Write},
@@ -23,17 +23,12 @@ pub mod field;
 pub mod ops;
 pub mod prime_field;
 pub mod transmute;
+pub mod vec_ops_field;
 
 // Mersenne prime 31
 pub const M31_MODULUS: u32 = 2147483647;
-pub const M31_MODULUS_U32: u32 = (1 << 31) - 1;
-pub const M31_MODULUS_I32: i32 = M31_MODULUS_U32 as i32;
-pub const M31_MODULUS_U64: u64 = (1 << 31) - 1;
-pub const M31_MODULUS_I64: i64 = (1 << 31) - 1;
-pub const M31_MODULUS_U128: u128 = (1 << 31) - 1;
-pub const M31_MODULUS_USIZE: usize = (1 << 31) - 1;
 
-const LANES: usize = 64;
+const LANES: usize = 4;
 
 #[derive(
     Copy,
@@ -54,15 +49,15 @@ pub struct M31 {
 impl M31 {
     pub fn batch_mult_normal(values: &mut [u32], multipland: u32) {
         for elem in values.iter_mut() {
-            *elem = ((*elem as u64 * multipland as u64) % M31_MODULUS_U64) as u32;
+            *elem = ((*elem as u64 * multipland as u64) % M31_MODULUS as u64) as u32;
         }
     }
 
     pub fn batch_mult_trick(values: &mut [u32], multipland: u32) {
         for elem in values.iter_mut() {
             let mut product = *elem as u64 * multipland as u64;
-            product = (product & M31_MODULUS_U64) + (product >> 31);
-            product = (product & M31_MODULUS_U64) + (product >> 31);
+            product = (product & M31_MODULUS as u64) + (product >> 31);
+            product = (product & M31_MODULUS as u64) + (product >> 31);
             *elem = product as u32;
         }
     }
@@ -93,12 +88,12 @@ impl M31 {
 
     pub fn batch_sum_packed(values: &mut [u32]) {
         assert!(values.len() % LANES == 0);
-        let packed_modulus: Simd<u32, LANES> = u32x64::splat(M31_MODULUS);
-        let x = u32x64::splat(9999999);
+        let packed_modulus: Simd<u32, LANES> = u32x4::splat(M31_MODULUS);
+        let x = u32x4::splat(9999999);
         // let mut packed_sums: Simd<u32, LANES> = u32x64::splat(0);
         for i in (0..values.len()).step_by(LANES) {
             let mut tmp_packed_sums: Simd<u32, LANES> =
-                x + u32x64::from_slice(&values[i..i + LANES]);
+                x + u32x4::from_slice(&values[i..i + LANES]);
             let is_mod_needed: Mask<i32, LANES> = tmp_packed_sums.simd_ge(packed_modulus);
             tmp_packed_sums =
                 is_mod_needed.select(tmp_packed_sums - packed_modulus, tmp_packed_sums);
@@ -132,34 +127,33 @@ impl M31 {
 
     pub fn batch_mult_trick_packed(values: &mut [u32], multiplicand: u32) {
         assert!(values.len() % LANES == 0);
-        let multiplicand: Simd<u64, LANES> = u64x64::splat(multiplicand as u64);
-        let modulus: Simd<u64, LANES> = u64x64::splat(M31_MODULUS_U64);
-        for i in (0..values.len()).step_by(64) {
+        let multiplicand: Simd<u64, LANES> = u64x4::splat(multiplicand as u64);
+        let modulus: Simd<u64, LANES> = u64x4::splat(M31_MODULUS as u64);
+        for i in (0..values.len()).step_by(LANES) {
             // widen
-            let widened: Simd<u64, 64> =
-                unsafe { simd_cast(u32x64::from_slice(&values[i..i + 64])) };
+            let widened: Simd<u64, LANES> =
+                unsafe { simd_cast(u32x4::from_slice(&values[i..i + LANES])) };
             // multiply
             let mut product = widened * multiplicand;
             // reduce
             product = (product & modulus) + (product >> 31);
             product = (product & modulus) + (product >> 31);
             // narrow
-            let narrowed: Simd<u32, 64> = unsafe { simd_cast(product) };
+            let narrowed: Simd<u32, LANES> = unsafe { simd_cast(product) };
             // write back in
-            values[i..i + 64].copy_from_slice(&narrowed.to_array());
+            values[i..i + LANES].copy_from_slice(&narrowed.to_array());
         }
     }
 
     pub fn batch_mult_trick_parts_packed(values: &mut [u32], multiplicand: u32) {
         assert!(values.len() % LANES == 0);
-        let multiplicand_lo: Simd<u32, LANES> = u32x64::splat(multiplicand & 0xFFFF);
-        let multiplicand_hi: Simd<u32, LANES> = u32x64::splat(multiplicand >> 16);
-        let modulus: Simd<u32, LANES> = u32x64::splat(M31_MODULUS);
+        let multiplicand_lo: Simd<u32, LANES> = u32x4::splat(multiplicand & 0xFFFF);
+        let multiplicand_hi: Simd<u32, LANES> = u32x4::splat(multiplicand >> 16);
+        let modulus: Simd<u32, LANES> = u32x4::splat(M31_MODULUS);
         for i in (0..values.len()).step_by(64) {
             // split the value
-            let tmp_values: Simd<u32, 64> = u32x64::from_slice(&values[i..i + 64]);
-            let lo = tmp_values & u32x64::splat(0xFFFF);
-            let hi = tmp_values >> 16;
+            let lo = u32x4::from_slice(&values[i..i + 64]) & u32x4::splat(0xFFFF);
+            let hi = u32x4::from_slice(&values[i..i + 64]) >> 16;
 
             // carry out the multiplication
             let mut hi_hi = hi * multiplicand_hi;
@@ -182,7 +176,7 @@ impl M31 {
             full_product = (full_product & modulus) + (full_product >> 31);
 
             // write back in
-            values[i..i + 64].copy_from_slice(&full_product.to_array());
+            values[i..i + LANES].copy_from_slice(&full_product.to_array());
         }
     }
 
@@ -201,11 +195,11 @@ impl M31 {
 
     pub fn reduce_sum_packed(values: &[u32]) -> Self {
         assert!(values.len() % LANES == 0);
-        let packed_modulus: Simd<u32, LANES> = u32x64::splat(M31_MODULUS);
-        let mut packed_sums: Simd<u32, LANES> = u32x64::splat(0);
+        let packed_modulus: Simd<u32, LANES> = u32x4::splat(M31_MODULUS);
+        let mut packed_sums: Simd<u32, LANES> = u32x4::splat(0);
         for i in (0..values.len()).step_by(LANES) {
             let tmp_packed_sums: Simd<u32, LANES> =
-                packed_sums + u32x64::from_slice(&values[i..i + LANES]);
+                packed_sums + u32x4::from_slice(&values[i..i + LANES]);
             let is_mod_needed: Mask<i32, LANES> = tmp_packed_sums.simd_ge(packed_modulus);
             packed_sums = is_mod_needed.select(tmp_packed_sums - packed_modulus, tmp_packed_sums);
         }
@@ -225,8 +219,8 @@ impl M31 {
         assert!(values.len() % LANES == 0);
         let packed_modulus: uint32x4_t = unsafe { vdupq_n_u32(M31_MODULUS) };
         let mut packed_sums: uint32x4_t = unsafe { vdupq_n_u32(0) };
-        for i in (0..values.len()).step_by(64) {
-            for j in (0..64).step_by(4) {
+        for i in (0..values.len()).step_by(LANES) {
+            for j in (0..LANES).step_by(4) {
                 let tmp_packed_sums: uint32x4_t =
                     unsafe { vaddq_u32(packed_sums, vld1q_u32(values.as_ptr().add(i + j))) };
                 let is_mod_needed: uint32x4_t =
@@ -314,7 +308,7 @@ impl Zeroize for M31 {
 
 impl Distribution<M31> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> M31 {
-        let value = rng.gen_range(0..M31_MODULUS_U32);
+        let value = rng.gen_range(0..M31_MODULUS as u64);
         M31::from(value)
     }
 }
@@ -363,7 +357,7 @@ mod tests {
     use ark_ff::{Field, UniformRand};
     use ark_std::test_rng;
 
-    use crate::fields::m31::{M31, M31_MODULUS, M31_MODULUS_U64};
+    use crate::fields::m31::{M31, M31_MODULUS};
 
     #[test]
     fn is_5_a_generator() {
@@ -383,8 +377,8 @@ mod tests {
             result
         }
         for i in (M31_MODULUS - 3)..=M31_MODULUS {
-            if mod_exp(i as u64, (2) as u64, M31_MODULUS_U64) == 1
-                && mod_exp(i as u64, (1) as u64, M31_MODULUS_U64) != 1
+            if mod_exp(i as u64, (2) as u64, M31_MODULUS as u64) == 1
+                && mod_exp(i as u64, (1) as u64, M31_MODULUS as u64) != 1
             {
                 println!("{} is two adic root of unity", i);
             }

@@ -8,7 +8,7 @@ impl Field for M31 {
 
     type BasePrimeFieldIter = std::iter::Empty<Self>;
 
-    const SQRT_PRECOMP: Option<ark_ff::SqrtPrecomputation<Self>> = None;
+    const SQRT_PRECOMP: Option<ark_ff::SqrtPrecomputation<Self>> = None; // what values should I precompute?
 
     const ZERO: Self = Self { value: 0 };
 

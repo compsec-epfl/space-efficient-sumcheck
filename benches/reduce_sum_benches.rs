@@ -135,9 +135,9 @@ fn batch_mult_trick_parts_packed(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    batch_mult_normal,
-    batch_mult_trick,
-    batch_mult_trick_parts,
+    // batch_mult_normal,
+    // batch_mult_trick,
+    // batch_mult_trick_parts,
     batch_mult_trick_packed,
     batch_mult_trick_parts_packed,
     // batch_mult_mont,
