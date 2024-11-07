@@ -1,4 +1,4 @@
-use ark_ff::{FftField, Field, One, Zero};
+use ark_ff::{Field, One, Zero};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalDeserializeWithFlags, CanonicalSerialize,
     CanonicalSerializeWithFlags, Flags, SerializationError,
@@ -7,7 +7,7 @@ use ark_std::rand::{distributions::Standard, prelude::Distribution, Rng};
 use zeroize::Zeroize;
 
 use std::simd::cmp::SimdPartialOrd;
-use std::simd::{u32x4, u32x64, u64x64, Simd};
+use std::simd::{u32x64, u64x64, Simd};
 use std::{
     fmt::{self, Display, Formatter},
     io::{Read, Write},
