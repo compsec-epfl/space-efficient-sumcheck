@@ -33,7 +33,7 @@ pub const M31_MODULUS: u32 = 2147483647;
     CanonicalDeserialize,
     CanonicalSerialize,
 )]
-#[repr(transparent)]
+
 pub struct M31 {
     value: u32,
 }

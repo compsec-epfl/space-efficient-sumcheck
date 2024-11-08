@@ -23,5 +23,5 @@ fn scalar_mult(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, scalar_mult, reduce_sum);
+criterion_group!(benches, reduce_sum);
 criterion_main!(benches);

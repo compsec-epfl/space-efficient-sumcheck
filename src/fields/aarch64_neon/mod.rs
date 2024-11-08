@@ -1,8 +1,48 @@
-use ark_std::{arch::aarch64, cmp, mem::transmute};
+use ark_std::{
+    arch::{aarch64, asm},
+    cmp,
+    mem::transmute,
+};
 
 use crate::fields::m31::M31_MODULUS;
 
-#[inline]
+#[inline(always)]
+unsafe fn sum_vectors_under_modulo_asm(v0: *const u32, v1: *const u32, modulus: *const u32) -> [u32; 4] {
+    let mut dest: [u32; 4] = [0, 0, 0, 0];
+    asm!(
+        // Load vectors v0 and v1 into SIMD registers q0 and q1
+        "ld1 {{ v0.4s, v1.4s }}, [{0}]",
+        // "ldr q0, [{0}]",
+        // "ldr q1, [{1}]",
+
+        // Add v0 and v1: v0 = v0 + v1
+        "add v0.4s, v0.4s, v1.4s",
+
+        // Load packed modulus into q1
+        "ldr q1, [{1}]",
+
+        // Compare if v0 >= v1, result stored in v2
+        "cmhi v2.4s, v1.4s, v0.4s",
+
+        // Clear corresponding bits in v1 using v2 as mask
+        "bic v1.16b, v1.16b, v2.16b",
+
+        // Subtract v1 from v0 to get the result
+        "sub v0.4s, v0.4s, v1.4s",
+
+        // Store the result back to memory
+        "str q0, [{2}]",
+
+        in(reg) v0,
+        // in(reg) v1,
+        in(reg) modulus,
+        inout(reg) dest.as_mut_ptr() => _,
+        options(nostack),
+    );
+    return dest;
+}
+
+#[inline(always)]
 fn sum_vectors(
     v0: &mut aarch64::uint32x4_t,
     v1: &aarch64::uint32x4_t,
@@ -17,7 +57,7 @@ fn sum_vectors(
     // *v0 = aarch64::vminq_u32(sum1, aarch64::vandq_u32(*packed_modulus, sum2));
 }
 
-#[inline]
+#[inline(always)]
 fn sum_lanes(lanes: &aarch64::uint32x4_t) -> u32 {
     let reduced_sum: u32 = [
         unsafe { aarch64::vgetq_lane_u32(*lanes, 0) },
@@ -35,6 +75,7 @@ fn sum_lanes(lanes: &aarch64::uint32x4_t) -> u32 {
 }
 
 pub fn reduce_sum_32_bit_modulus(values: &[u32], modulus: u32) -> u32 {
+    let p = [modulus; 4];
     let packed_modulus: aarch64::uint32x4_t =
         unsafe { transmute::<[u32; 4], aarch64::uint32x4_t>([modulus; 4]) };
     let mut sums: aarch64::uint32x4_t = unsafe { aarch64::vdupq_n_u32(0) };
@@ -43,9 +84,18 @@ pub fn reduce_sum_32_bit_modulus(values: &[u32], modulus: u32) -> u32 {
     for step in (0..values.len()).step_by(64) {
         // sum the first 8 vectors into v0, v2, v4, v6
         let mut v0 = unsafe { aarch64::vld1q_u32(values.as_ptr().add(step)) };
-        let v1 = unsafe { aarch64::vld1q_u32(values.as_ptr().add(step + 4)) };
-        sum_vectors(&mut v0, &v1, &packed_modulus);
-        let mut v2 = unsafe { aarch64::vld1q_u32(values.as_ptr().add(step + 8)) };
+        // let v1 = unsafe { aarch64::vld1q_u32(values.as_ptr().add(step + 4)) };
+        // let mut dest: [u32; 4] = [0, 0, 0, 0];
+        let r = unsafe {
+            sum_vectors_under_modulo_asm(
+                values.as_ptr().add(step),
+                values.as_ptr().add(step + 4),
+                p.as_ptr(),
+            )
+        };
+        v0 = unsafe { aarch64::vld1q_u32(r.as_ptr()) };
+        let mut v2: aarch64::uint32x4_t =
+            unsafe { aarch64::vld1q_u32(values.as_ptr().add(step + 8)) };
         let v3 = unsafe { aarch64::vld1q_u32(values.as_ptr().add(step + 12)) };
         sum_vectors(&mut v2, &v3, &packed_modulus);
         let mut v4 = unsafe { aarch64::vld1q_u32(values.as_ptr().add(step + 16)) };
@@ -92,112 +142,35 @@ pub fn scalar_mult_32_bit_modulus(values: &mut [u32], scalar: u32, modulus: u32)
     let packed_scalar: aarch64::uint32x4_t =
         unsafe { transmute::<[u32; 4], aarch64::uint32x4_t>([scalar; 4]) };
     for step in (0..values.len()).step_by(4) {
-        // can I unroll this?
         unsafe {
             let lhs = aarch64::vld1q_u32(values.as_ptr().add(step));
-            // let mut tmp: [u32; 4] = [
-            //     unsafe { aarch64::vgetq_lane_u32(lhs, 0) },
-            //     unsafe { aarch64::vgetq_lane_u32(lhs, 1) },
-            //     unsafe { aarch64::vgetq_lane_u32(lhs, 2) },
-            //     unsafe { aarch64::vgetq_lane_u32(lhs, 3) },
-            // ];
-            // println!(
-            //     "{:?},{:?},{:?},{:?}",
-            //     values[step],
-            //     values[step + 1],
-            //     values[step + 2],
-            //     values[step + 3]
-            // );
-            // assert_eq!(tmp[0], 1695424478);
-            let mut hi = aarch64::vandq_u32(
-                aarch64::vreinterpretq_u32_s32(aarch64::vqdmulhq_s32(
-                    aarch64::vreinterpretq_s32_u32(lhs),
-                    aarch64::vreinterpretq_s32_u32(packed_scalar),
-                )),
-                aarch64::vdupq_n_u32(0xFFFFFFFE),
+            let upper = aarch64::vreinterpretq_u32_s32(aarch64::vqdmulhq_s32(
+                aarch64::vreinterpretq_s32_u32(lhs),
+                aarch64::vreinterpretq_s32_u32(packed_scalar),
+            ));
+            let lower = aarch64::vmulq_u32(lhs, packed_scalar);
+            let t = aarch64::vmlsq_u32(lower, upper, packed_modulus);
+            let res = aarch64::vminq_u32(
+                aarch64::vmlsq_u32(lower, upper, packed_modulus),
+                aarch64::vsubq_u32(t, packed_modulus),
             );
-
-            // let mut hi_values: [u32; 4] = [
-            //     unsafe { aarch64::vgetq_lane_u32(hi, 0) },
-            //     unsafe { aarch64::vgetq_lane_u32(hi, 1) },
-            //     unsafe { aarch64::vgetq_lane_u32(hi, 2) },
-            //     unsafe { aarch64::vgetq_lane_u32(hi, 3) },
-            // ];
-            // // println!("hi_values[0]: {:?}", hi_values[0]);
-            // // assert_eq!(
-            // //     hi_values[0],
-            // //     (((values[0] as u64) * (scalar as u64)) >> 32) as u32
-            // // );
-
-            // // println!("{:?}", hi_times_two);
-            // hi_values[0] = hi_values[0];
-            // hi_values[1] = hi_values[1];
-            // hi_values[2] = hi_values[2];
-            // hi_values[3] = hi_values[3];
-
-            // hi = aarch64::vld1q_u32(hi_values.as_ptr());
-
-            // perform lower prod and ensure it's in the field
-            // let mut lo = aarch64::vmulq_u32(lhs, packed_scalar);
-            let lo = aarch64::vaddq_u32(
-                aarch64::vandq_u32(aarch64::vmulq_u32(lhs, packed_scalar), packed_modulus),
-                aarch64::vshrq_n_u32(aarch64::vmulq_u32(lhs, packed_scalar), 31),
-            );
-            // let gte_mask = unsafe { aarch64::vcgeq_u32(lo, packed_modulus) };
-            // lo = unsafe { aarch64::vsubq_u32(lo, aarch64::vandq_u32(packed_modulus, gte_mask)) };
-            // let mut lo_values: [u32; 4] = [
-            //     unsafe { aarch64::vgetq_lane_u32(lo, 0) },
-            //     unsafe { aarch64::vgetq_lane_u32(lo, 1) },
-            //     unsafe { aarch64::vgetq_lane_u32(lo, 2) },
-            //     unsafe { aarch64::vgetq_lane_u32(lo, 3) },
-            // ];
-            // assert_eq!(
-            //     lo_values[0],
-            //     ((((values[0] as u64) * (scalar as u64)) & 0xFFFFFFFF) % M31_MODULUS as u64) as u32
-            // );
-            sum_vectors(&mut hi, &lo, &packed_modulus);
-            // hi_values = [
-            //     unsafe { aarch64::vgetq_lane_u32(hi, 0) },
-            //     unsafe { aarch64::vgetq_lane_u32(hi, 1) },
-            //     unsafe { aarch64::vgetq_lane_u32(hi, 2) },
-            //     unsafe { aarch64::vgetq_lane_u32(hi, 3) },
-            // ];
-            // assert_eq!(
-            //     hi_values[0],
-            //     (((values[0] as u64) * (scalar as u64)) % M31_MODULUS as u64) as u32
-            // );
-
-            aarch64::vst1q_u32(values.as_mut_ptr().add(step), hi);
+            aarch64::vst1q_u32(values.as_mut_ptr().add(step), res);
         }
-        // unsafe {
-        //     // Unrolling the loop to handle 8 elements per iteration (twice the original size).
-        //     // First set of 4 elements
-        //     let lhs_0 = aarch64::vld1q_u32(values.as_ptr().add(step));
-        //     let upper_0 = aarch64::vreinterpretq_u32_s32(aarch64::vqdmulhq_s32(
-        //         aarch64::vreinterpretq_s32_u32(lhs_0),
-        //         aarch64::vreinterpretq_s32_u32(packed_scalar),
-        //     ));
-        //     let lower_0 = aarch64::vmulq_u32(lhs_0, packed_scalar);
-        //     let t_0 = aarch64::vmlsq_u32(lower_0, upper_0, packed_modulus);
-        //     let res_0 = aarch64::vminq_u32(
-        //         aarch64::vmlsq_u32(lower_0, upper_0, packed_modulus),
-        //         aarch64::vsubq_u32(t_0, packed_modulus),
-        //     );
-        //     aarch64::vst1q_u32(values.as_mut_ptr().add(step), res_0);
-
-        //     // Second set of 4 elements
-        //     let lhs_1 = aarch64::vld1q_u32(values.as_ptr().add(step + 4));
-        //     let upper_1 = aarch64::vreinterpretq_u32_s32(aarch64::vqdmulhq_s32(
-        //         aarch64::vreinterpretq_s32_u32(lhs_1),
-        //         aarch64::vreinterpretq_s32_u32(packed_scalar),
-        //     ));
-        //     let lower_1 = aarch64::vmulq_u32(lhs_1, packed_scalar);
-        //     let t_1 = aarch64::vmlsq_u32(lower_1, upper_1, packed_modulus);
-        //     let res_1 = aarch64::vminq_u32(
-        //         aarch64::vmlsq_u32(lower_1, upper_1, packed_modulus),
-        //         aarch64::vsubq_u32(t_1, packed_modulus),
-        //     );
-        //     aarch64::vst1q_u32(values.as_mut_ptr().add(step + 4), res_1);
-        // }
     }
 }
+
+// unsafe {
+//     // Unrolling the loop to handle 8 elements per iteration (twice the original size).
+//     // First set of 4 elements
+//     let lhs_0 = aarch64::vld1q_u32(values.as_ptr().add(step));
+//     let upper_0 = aarch64::vreinterpretq_u32_s32(aarch64::vqdmulhq_s32(
+//         aarch64::vreinterpretq_s32_u32(lhs_0),
+//         aarch64::vreinterpretq_s32_u32(packed_scalar),
+//     ));
+//     let lower_0 = aarch64::vmulq_u32(lhs_0, packed_scalar);
+//     let t_0 = aarch64::vmlsq_u32(lower_0, upper_0, packed_modulus);
+//     let res_0 = aarch64::vminq_u32(
+//         aarch64::vmlsq_u32(lower_0, upper_0, packed_modulus),
+//         aarch64::vsubq_u32(t_0, packed_modulus),
+//     );
+//     aarch64::vst1q_u32(values.as_mut_ptr().add(step), res_0);
