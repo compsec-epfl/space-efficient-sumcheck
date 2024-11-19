@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn receive_message() {
-        let mut m0 = VerifierMessages::new(&vec![]);
+        let mut m0: VerifierMessages<TestField> = VerifierMessages::new(&vec![]);
 
         // ## receive 13
         m0.receive_message(TestField::from(13));
@@ -71,8 +71,10 @@ mod tests {
             m0.message_hats,
             vec![TestField::one() - TestField::from(13)]
         );
-        assert_eq!(m0.indices_of_zero_and_ones, vec![]);
-        assert_eq!(m0.messages_zeros_and_ones, vec![]);
+        let empty_indices: Vec<usize> = vec![];
+        let empty: Vec<bool> = vec![];
+        assert_eq!(m0.indices_of_zero_and_ones, empty_indices);
+        assert_eq!(m0.messages_zeros_and_ones, empty);
 
         // ## receive 0
         m0.receive_message(TestField::zero());
