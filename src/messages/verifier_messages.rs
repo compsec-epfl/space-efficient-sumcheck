@@ -62,7 +62,7 @@ impl<F: Field> VerifierMessages<F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::provers::{test_helpers::TestField, verifier_messages::VerifierMessages};
+    use crate::{messages::VerifierMessages, tests::F19};
     use ark_ff::{One, Zero};
 
     #[test]
@@ -70,67 +70,56 @@ mod tests {
         let mut m0 = VerifierMessages::new(&vec![]);
 
         // ## receive 13
-        m0.receive_message(TestField::from(13));
-        assert_eq!(m0.messages, vec![TestField::from(13)]);
-        assert_eq!(
-            m0.message_hats,
-            vec![TestField::one() - TestField::from(13)]
-        );
+        m0.receive_message(F19::from(13));
+        assert_eq!(m0.messages, vec![F19::from(13)]);
+        assert_eq!(m0.message_hats, vec![F19::one() - F19::from(13)]);
 
         // ## receive 0
-        m0.receive_message(TestField::zero());
-        assert_eq!(m0.messages, vec![TestField::from(13), TestField::zero()]);
+        m0.receive_message(F19::zero());
+        assert_eq!(m0.messages, vec![F19::from(13), F19::zero()]);
         assert_eq!(
             m0.message_hats,
-            vec![TestField::one() - TestField::from(13), TestField::one()]
+            vec![F19::one() - F19::from(13), F19::one()]
         );
 
         // ## receive 7
-        m0.receive_message(TestField::from(7));
-        assert_eq!(
-            m0.messages,
-            vec![TestField::from(13), TestField::zero(), TestField::from(7)]
-        );
+        m0.receive_message(F19::from(7));
+        assert_eq!(m0.messages, vec![F19::from(13), F19::zero(), F19::from(7)]);
         assert_eq!(
             m0.message_hats,
             vec![
-                TestField::one() - TestField::from(13),
-                TestField::one(),
-                TestField::one() - TestField::from(7)
+                F19::one() - F19::from(13),
+                F19::one(),
+                F19::one() - F19::from(7)
             ]
         );
 
         // ## receive 1
-        m0.receive_message(TestField::one());
+        m0.receive_message(F19::one());
         assert_eq!(
             m0.messages,
-            vec![
-                TestField::from(13),
-                TestField::zero(),
-                TestField::from(7),
-                TestField::one()
-            ]
+            vec![F19::from(13), F19::zero(), F19::from(7), F19::one()]
         );
         assert_eq!(
             m0.message_hats,
             vec![
-                TestField::one() - TestField::from(13),
-                TestField::one(),
-                TestField::one() - TestField::from(7),
-                TestField::zero()
+                F19::one() - F19::from(13),
+                F19::one(),
+                F19::one() - F19::from(7),
+                F19::zero()
             ]
         );
 
         let mut m1 = VerifierMessages::new(&vec![]);
 
         // ## receive zero
-        m1.receive_message(TestField::from(0));
-        assert_eq!(m1.messages, vec![TestField::from(0)]);
-        assert_eq!(m1.message_hats, vec![TestField::one()]);
+        m1.receive_message(F19::from(0));
+        assert_eq!(m1.messages, vec![F19::from(0)]);
+        assert_eq!(m1.message_hats, vec![F19::one()]);
 
         // receive 1
-        m1.receive_message(TestField::from(1));
-        assert_eq!(m1.messages, vec![TestField::from(0), TestField::one()]);
-        assert_eq!(m1.message_hats, vec![TestField::one(), TestField::zero()]);
+        m1.receive_message(F19::from(1));
+        assert_eq!(m1.messages, vec![F19::from(0), F19::one()]);
+        assert_eq!(m1.message_hats, vec![F19::one(), F19::zero()]);
     }
 }

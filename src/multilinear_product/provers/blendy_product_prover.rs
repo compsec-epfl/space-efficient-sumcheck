@@ -3,14 +3,13 @@ use std::marker::PhantomData;
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
-use crate::provers::{
-    evaluation_stream::EvaluationStream,
+use crate::{
     hypercube::Hypercube,
-    lagrange_polynomial::LagrangePolynomial,
-    prover::{Prover, ProverArgs, ProverArgsStageInfo},
+    interpolation::LagrangePolynomial,
+    messages::VerifierMessages,
+    multilinear_product::{Prover, ProverArgs, ProverArgsStageInfo},
+    streams::EvaluationStream,
 };
-
-use super::verifier_messages::VerifierMessages;
 
 pub struct BlendyProductProver<'a, F: Field, S: EvaluationStream<F>> {
     claimed_sum: F,
@@ -62,13 +61,12 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
         println!("j_prime: {:?}", j_prime);
         println!("t: {:?}", t);
 
-
-        let r1: Vec<F> = self.verifier_messages.messages[0..j_prime-1].to_vec();
+        let r1: Vec<F> = self.verifier_messages.messages[0..j_prime - 1].to_vec();
         let mut r1_hat: Vec<F> = vec![F::ZERO; r1.len()];
         for i in 0..r1.len() {
             r1_hat[i] = F::ONE - r1[i];
         }
-        let r2: Vec<F> = self.verifier_messages.messages[j_prime-1..].to_vec();
+        let r2: Vec<F> = self.verifier_messages.messages[j_prime - 1..].to_vec();
         let mut r2_hat: Vec<F> = vec![F::ZERO; r2.len()];
         for i in 0..r2.len() {
             r2_hat[i] = F::ONE - r2[i];
@@ -76,7 +74,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
 
         for (b_prime_index, b_prime) in Hypercube::new(j - j_prime) {
             let lag_poly_1 =
-            LagrangePolynomial::lag_poly(r2.clone(), r2_hat.clone(), b_prime.clone());
+                LagrangePolynomial::lag_poly(r2.clone(), r2_hat.clone(), b_prime.clone());
             for (b_prime_prime_index, b_prime_prime) in Hypercube::new(j - j_prime) {
                 let lag_poly_2 =
                     LagrangePolynomial::lag_poly(r2.clone(), r2_hat.clone(), b_prime_prime.clone());
@@ -85,15 +83,25 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
                 println!("r2: {:?}", r2);
                 println!("lag_poly_1: {:?}", lag_poly_1);
                 println!("lag_poly_2: {:?}", lag_poly_2);
-                for (v_index, _) in Hypercube::new((t as i64 - j as i64 + j_prime as i64) as usize) {
-                    let b_prime_0_v = v_index << (j - j_prime + 1)| 0 << (j - j_prime) | b_prime_index;
-                    let b_prime_prime_0_v = v_index << (j - j_prime+ 1)| 0 << (j - j_prime) | b_prime_prime_index;
-                    let b_prime_1_v = v_index << (j - j_prime + 1)| 1 << (j - j_prime) | b_prime_index;
-                    let b_prime_prime_1_v = v_index << (j - j_prime+ 1)| 1 << (j - j_prime) | b_prime_prime_index;
+                for (v_index, _) in Hypercube::new((t as i64 - j as i64 + j_prime as i64) as usize)
+                {
+                    let b_prime_0_v =
+                        v_index << (j - j_prime + 1) | 0 << (j - j_prime) | b_prime_index;
+                    let b_prime_prime_0_v =
+                        v_index << (j - j_prime + 1) | 0 << (j - j_prime) | b_prime_prime_index;
+                    let b_prime_1_v =
+                        v_index << (j - j_prime + 1) | 1 << (j - j_prime) | b_prime_index;
+                    let b_prime_prime_1_v =
+                        v_index << (j - j_prime + 1) | 1 << (j - j_prime) | b_prime_prime_index;
                     println!("b_prime_0_v {:?}", b_prime_0_v);
                     println!("b_prime_prime_0_v {:?}", b_prime_0_v);
-                    println!("adding: {:?}", self.j_prime_table[b_prime_0_v][b_prime_prime_0_v]);
-                    sum_0 += lag_poly_1 * lag_poly_2 * self.j_prime_table[b_prime_0_v][b_prime_prime_0_v];
+                    println!(
+                        "adding: {:?}",
+                        self.j_prime_table[b_prime_0_v][b_prime_prime_0_v]
+                    );
+                    sum_0 += lag_poly_1
+                        * lag_poly_2
+                        * self.j_prime_table[b_prime_0_v][b_prime_prime_0_v];
                     sum_1 += self.j_prime_table[b_prime_1_v][b_prime_prime_1_v];
                     sum_half += self.j_prime_table[b_prime_0_v][b_prime_prime_0_v];
                     sum_half += self.j_prime_table[b_prime_0_v][b_prime_prime_1_v];
@@ -151,22 +159,26 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
             ];
             let b_num_vars = self.num_variables - j_prime - t;
             for (b_index, _) in Hypercube::new(b_num_vars) {
-
                 println!("####### X update");
 
                 for (b_prime_index, _) in Hypercube::new(t + 1) {
                     self.x_table[b_prime_index] = F::ZERO;
                     for (x_index, x) in Hypercube::new(j_prime - 1) {
-                        let evaluation_point = x_index << (t + 1 + b_num_vars) | b_prime_index << b_num_vars | b_index;
+                        let evaluation_point =
+                            x_index << (t + 1 + b_num_vars) | b_prime_index << b_num_vars | b_index;
                         println!("point: {:?}", evaluation_point);
                         let lag_poly = LagrangePolynomial::lag_poly(
-                            self.verifier_messages.messages[0..j_prime-1].to_vec(),
-                            self.verifier_messages.message_hats[0..j_prime-1].to_vec(),
+                            self.verifier_messages.messages[0..j_prime - 1].to_vec(),
+                            self.verifier_messages.message_hats[0..j_prime - 1].to_vec(),
                             x,
                         );
-                        println!("lag_poly: {:?}, eval: {:?}", lag_poly, self.evaluation_stream_1.get_evaluation(evaluation_point));
+                        println!(
+                            "lag_poly: {:?}, eval: {:?}",
+                            lag_poly,
+                            self.evaluation_stream_1.get_evaluation(evaluation_point)
+                        );
                         self.x_table[b_prime_index] +=
-                        lag_poly * self.evaluation_stream_1.get_evaluation(evaluation_point);
+                            lag_poly * self.evaluation_stream_1.get_evaluation(evaluation_point);
                         println!("x_table: {:?}", self.x_table);
                     }
                 }
@@ -176,17 +188,23 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
                 for (b_prime_prime_index, _) in Hypercube::new(t + 1) {
                     self.y_table[b_prime_prime_index] = F::ZERO;
                     for (x_index, x) in Hypercube::new(j_prime - 1) {
-                        let evaluation_point = x_index << (t + 1 + b_num_vars) | b_prime_prime_index << b_num_vars | b_index;
+                        let evaluation_point = x_index << (t + 1 + b_num_vars)
+                            | b_prime_prime_index << b_num_vars
+                            | b_index;
                         println!("b_prime_prime_index: {:?}", b_prime_prime_index);
                         println!("point: {:?}", evaluation_point);
                         let lag_poly = LagrangePolynomial::lag_poly(
-                            self.verifier_messages.messages[0..j_prime-1].to_vec(),
-                            self.verifier_messages.message_hats[0..j_prime-1].to_vec(),
+                            self.verifier_messages.messages[0..j_prime - 1].to_vec(),
+                            self.verifier_messages.message_hats[0..j_prime - 1].to_vec(),
                             x,
                         );
-                        println!("lag_poly: {:?}, eval: {:?}", lag_poly, self.evaluation_stream_2.get_evaluation(evaluation_point));
+                        println!(
+                            "lag_poly: {:?}, eval: {:?}",
+                            lag_poly,
+                            self.evaluation_stream_2.get_evaluation(evaluation_point)
+                        );
                         self.y_table[b_prime_prime_index] +=
-                        lag_poly * self.evaluation_stream_2.get_evaluation(evaluation_point);
+                            lag_poly * self.evaluation_stream_2.get_evaluation(evaluation_point);
                         println!("y_table: {:?}", self.y_table);
                     }
                 }
@@ -282,25 +300,26 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProductPro
 mod tests {
     use std::marker::PhantomData;
 
-    use crate::provers::{
-        prover::{Prover, ProverArgs, ProverArgsStageInfo},
-        test_helpers::{
-            run_product_sumcheck_test, test_polynomial_2, BasicEvaluationStream, TestField,
+    use crate::{
+        multilinear_product::{
+            prover::{Prover, ProverArgs, ProverArgsStageInfo},
+            BlendyProductProver,
         },
-        BlendyProductProver,
+        tests::{four_variable_polynomial, sanity_test_4_variables, BasicEvaluationStream, F19},
     };
 
     #[test]
     fn sumcheck() {
-        let evaluation_stream: BasicEvaluationStream<TestField> =
-            BasicEvaluationStream::new(test_polynomial_2());
+        // create an evaluation stream for a known polynomial
+        let evaluation_stream: BasicEvaluationStream<F19> =
+            BasicEvaluationStream::new(four_variable_polynomial());
 
         // k=2 (DEFAULT)
-        run_product_sumcheck_test(BlendyProductProver::new(BlendyProductProver::generate_default_args(
-            &evaluation_stream,
-        )));
+        sanity_test_4_variables(BlendyProductProver::new(
+            BlendyProductProver::generate_default_args(&evaluation_stream),
+        ));
         // k=3
-        run_product_sumcheck_test(BlendyProductProver::new(ProverArgs {
+        sanity_test_4_variables(BlendyProductProver::new(ProverArgs {
             stream: &evaluation_stream,
             stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
             _phantom: PhantomData,

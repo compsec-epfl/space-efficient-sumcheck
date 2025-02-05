@@ -1,7 +1,8 @@
-use crate::provers::hypercube::{Hypercube, HypercubeMember};
+use crate::{
+    hypercube::{Hypercube, HypercubeMember},
+    messages::VerifierMessages,
+};
 use ark_ff::Field;
-
-use super::verifier_messages::VerifierMessages;
 
 #[derive(Debug)]
 pub struct LagrangePolynomial<F: Field> {
@@ -95,26 +96,25 @@ impl<F: Field> Iterator for LagrangePolynomial<F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::provers::{
-        hypercube::HypercubeMember, lagrange_polynomial::LagrangePolynomial,
-        test_helpers::TestField, verifier_messages::VerifierMessages,
+    use crate::{
+        hypercube::HypercubeMember, interpolation::LagrangePolynomial, messages::VerifierMessages,
+        tests::F19,
     };
 
     #[test]
     fn next() {
         // remember this is gray code ordering!
-        let messages: Vec<TestField> =
-            vec![TestField::from(13), TestField::from(0), TestField::from(7)];
-        let message_hats: Vec<TestField> = messages
+        let messages: Vec<F19> = vec![F19::from(13), F19::from(0), F19::from(7)];
+        let message_hats: Vec<F19> = messages
             .clone()
             .iter()
-            .map(|message| TestField::from(1) - message)
+            .map(|message| F19::from(1) - message)
             .collect();
-        let mut lag_poly: LagrangePolynomial<TestField> =
+        let mut lag_poly: LagrangePolynomial<F19> =
             LagrangePolynomial::new(VerifierMessages::new(&vec![
-                TestField::from(13),
-                TestField::from(0),
-                TestField::from(7),
+                F19::from(13),
+                F19::from(0),
+                F19::from(7),
             ]));
         for gray_code_index in [0, 1, 3, 2, 6, 7, 5, 4] {
             let exp = LagrangePolynomial::lag_poly(
@@ -129,18 +129,17 @@ mod tests {
     #[test]
     fn boolean_next() {
         // remember this is gray code ordering!
-        let messages: Vec<TestField> =
-            vec![TestField::from(0), TestField::from(1), TestField::from(1)];
-        let message_hats: Vec<TestField> = messages
+        let messages: Vec<F19> = vec![F19::from(0), F19::from(1), F19::from(1)];
+        let message_hats: Vec<F19> = messages
             .clone()
             .iter()
-            .map(|message| TestField::from(1) - message)
+            .map(|message| F19::from(1) - message)
             .collect();
-        let mut lag_poly: LagrangePolynomial<TestField> =
+        let mut lag_poly: LagrangePolynomial<F19> =
             LagrangePolynomial::new(VerifierMessages::new(&vec![
-                TestField::from(0),
-                TestField::from(1),
-                TestField::from(1),
+                F19::from(0),
+                F19::from(1),
+                F19::from(1),
             ]));
         for gray_code_index in [0, 1, 3, 2, 6, 7, 5, 4] {
             let exp = LagrangePolynomial::lag_poly(

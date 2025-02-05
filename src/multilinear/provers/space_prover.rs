@@ -1,11 +1,11 @@
 use ark_ff::Field;
 use ark_std::marker::PhantomData;
 
-use crate::provers::{
-    evaluation_stream::EvaluationStream,
+use crate::{
     hypercube::Hypercube,
-    lagrange_polynomial::LagrangePolynomial,
-    prover::{Prover, ProverArgs},
+    interpolation::LagrangePolynomial,
+    multilinear::prover::{Prover, ProverArgs},
+    streams::EvaluationStream,
 };
 
 pub struct SpaceProver<'a, F: Field, S: EvaluationStream<F>> {
@@ -124,22 +124,16 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for SpaceProver<'a, 
 
 #[cfg(test)]
 mod tests {
-    use crate::provers::{
-        test_helpers::{
-            run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
-            BasicEvaluationStream, TestField,
-        },
-        Prover, SpaceProver,
+    use crate::{
+        multilinear::{prover::Prover, SpaceProver},
+        tests::{sanity_test_3_variables, three_variable_polynomial, BasicEvaluationStream, F19},
     };
 
     #[test]
     fn sumcheck() {
-        let evaluation_stream: BasicEvaluationStream<TestField> =
-            BasicEvaluationStream::new(test_polynomial());
-        run_boolean_sumcheck_test(SpaceProver::new(SpaceProver::generate_default_args(
-            &evaluation_stream,
-        )));
-        run_basic_sumcheck_test(SpaceProver::new(SpaceProver::generate_default_args(
+        let evaluation_stream: BasicEvaluationStream<F19> =
+            BasicEvaluationStream::new(three_variable_polynomial());
+        sanity_test_3_variables(SpaceProver::new(SpaceProver::generate_default_args(
             &evaluation_stream,
         )));
     }

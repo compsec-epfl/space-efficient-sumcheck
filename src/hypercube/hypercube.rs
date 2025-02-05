@@ -117,7 +117,7 @@ impl Iterator for Hypercube {
 
 #[cfg(test)]
 mod tests {
-    use crate::provers::hypercube::{Hypercube, HypercubeMember};
+    use crate::hypercube::{Hypercube, HypercubeMember};
 
     fn is_eq(given: HypercubeMember, expected: Vec<bool>) {
         // check each value in the vec

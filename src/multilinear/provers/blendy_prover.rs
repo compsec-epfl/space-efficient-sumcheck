@@ -3,14 +3,13 @@ use std::marker::PhantomData;
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
-use crate::provers::{
-    evaluation_stream::EvaluationStream,
+use crate::{
     hypercube::Hypercube,
-    lagrange_polynomial::LagrangePolynomial,
-    prover::{Prover, ProverArgs, ProverArgsStageInfo},
+    interpolation::LagrangePolynomial,
+    messages::VerifierMessages,
+    multilinear::{Prover, ProverArgs, ProverArgsStageInfo},
+    streams::EvaluationStream,
 };
-
-use super::verifier_messages::VerifierMessages;
 
 pub struct BlendyProver<'a, F: Field, S: EvaluationStream<F>> {
     claimed_sum: F,
@@ -249,29 +248,24 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProver<'a,
 mod tests {
     use std::marker::PhantomData;
 
-    use crate::provers::{
-        prover::{Prover, ProverArgs, ProverArgsStageInfo},
-        test_helpers::{
-            run_basic_sumcheck_test, run_boolean_sumcheck_test, test_polynomial,
-            BasicEvaluationStream, TestField,
+    use crate::{
+        multilinear::{
+            prover::{Prover, ProverArgs, ProverArgsStageInfo},
+            BlendyProver,
         },
-        BlendyProver,
+        tests::{sanity_test_3_variables, three_variable_polynomial, BasicEvaluationStream, F19},
     };
 
     #[test]
     fn sumcheck() {
-        let evaluation_stream: BasicEvaluationStream<TestField> =
-            BasicEvaluationStream::new(test_polynomial());
-        run_boolean_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
-            &evaluation_stream,
-        )));
-        // k=2
-        run_basic_sumcheck_test(BlendyProver::new(BlendyProver::generate_default_args(
-            &evaluation_stream,
-        )));
-        // k=1
-        run_basic_sumcheck_test(BlendyProver::new(ProverArgs {
-            stream: &evaluation_stream,
+        // create a stream for a known polynomial
+        let s: BasicEvaluationStream<F19> = BasicEvaluationStream::new(three_variable_polynomial());
+
+        // test for k=2 (DEFAULT)
+        sanity_test_3_variables(BlendyProver::new(BlendyProver::generate_default_args(&s)));
+        // test for k=1
+        sanity_test_3_variables(BlendyProver::new(ProverArgs {
+            stream: &s,
             stage_info: Some(ProverArgsStageInfo { num_stages: 1 }),
             _phantom: PhantomData,
         }));

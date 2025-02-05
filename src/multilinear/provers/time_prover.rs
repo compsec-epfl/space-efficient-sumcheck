@@ -1,12 +1,12 @@
 use ark_ff::Field;
 use ark_std::{marker::PhantomData, vec::Vec};
 
-use crate::provers::{
-    evaluation_stream::EvaluationStream,
-    prover::{Prover, ProverArgs},
+use crate::{
+    multilinear::prover::{Prover, ProverArgs},
+    streams::EvaluationStream,
 };
 
-pub struct TimeProductProver<'a, F: Field, S: EvaluationStream<F>> {
+pub struct TimeProver<'a, F: Field, S: EvaluationStream<F>> {
     claimed_sum: F,
     current_round: usize,
     evaluations: Option<Vec<F>>,
@@ -14,7 +14,7 @@ pub struct TimeProductProver<'a, F: Field, S: EvaluationStream<F>> {
     num_variables: usize,
 }
 
-impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<'a, F, S> {
+impl<'a, F: Field, S: EvaluationStream<F>> TimeProver<'a, F, S> {
     fn num_free_variables(&self) -> usize {
         self.num_variables - self.current_round
     }
@@ -38,18 +38,15 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<'a, F, S> {
             let is_set: bool = (i & bitmask) != 0;
 
             // Get the point evaluation for the current index
-            let product_of_points_evaluation = match &self.evaluations {
-                Some(evaluations) => evaluations[i] * evaluations[i],
-                None => {
-                    self.evaluation_stream.get_evaluation(i)
-                        * self.evaluation_stream.get_evaluation(i)
-                }
+            let point_evaluation = match &self.evaluations {
+                Some(evaluations) => evaluations[i],
+                None => self.evaluation_stream.get_evaluation(i),
             };
 
             // Accumulate the value based on whether the bit is set or not
             match is_set {
-                false => sum_0 += product_of_points_evaluation,
-                true => sum_1 += product_of_points_evaluation,
+                false => sum_0 += point_evaluation,
+                true => sum_1 += point_evaluation,
             }
         }
 
@@ -93,6 +90,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<'a, F, S> {
                 None => self.evaluation_stream.get_evaluation(i1),
                 Some(evaluations) => evaluations[i1],
             };
+
             // Update the i0-th evaluation based on the reduction operation
             evaluations[i0] =
                 point_evaluation_i0 * verifier_message_hat + point_evaluation_i1 * verifier_message;
@@ -106,7 +104,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<'a, F, S> {
     }
 }
 
-impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for TimeProductProver<'a, F, S> {
+impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for TimeProver<'a, F, S> {
     fn claimed_sum(&self) -> F {
         self.claimed_sum
     }
@@ -163,19 +161,17 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for TimeProductProve
 
 #[cfg(test)]
 mod tests {
-    use crate::provers::{
-        test_helpers::{
-            run_product_sumcheck_test, test_polynomial_2, BasicEvaluationStream, TestField
-        },
-        Prover, TimeProductProver,
+    use crate::{
+        multilinear::{prover::Prover, TimeProver},
+        tests::{sanity_test_3_variables, three_variable_polynomial, BasicEvaluationStream, F19},
     };
 
     #[test]
     fn sumcheck() {
-        let evaluation_stream_1: BasicEvaluationStream<TestField> =
-            BasicEvaluationStream::new(test_polynomial_2());
-        run_product_sumcheck_test(TimeProductProver::new(
-            TimeProductProver::generate_default_args(&evaluation_stream_1),
-        ));
+        let evaluation_stream_0: BasicEvaluationStream<F19> =
+            BasicEvaluationStream::new(three_variable_polynomial());
+        sanity_test_3_variables(TimeProver::new(TimeProver::generate_default_args(
+            &evaluation_stream_0,
+        )));
     }
 }

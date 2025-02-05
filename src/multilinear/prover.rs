@@ -1,7 +1,7 @@
 use ark_ff::Field;
 use ark_std::marker::PhantomData;
 
-use crate::provers::evaluation_stream::EvaluationStream;
+use crate::streams::EvaluationStream;
 
 pub struct ProverArgsStageInfo {
     pub num_stages: usize,
