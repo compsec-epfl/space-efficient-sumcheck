@@ -14,8 +14,8 @@ use crate::{
 pub struct BlendyProductProver<'a, F: Field, S: EvaluationStream<F>> {
     claimed_sum: F,
     current_round: usize,
-    evaluation_stream_1: &'a S,
-    evaluation_stream_2: &'a S,
+    stream_p: &'a S,
+    stream_q: &'a S,
     num_stages: usize,
     num_variables: usize,
     verifier_messages: VerifierMessages<F>,
@@ -28,7 +28,7 @@ pub struct BlendyProductProver<'a, F: Field, S: EvaluationStream<F>> {
 impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
     const DEFAULT_NUM_STAGES: usize = 2;
 
-    fn compute_round(&self) -> (F, F) {
+    fn compute_round(&self) -> (F, F, F) {
         // Initialize accumulators for sum_0 and sum_1
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
@@ -116,7 +116,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
         sum_half = sum_half / F::from(4_u32);
 
         // Return the accumulated sums
-        (sum_0, sum_1)
+        (sum_0, sum_1, sum_half)
     }
 
     fn is_initial_round(&self) -> bool {
@@ -175,10 +175,10 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
                         println!(
                             "lag_poly: {:?}, eval: {:?}",
                             lag_poly,
-                            self.evaluation_stream_1.get_evaluation(evaluation_point)
+                            self.stream_p.get_evaluation(evaluation_point)
                         );
                         self.x_table[b_prime_index] +=
-                            lag_poly * self.evaluation_stream_1.get_evaluation(evaluation_point);
+                            lag_poly * self.stream_q.get_evaluation(evaluation_point);
                         println!("x_table: {:?}", self.x_table);
                     }
                 }
@@ -201,10 +201,10 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
                         println!(
                             "lag_poly: {:?}, eval: {:?}",
                             lag_poly,
-                            self.evaluation_stream_2.get_evaluation(evaluation_point)
+                            self.stream_p.get_evaluation(evaluation_point)
                         );
                         self.y_table[b_prime_prime_index] +=
-                            lag_poly * self.evaluation_stream_2.get_evaluation(evaluation_point);
+                            lag_poly * self.stream_q.get_evaluation(evaluation_point);
                         println!("y_table: {:?}", self.y_table);
                     }
                 }
@@ -235,9 +235,15 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProductPro
         self.claimed_sum
     }
 
-    fn generate_default_args(stream: &'a S) -> ProverArgs<'a, F, S> {
+    fn generate_default_args(
+        stream_p: &'a S,
+        stream_q: &'a S,
+        claimed_sum: F,
+    ) -> ProverArgs<'a, F, S> {
         ProverArgs {
-            stream,
+            stream_p,
+            stream_q,
+            claimed_sum,
             stage_info: Some(ProverArgsStageInfo {
                 num_stages: BlendyProductProver::<F, S>::DEFAULT_NUM_STAGES,
             }),
@@ -246,16 +252,16 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProductPro
     }
 
     fn new(prover_args: ProverArgs<'a, F, S>) -> Self {
-        let claimed_sum: F = prover_args.stream.get_claimed_sum();
-        let num_variables: usize = prover_args.stream.get_num_variables();
+        let claimed_sum: F = prover_args.stream_p.get_claimed_sum();
+        let num_variables: usize = prover_args.stream_q.get_num_variables();
         let num_stages: usize = prover_args.stage_info.unwrap().num_stages;
         let stage_size: usize = num_variables / num_stages;
         // return the BlendyProver instance
         Self {
             claimed_sum,
             current_round: 0,
-            evaluation_stream_1: prover_args.stream,
-            evaluation_stream_2: prover_args.stream,
+            stream_p: prover_args.stream_p,
+            stream_q: prover_args.stream_q,
             num_stages,
             num_variables,
             verifier_messages: VerifierMessages::new(&vec![]),
@@ -269,7 +275,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProductPro
         }
     }
 
-    fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F)> {
+    fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F, F)> {
         // Ensure the current round is within bounds
         if self.current_round >= self.total_rounds() {
             return None;
@@ -282,7 +288,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProductPro
 
         self.compute_state();
 
-        let sums: (F, F) = self.compute_round();
+        let sums: (F, F, F) = self.compute_round();
 
         // Increment the round counter
         self.current_round += 1;
@@ -310,17 +316,21 @@ mod tests {
 
     #[test]
     fn sumcheck() {
-        // create an evaluation stream for a known polynomial
-        let evaluation_stream: BasicEvaluationStream<F19> =
+        // create evaluation streams for a known polynomials
+        let stream_p: BasicEvaluationStream<F19> =
+            BasicEvaluationStream::new(four_variable_polynomial());
+        let stream_q: BasicEvaluationStream<F19> =
             BasicEvaluationStream::new(four_variable_polynomial());
 
         // k=2 (DEFAULT)
         sanity_test_4_variables(BlendyProductProver::new(
-            BlendyProductProver::generate_default_args(&evaluation_stream),
+            BlendyProductProver::generate_default_args(&stream_p, &stream_q, F19::from(18_u32)),
         ));
         // k=3
         sanity_test_4_variables(BlendyProductProver::new(ProverArgs {
-            stream: &evaluation_stream,
+            stream_p: &stream_p,
+            stream_q: &stream_q,
+            claimed_sum: F19::from(18_u32),
             stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
             _phantom: PhantomData,
         }));
