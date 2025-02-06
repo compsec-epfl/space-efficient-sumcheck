@@ -10,7 +10,7 @@ use ark_ff::Field;
  * as a field value.
  */
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BenchEvaluationStream<F: Field> {
     pub num_variables: usize,
     pub claimed_sum: F,

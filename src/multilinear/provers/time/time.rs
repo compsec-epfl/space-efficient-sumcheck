@@ -1,24 +1,21 @@
 use ark_ff::Field;
-use ark_std::{marker::PhantomData, vec::Vec};
+use ark_std::vec::Vec;
 
-use crate::{
-    multilinear::prover::{Prover, ProverArgs},
-    streams::EvaluationStream,
-};
+use crate::streams::EvaluationStream;
 
-pub struct TimeProver<'a, F: Field, S: EvaluationStream<F>> {
-    claimed_sum: F,
-    current_round: usize,
-    evaluations: Option<Vec<F>>,
-    evaluation_stream: &'a S, // Keep this for now, case we can do some small optimizations of first round etc
-    num_variables: usize,
+pub struct TimeProver<F: Field, S: EvaluationStream<F>> {
+    pub claim: F,
+    pub current_round: usize,
+    pub evaluations: Option<Vec<F>>,
+    pub evaluation_stream: S, // Keep this for now, case we can do some small optimizations of first round etc
+    pub num_variables: usize,
 }
 
-impl<'a, F: Field, S: EvaluationStream<F>> TimeProver<'a, F, S> {
+impl<F: Field, S: EvaluationStream<F>> TimeProver<F, S> {
     fn num_free_variables(&self) -> usize {
         self.num_variables - self.current_round
     }
-    fn vsbw_evaluate(&self) -> (F, F) {
+    pub fn vsbw_evaluate(&self) -> (F, F) {
         // Initialize accumulators for sum_0 and sum_1
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
@@ -53,7 +50,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProver<'a, F, S> {
         // Return the accumulated sums
         (sum_0, sum_1)
     }
-    fn vsbw_reduce_evaluations(&mut self, verifier_message: F, verifier_message_hat: F) {
+    pub fn vsbw_reduce_evaluations(&mut self, verifier_message: F, verifier_message_hat: F) {
         // Clone or initialize the evaluations vector
         let mut evaluations = match &self.evaluations {
             Some(evaluations) => evaluations.clone(),
@@ -102,76 +99,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProver<'a, F, S> {
         // Update the internal state with the new evaluations vector
         self.evaluations = Some(evaluations.clone());
     }
-}
-
-impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for TimeProver<'a, F, S> {
-    fn claimed_sum(&self) -> F {
-        self.claimed_sum
-    }
-
-    fn generate_default_args(stream: &'a S) -> ProverArgs<'a, F, S> {
-        ProverArgs {
-            stream,
-            stage_info: None,
-            _phantom: PhantomData,
-        }
-    }
-
-    fn new(prover_args: ProverArgs<'a, F, S>) -> Self {
-        let claimed_sum = prover_args.stream.get_claimed_sum();
-        let num_variables = prover_args.stream.get_num_variables();
-        Self {
-            claimed_sum,
-            current_round: 0,
-            evaluations: None,
-            evaluation_stream: prover_args.stream,
-            num_variables,
-        }
-    }
-
-    fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F)> {
-        // Ensure the current round is within bounds
-        if self.current_round >= self.total_rounds() {
-            return None;
-        }
-
-        // If it's not the first round, reduce the evaluations table
-        if self.current_round != 0 {
-            // update the evaluations table by absorbing leftmost variable assigned to verifier_message
-            self.vsbw_reduce_evaluations(
-                verifier_message.unwrap(),
-                F::ONE - verifier_message.unwrap(),
-            )
-        }
-
-        // evaluate using vsbw
-        let sums = self.vsbw_evaluate();
-
-        // Increment the round counter
-        self.current_round += 1;
-
-        // Return the computed polynomial
-        return Some(sums);
-    }
-
-    fn total_rounds(&self) -> usize {
+    pub fn total_rounds(&self) -> usize {
         self.num_variables
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        multilinear::{prover::Prover, TimeProver},
-        tests::{sanity_test_3_variables, three_variable_polynomial, BasicEvaluationStream, F19},
-    };
-
-    #[test]
-    fn sumcheck() {
-        let evaluation_stream_0: BasicEvaluationStream<F19> =
-            BasicEvaluationStream::new(three_variable_polynomial());
-        sanity_test_3_variables(TimeProver::new(TimeProver::generate_default_args(
-            &evaluation_stream_0,
-        )));
     }
 }
