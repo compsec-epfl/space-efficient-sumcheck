@@ -1,9 +1,8 @@
-mod sumcheck;
+mod prove;
 mod provers;
 
-pub use sumcheck::Sumcheck;
+pub use prove::Sumcheck;
 pub use provers::{
-    Prover, ProverConfig,
     blendy::{BlendyProver, BlendyProverConfig},
     space::{SpaceProver, SpaceProverConfig},
     time::{TimeProver, TimeProverConfig},

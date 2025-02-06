@@ -1,10 +1,14 @@
 use ark_ff::Field;
 
 use crate::streams::EvaluationStream;
-
 pub trait ProverConfig<F: Field, S: EvaluationStream<F>> {
     fn default(claim: F, num_variables: usize, stream: S) -> Self;
 }
+
+pub trait ProductProverConfig<F: Field, S: EvaluationStream<F>> {
+    fn default(claim: F, num_variables: usize, stream_p: S, stream_q: S) -> Self;
+}
+
 pub trait Prover<F: Field> {
     type ProverConfig;
     type ProverMessage;

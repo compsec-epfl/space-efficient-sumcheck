@@ -1,34 +1,31 @@
-use std::marker::PhantomData;
-
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
 use crate::{
-    hypercube::Hypercube,
-    interpolation::LagrangePolynomial,
-    messages::VerifierMessages,
-    multilinear_product::{Prover, ProverArgs, ProverArgsStageInfo},
+    hypercube::Hypercube, interpolation::LagrangePolynomial, messages::VerifierMessages,
     streams::EvaluationStream,
 };
 
-pub struct BlendyProductProver<'a, F: Field, S: EvaluationStream<F>> {
-    claimed_sum: F,
-    current_round: usize,
-    stream_p: &'a S,
-    stream_q: &'a S,
-    num_stages: usize,
-    num_variables: usize,
-    verifier_messages: VerifierMessages<F>,
-    x_table: Vec<F>,
-    y_table: Vec<F>,
-    j_prime_table: Vec<Vec<F>>,
-    stage_size: usize,
+pub struct BlendyProductProver<F: Field, S: EvaluationStream<F>> {
+    pub claim: F,
+    pub current_round: usize,
+    pub stream_p: S,
+    pub stream_q: S,
+    pub num_stages: usize,
+    pub num_variables: usize,
+    pub verifier_messages: VerifierMessages<F>,
+    pub x_table: Vec<F>,
+    pub y_table: Vec<F>,
+    pub j_prime_table: Vec<Vec<F>>,
+    pub stage_size: usize,
 }
 
-impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
-    const DEFAULT_NUM_STAGES: usize = 2;
+impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
+    pub fn total_rounds(&self) -> usize {
+        self.num_variables
+    }
 
-    fn compute_round(&self) -> (F, F, F) {
+    pub fn compute_round(&self) -> (F, F, F) {
         // Initialize accumulators for sum_0 and sum_1
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
@@ -119,11 +116,11 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
         (sum_0, sum_1, sum_half)
     }
 
-    fn is_initial_round(&self) -> bool {
+    pub fn is_initial_round(&self) -> bool {
         self.current_round == 0
     }
 
-    fn compute_state(&mut self) {
+    pub fn compute_state(&mut self) {
         println!("####### compute state");
         let j_prime: usize;
         let t: usize;
@@ -227,112 +224,5 @@ impl<'a, F: Field, S: EvaluationStream<F>> BlendyProductProver<'a, F, S> {
             println!("j_prime_table[1][0]: {:?}", self.j_prime_table[1][0]);
             println!("j_prime_table[1][1]: {:?}", self.j_prime_table[1][1]);
         }
-    }
-}
-
-impl<'a, F: Field, S: EvaluationStream<F>> Prover<'a, F, S> for BlendyProductProver<'a, F, S> {
-    fn claimed_sum(&self) -> F {
-        self.claimed_sum
-    }
-
-    fn generate_default_args(
-        stream_p: &'a S,
-        stream_q: &'a S,
-        claimed_sum: F,
-    ) -> ProverArgs<'a, F, S> {
-        ProverArgs {
-            stream_p,
-            stream_q,
-            claimed_sum,
-            stage_info: Some(ProverArgsStageInfo {
-                num_stages: BlendyProductProver::<F, S>::DEFAULT_NUM_STAGES,
-            }),
-            _phantom: PhantomData,
-        }
-    }
-
-    fn new(prover_args: ProverArgs<'a, F, S>) -> Self {
-        let claimed_sum: F = prover_args.stream_p.get_claimed_sum();
-        let num_variables: usize = prover_args.stream_q.get_num_variables();
-        let num_stages: usize = prover_args.stage_info.unwrap().num_stages;
-        let stage_size: usize = num_variables / num_stages;
-        // return the BlendyProver instance
-        Self {
-            claimed_sum,
-            current_round: 0,
-            stream_p: prover_args.stream_p,
-            stream_q: prover_args.stream_q,
-            num_stages,
-            num_variables,
-            verifier_messages: VerifierMessages::new(&vec![]),
-            x_table: vec![F::ZERO; Hypercube::stop_value(num_variables.div_ceil(2 * num_stages))],
-            y_table: vec![F::ZERO; Hypercube::stop_value(num_variables.div_ceil(2 * num_stages))],
-            j_prime_table: vec![
-                vec![F::ZERO; Hypercube::stop_value(stage_size)];
-                Hypercube::stop_value(stage_size)
-            ],
-            stage_size,
-        }
-    }
-
-    fn next_message(&mut self, verifier_message: Option<F>) -> Option<(F, F, F)> {
-        // Ensure the current round is within bounds
-        if self.current_round >= self.total_rounds() {
-            return None;
-        }
-
-        if !self.is_initial_round() {
-            self.verifier_messages
-                .receive_message(verifier_message.unwrap());
-        }
-
-        self.compute_state();
-
-        let sums: (F, F, F) = self.compute_round();
-
-        // Increment the round counter
-        self.current_round += 1;
-
-        // Return the computed polynomial sums
-        Some(sums)
-    }
-
-    fn total_rounds(&self) -> usize {
-        self.num_variables
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::marker::PhantomData;
-
-    use crate::{
-        multilinear_product::{
-            prover::{Prover, ProverArgs, ProverArgsStageInfo},
-            BlendyProductProver,
-        },
-        tests::{four_variable_polynomial, sanity_test_4_variables, BasicEvaluationStream, F19},
-    };
-
-    #[test]
-    fn sumcheck() {
-        // create evaluation streams for a known polynomials
-        let stream_p: BasicEvaluationStream<F19> =
-            BasicEvaluationStream::new(four_variable_polynomial());
-        let stream_q: BasicEvaluationStream<F19> =
-            BasicEvaluationStream::new(four_variable_polynomial());
-
-        // k=2 (DEFAULT)
-        sanity_test_4_variables(BlendyProductProver::new(
-            BlendyProductProver::generate_default_args(&stream_p, &stream_q, F19::from(18_u32)),
-        ));
-        // k=3
-        sanity_test_4_variables(BlendyProductProver::new(ProverArgs {
-            stream_p: &stream_p,
-            stream_q: &stream_q,
-            claimed_sum: F19::from(18_u32),
-            stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
-            _phantom: PhantomData,
-        }));
     }
 }

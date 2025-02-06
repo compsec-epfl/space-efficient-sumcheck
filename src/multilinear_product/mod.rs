@@ -1,6 +1,6 @@
-mod prover;
 mod provers;
 
-pub use prover::{Prover, ProverArgs, ProverArgsStageInfo};
-pub use provers::{BlendyProductProver, TimeProductProver};
-// pub use proof::Sumcheck;
+pub use provers::{
+    blendy::{BlendyProductProver, BlendyProductProverConfig},
+    time::{TimeProductProver, TimeProductProverConfig},
+};

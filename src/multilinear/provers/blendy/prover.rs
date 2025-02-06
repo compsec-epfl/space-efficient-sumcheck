@@ -3,7 +3,8 @@ use ark_ff::Field;
 use crate::{
     hypercube::Hypercube,
     messages::VerifierMessages,
-    multilinear::{BlendyProver, BlendyProverConfig, Prover},
+    multilinear::{BlendyProver, BlendyProverConfig},
+    prover::Prover,
     streams::EvaluationStream,
 };
 
@@ -70,7 +71,7 @@ where
 mod tests {
     use crate::{
         multilinear::BlendyProver,
-        tests::{sanity_test, BasicEvaluationStream, F19},
+        tests::{multilinear::sanity_test, BasicEvaluationStream, F19},
     };
 
     #[test]

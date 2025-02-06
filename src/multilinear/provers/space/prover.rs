@@ -1,7 +1,8 @@
 use ark_ff::Field;
 
 use crate::{
-    multilinear::{Prover, SpaceProver, SpaceProverConfig},
+    multilinear::{SpaceProver, SpaceProverConfig},
+    prover::Prover,
     streams::EvaluationStream,
 };
 
@@ -52,7 +53,7 @@ impl<F: Field, S: EvaluationStream<F>> Prover<F> for SpaceProver<F, S> {
 mod tests {
     use crate::{
         multilinear::SpaceProver,
-        tests::{sanity_test, BasicEvaluationStream, F19},
+        tests::{multilinear::sanity_test, BasicEvaluationStream, F19},
     };
 
     #[test]

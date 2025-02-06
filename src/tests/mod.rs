@@ -1,13 +1,10 @@
 #![cfg(test)]
 
 mod fields;
-mod multilinear;
-mod multilinear_product;
 mod polynomials;
 mod streams;
 
+pub mod multilinear;
+pub mod multilinear_product;
 pub use fields::F19;
-pub use multilinear::{multilinear_round_sanity, sanity_test, sanity_test_3_variables};
-pub use multilinear_product::sanity_test_4_variables;
-pub use polynomials::{four_variable_polynomial, three_variable_polynomial};
 pub use streams::{BasicEvaluationStream, BenchEvaluationStream};

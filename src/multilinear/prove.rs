@@ -1,7 +1,7 @@
 use ark_ff::Field;
 use ark_std::{rand::Rng, vec::Vec};
 
-use crate::{multilinear::Prover, streams::EvaluationStream};
+use crate::{prover::Prover, streams::EvaluationStream};
 
 #[derive(Debug)]
 pub struct Sumcheck<F: Field> {
@@ -62,7 +62,8 @@ impl<F: Field> Sumcheck<F> {
 mod tests {
     use super::Sumcheck;
     use crate::{
-        multilinear::{BlendyProver, BlendyProverConfig, Prover, ProverConfig, TimeProver},
+        multilinear::{BlendyProver, BlendyProverConfig, TimeProver},
+        prover::{Prover, ProverConfig},
         tests::{BenchEvaluationStream, F19},
     };
 

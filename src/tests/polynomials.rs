@@ -51,8 +51,8 @@ pub fn four_variable_polynomial<F: Field>() -> Vec<F> {
 }
 
 /*
- * Below here we extend multivariate::SparsePolynomial<F, SparseTerm> so that we can
- * get evaluations over the boolean hypercube
+ * Below here, we extend multivariate::SparsePolynomial<F, SparseTerm> so that we can
+ * get evaluations over the boolean hypercube (it's not so important it's just handy)
  *
  * The idea comes from here: https://github.com/montekki/thaler-study/blob/master/sum-check-protocol/src/lib.rs
  */

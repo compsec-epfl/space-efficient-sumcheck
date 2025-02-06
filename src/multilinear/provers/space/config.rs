@@ -1,6 +1,6 @@
 use ark_ff::Field;
 
-use crate::{multilinear::ProverConfig, streams::EvaluationStream};
+use crate::{prover::ProverConfig, streams::EvaluationStream};
 
 pub struct SpaceProverConfig<F, S>
 where
