@@ -3,13 +3,17 @@ use ark_ff::{
     fields::{Fp128, Fp64, MontBackend, MontConfig},
     Field,
 };
-use ark_std::marker::PhantomData;
 use space_efficient_sumcheck::{
-    provers::{
-        test_helpers::BenchEvaluationStream, BlendyProver, Prover, ProverArgs, ProverArgsStageInfo,
-        SpaceProver, TimeProver,
+    multilinear::{
+        BlendyProver, BlendyProverConfig, SpaceProver, SpaceProverConfig, TimeProver,
+        TimeProverConfig,
     },
-    Sumcheck,
+    multilinear_product::{
+        BlendyProductProver, BlendyProductProverConfig, TimeProductProver, TimeProductProverConfig,
+    },
+    prover::{ProductProverConfig, Prover, ProverConfig},
+    tests::BenchEvaluationStream,
+    ProductSumcheck, Sumcheck,
 };
 use std::env;
 
@@ -128,34 +132,50 @@ fn run_bench_on_field<F: Field>(bench_args: BenchArgs) {
 
     match bench_args.algorithm_label {
         AlgorithmLabel::CTY => {
-            Sumcheck::prove(
-                &mut SpaceProver::<F, BenchEvaluationStream<F>>::new(ProverArgs {
-                    stream: &stream,
-                    stage_info: None,
-                    _phantom: PhantomData,
-                }),
+            let config: SpaceProverConfig<F, BenchEvaluationStream<F>> =
+                SpaceProverConfig::<F, BenchEvaluationStream<F>>::default(
+                    stream.claimed_sum,
+                    bench_args.num_variables,
+                    stream,
+                );
+            Sumcheck::<F>::prove::<
+                BenchEvaluationStream<F>,
+                SpaceProver<F, BenchEvaluationStream<F>>,
+            >(
+                &mut SpaceProver::<F, BenchEvaluationStream<F>>::new(config),
                 &mut rng,
             );
         }
         AlgorithmLabel::VSBW => {
-            Sumcheck::prove(
-                &mut TimeProver::<F, BenchEvaluationStream<F>>::new(ProverArgs {
-                    stream: &stream,
-                    stage_info: None,
-                    _phantom: PhantomData,
-                }),
+            let config: TimeProductProverConfig<F, BenchEvaluationStream<F>> =
+                TimeProductProverConfig::<F, BenchEvaluationStream<F>>::default(
+                    stream.claimed_sum,
+                    bench_args.num_variables,
+                    stream.clone(),
+                    stream,
+                );
+            ProductSumcheck::<F>::prove::<
+                BenchEvaluationStream<F>,
+                TimeProductProver<F, BenchEvaluationStream<F>>,
+            >(
+                &mut TimeProductProver::<F, BenchEvaluationStream<F>>::new(config),
                 &mut rng,
             );
         }
         AlgorithmLabel::Blendy => {
-            Sumcheck::prove(
-                &mut BlendyProver::<F, BenchEvaluationStream<F>>::new(ProverArgs {
-                    stream: &stream,
-                    stage_info: Some(ProverArgsStageInfo {
-                        num_stages: bench_args.stage_size,
-                    }),
-                    _phantom: PhantomData,
-                }),
+            let config: BlendyProductProverConfig<F, BenchEvaluationStream<F>> =
+                BlendyProductProverConfig::<F, BenchEvaluationStream<F>> {
+                    claim: stream.claimed_sum,
+                    num_variables: bench_args.num_variables,
+                    num_stages: bench_args.stage_size,
+                    stream_p: stream.clone(),
+                    stream_q: stream,
+                };
+            ProductSumcheck::<F>::prove::<
+                BenchEvaluationStream<F>,
+                BlendyProductProver<F, BenchEvaluationStream<F>>,
+            >(
+                &mut BlendyProductProver::<F, BenchEvaluationStream<F>>::new(config),
                 &mut rng,
             );
         }

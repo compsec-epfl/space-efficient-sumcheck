@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 mod fields;
 mod polynomials;
 mod streams;

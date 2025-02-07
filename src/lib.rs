@@ -1,5 +1,5 @@
 #[doc(hidden)]
-mod tests;
+pub mod tests;
 
 pub mod hypercube;
 pub mod interpolation;
@@ -10,3 +10,4 @@ pub mod prover;
 pub mod streams;
 
 pub use crate::multilinear::Sumcheck;
+pub use crate::multilinear_product::ProductSumcheck;
