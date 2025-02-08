@@ -18,6 +18,7 @@ pub struct BlendyProductProver<F: Field, S: EvaluationStream<F>> {
     pub y_table: Vec<F>,
     pub j_prime_table: Vec<Vec<F>>,
     pub stage_size: usize,
+    pub inverse_four: F,
 }
 
 impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
@@ -33,30 +34,22 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
 
         let j_prime: usize;
         let t: usize;
-        println!("num_variables: {:?}", self.num_variables);
+        // println!("num_variables: {:?}", self.num_variables);
         let l = self.num_variables.div_ceil(2 * self.num_stages);
-        println!("l: {:?}", l);
+        // println!("l: {:?}", l);
         let j = self.current_round + 1;
-        println!("j: {:?}", j);
+        // println!("j: {:?}", j);
         let mut p = 0_usize;
         let s = (j).ilog2() as usize;
-        println!("s: {:?}", s);
-        println!("l - 1: {:?}", l - 1);
+        // println!("s: {:?}", s);
+        // println!("l - 1: {:?}", l - 1);
         if j <= l - 1 {
-            if 2_usize.pow(s as u32) == j {
-                p = 1;
-            }
             j_prime = 2_usize.pow(s as u32);
             t = j_prime - 1;
         } else {
-            if j % l == 0 {
-                p = 1;
-            }
             j_prime = l * (j / l);
             t = l - 1;
         }
-        println!("j_prime: {:?}", j_prime);
-        println!("t: {:?}", t);
 
         let r1: Vec<F> = self.verifier_messages.messages[0..j_prime - 1].to_vec();
         let mut r1_hat: Vec<F> = vec![F::ZERO; r1.len()];
@@ -75,11 +68,6 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
             for (b_prime_prime_index, b_prime_prime) in Hypercube::new(j - j_prime) {
                 let lag_poly_2 =
                     LagrangePolynomial::lag_poly(r2.clone(), r2_hat.clone(), b_prime_prime.clone());
-                println!("b_prime_prime: {:?}", b_prime_prime);
-                println!("r1: {:?}", r1);
-                println!("r2: {:?}", r2);
-                println!("lag_poly_1: {:?}", lag_poly_1);
-                println!("lag_poly_2: {:?}", lag_poly_2);
                 for (v_index, _) in Hypercube::new((t as i64 - j as i64 + j_prime as i64) as usize)
                 {
                     let b_prime_0_v =
@@ -90,27 +78,19 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                         v_index << (j - j_prime + 1) | 1 << (j - j_prime) | b_prime_index;
                     let b_prime_prime_1_v =
                         v_index << (j - j_prime + 1) | 1 << (j - j_prime) | b_prime_prime_index;
-                    println!("b_prime_0_v {:?}", b_prime_0_v);
-                    println!("b_prime_prime_0_v {:?}", b_prime_0_v);
-                    println!(
-                        "adding: {:?}",
-                        self.j_prime_table[b_prime_0_v][b_prime_prime_0_v]
-                    );
-                    sum_0 += lag_poly_1
-                        * lag_poly_2
-                        * self.j_prime_table[b_prime_0_v][b_prime_prime_0_v];
+                    sum_0 += self.j_prime_table[b_prime_0_v][b_prime_prime_0_v];
                     sum_1 += self.j_prime_table[b_prime_1_v][b_prime_prime_1_v];
                     sum_half += self.j_prime_table[b_prime_0_v][b_prime_prime_0_v];
                     sum_half += self.j_prime_table[b_prime_0_v][b_prime_prime_1_v];
                     sum_half += self.j_prime_table[b_prime_1_v][b_prime_prime_0_v];
                     sum_half += self.j_prime_table[b_prime_1_v][b_prime_prime_1_v];
                 }
-                // sum_0 = sum_0 * lag_poly_1 * lag_poly_2;
+                sum_0 = sum_0 * lag_poly_1 * lag_poly_2;
                 sum_1 = sum_1 * lag_poly_1 * lag_poly_2;
                 sum_half = sum_half * lag_poly_1 * lag_poly_2;
             }
         }
-        sum_half = sum_half / F::from(4_u32);
+        sum_half = sum_half * self.inverse_four;
 
         // Return the accumulated sums
         (sum_0, sum_1, sum_half)
@@ -121,18 +101,18 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
     }
 
     pub fn compute_state(&mut self) {
-        println!("####### compute state");
+        // println!("####### compute state");
         let j_prime: usize;
         let t: usize;
-        println!("num_variables: {:?}", self.num_variables);
+        // println!("num_variables: {:?}", self.num_variables);
         let l = self.num_variables.div_ceil(2 * self.num_stages);
-        println!("l: {:?}", l);
+        // println!("l: {:?}", l);
         let j = self.current_round + 1;
-        println!("j: {:?}", j);
+        // println!("j: {:?}", j);
         let mut p = 0_usize;
         let s = (j).ilog2() as usize;
-        println!("s: {:?}", s);
-        println!("l - 1: {:?}", l - 1);
+        // println!("s: {:?}", s);
+        // println!("l - 1: {:?}", l - 1);
         if j <= l - 1 {
             if 2_usize.pow(s as u32) == j {
                 p = 1;
@@ -146,8 +126,8 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
             j_prime = l * (j / l);
             t = l - 1;
         }
-        println!("j_prime: {:?}", j_prime);
-        println!("t: {:?}", t);
+        // println!("j_prime: {:?}", j_prime);
+        // println!("t: {:?}", t);
 
         if p == 1 {
             self.j_prime_table = vec![
@@ -156,31 +136,31 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
             ];
             let b_num_vars = self.num_variables - j_prime - t;
             for (b_index, _) in Hypercube::new(b_num_vars) {
-                println!("####### X update");
+                // println!("####### X update");
 
                 for (b_prime_index, _) in Hypercube::new(t + 1) {
                     self.x_table[b_prime_index] = F::ZERO;
                     for (x_index, x) in Hypercube::new(j_prime - 1) {
                         let evaluation_point =
                             x_index << (t + 1 + b_num_vars) | b_prime_index << b_num_vars | b_index;
-                        println!("point: {:?}", evaluation_point);
+                        // println!("point: {:?}", evaluation_point);
                         let lag_poly = LagrangePolynomial::lag_poly(
                             self.verifier_messages.messages[0..j_prime - 1].to_vec(),
                             self.verifier_messages.message_hats[0..j_prime - 1].to_vec(),
                             x,
                         );
-                        println!(
-                            "lag_poly: {:?}, eval: {:?}",
-                            lag_poly,
-                            self.stream_p.get_evaluation(evaluation_point)
-                        );
+                        // println!(
+                        //     "lag_poly: {:?}, eval: {:?}",
+                        //     lag_poly,
+                        //     self.stream_p.get_evaluation(evaluation_point)
+                        // );
                         self.x_table[b_prime_index] +=
                             lag_poly * self.stream_q.get_evaluation(evaluation_point);
-                        println!("x_table: {:?}", self.x_table);
+                        // println!("x_table: {:?}", self.x_table);
                     }
                 }
 
-                println!("####### Y update");
+                // println!("####### Y update");
 
                 for (b_prime_prime_index, _) in Hypercube::new(t + 1) {
                     self.y_table[b_prime_prime_index] = F::ZERO;
@@ -188,29 +168,32 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                         let evaluation_point = x_index << (t + 1 + b_num_vars)
                             | b_prime_prime_index << b_num_vars
                             | b_index;
-                        println!("b_prime_prime_index: {:?}", b_prime_prime_index);
-                        println!("point: {:?}", evaluation_point);
+                        // println!("b_prime_prime_index: {:?}", b_prime_prime_index);
+                        // println!("point: {:?}", evaluation_point);
                         let lag_poly = LagrangePolynomial::lag_poly(
                             self.verifier_messages.messages[0..j_prime - 1].to_vec(),
                             self.verifier_messages.message_hats[0..j_prime - 1].to_vec(),
                             x,
                         );
-                        println!(
-                            "lag_poly: {:?}, eval: {:?}",
-                            lag_poly,
-                            self.stream_p.get_evaluation(evaluation_point)
-                        );
+                        // println!(
+                        //     "lag_poly: {:?}, eval: {:?}",
+                        //     lag_poly,
+                        //     self.stream_p.get_evaluation(evaluation_point)
+                        // );
                         self.y_table[b_prime_prime_index] +=
                             lag_poly * self.stream_q.get_evaluation(evaluation_point);
-                        println!("y_table: {:?}", self.y_table);
+                        // println!("y_table: {:?}", self.y_table);
                     }
                 }
 
-                println!("####### M update");
-
+                // println!("blendy x_table: {:?}", self.x_table);
+                // println!("blendy y_table: {:?}", self.y_table);
+                // println!("####### M update");
                 for (b_prime_index, _) in Hypercube::new(t + 1) {
                     for (b_prime_prime_index, _) in Hypercube::new(t + 1) {
-                        // println!("adding to j_prime table: {:?}", (self.x_table[b_prime_index] * self.y_table[b_prime_prime_index]));
+                        // if (b_prime_index == 0 && b_prime_prime_index == 1) {
+                        //     println!("adding to [0][1]: {:?} * {:?}", self.x_table[b_prime_index], self.y_table[b_prime_prime_index]);
+                        // }
                         self.j_prime_table[b_prime_index][b_prime_prime_index] = self.j_prime_table
                             [b_prime_index][b_prime_prime_index]
                             + (self.x_table[b_prime_index] * self.y_table[b_prime_prime_index]);

@@ -25,6 +25,7 @@ impl<F: Field, S: EvaluationStream<F>> Prover<F> for TimeProductProver<F, S> {
             stream_p: prover_config.stream_p,
             stream_q: prover_config.stream_q,
             num_variables,
+            inverse_four: F::from(4_u32).inverse().unwrap(),
         }
     }
 

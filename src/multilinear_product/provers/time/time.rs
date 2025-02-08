@@ -11,6 +11,7 @@ pub struct TimeProductProver<F: Field, S: EvaluationStream<F>> {
     pub stream_p: S,
     pub stream_q: S,
     pub num_variables: usize,
+    pub inverse_four: F,
 }
 
 impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
@@ -25,9 +26,9 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
      * from the streams (instead of the tables), which reduces max memory usage by 1/2
      */
     pub fn vsbw_evaluate(&self) -> (F, F, F) {
-        // Initialize accumulators for sum_0 and sum_1
-        let mut sum_0 = F::ZERO;
-        let mut sum_1 = F::ZERO;
+        // Initialize accumulators
+        let mut sum_half = F::ZERO;
+        let mut j_prime_table: ((F, F), (F, F)) = ((F::ZERO, F::ZERO), (F::ZERO, F::ZERO));
 
         // Calculate the bitmask for the number of free variables
         let bitmask: usize = 1 << (self.num_free_variables() - 1);
@@ -39,27 +40,50 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
         };
 
         // Iterate through evaluations
-        for i in 0..evaluations_len {
-            // Check if the bit at the position specified by the bitmask is set
-            let is_set: bool = (i & bitmask) != 0;
+        for i in 0..(evaluations_len / 2) {
+            // these must be zeroed out
+            let mut x_table: (F, F) = (F::ZERO, F::ZERO);
+            let mut y_table: (F, F) = (F::ZERO, F::ZERO);
 
-            // Get the point evaluation for the current index
-            let product_of_points_evaluation = match (&self.evaluations_p, &self.evaluations_q) {
-                (None, _) | (_, None) => {
-                    self.stream_p.get_evaluation(i) * self.stream_q.get_evaluation(i)
-                }
-                (Some(evaluations_p), Some(evaluations_q)) => evaluations_p[i] * evaluations_q[i],
+            // get all the values
+            let p_zero = match &self.evaluations_p {
+                None => self.stream_p.get_evaluation(i),
+                Some(evaluations_p) => evaluations_p[i],
+            };
+            let q_zero = match &self.evaluations_q {
+                None => self.stream_q.get_evaluation(i),
+                Some(evaluations_q) => evaluations_q[i],
+            };
+            let p_one = match &self.evaluations_p {
+                None => self.stream_p.get_evaluation(i | bitmask),
+                Some(evaluations_p) => evaluations_p[i | bitmask],
+            };
+            let q_one = match &self.evaluations_q {
+                None => self.stream_q.get_evaluation(i | bitmask),
+                Some(evaluations_q) => evaluations_q[i | bitmask],
             };
 
-            // Accumulate the value based on whether the bit is set or not
-            match is_set {
-                false => sum_0 += product_of_points_evaluation,
-                true => sum_1 += product_of_points_evaluation,
-            }
+            // update tables
+            x_table.0 += p_zero;
+            y_table.0 += q_zero;
+            y_table.1 += q_one;
+            x_table.1 += p_one;
+
+            // update j_prime
+            j_prime_table.0 .0 = j_prime_table.0 .0 + x_table.0 * y_table.0;
+            j_prime_table.1 .1 = j_prime_table.1 .1 + x_table.1 * y_table.1;
+            j_prime_table.0 .1 = j_prime_table.0 .1 + x_table.0 * y_table.1;
+            j_prime_table.1 .0 = j_prime_table.1 .0 + x_table.1 * y_table.0;
         }
 
-        // Return the accumulated sums
-        (sum_0, sum_1, F::ZERO)
+        // update
+        let sum_0 = j_prime_table.0 .0;
+        let sum_1 = j_prime_table.1 .1;
+        sum_half +=
+            j_prime_table.0 .0 + j_prime_table.1 .1 + j_prime_table.0 .1 + j_prime_table.1 .0;
+        sum_half = sum_half * self.inverse_four;
+
+        (sum_0, sum_1, sum_half)
     }
     pub fn vsbw_reduce_evaluations_p(&mut self, verifier_message: F, verifier_message_hat: F) {
         // Clone or initialize the evaluations vector

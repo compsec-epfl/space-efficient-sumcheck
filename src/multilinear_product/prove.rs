@@ -65,7 +65,7 @@ mod tests {
     use super::ProductSumcheck;
     use crate::{
         multilinear_product::{BlendyProductProver, BlendyProductProverConfig, TimeProductProver},
-        prover::{Prover, ProductProverConfig},
+        prover::{ProductProverConfig, Prover},
         tests::{BenchEvaluationStream, F19},
     };
 
@@ -73,18 +73,28 @@ mod tests {
     fn algorithm_consistency() {
         const NUM_VARIABLES: usize = 4;
         // take an evaluation stream
-        let evaluation_stream: BenchEvaluationStream<F19> = BenchEvaluationStream::new(NUM_VARIABLES);
+        let evaluation_stream: BenchEvaluationStream<F19> =
+            BenchEvaluationStream::new(NUM_VARIABLES);
         let claim = evaluation_stream.claimed_sum;
         // initialize the provers
         let mut blendy_k3_prover = BlendyProductProver::<F19, BenchEvaluationStream<F19>>::new(
-            BlendyProductProverConfig::new(claim, 2, NUM_VARIABLES, evaluation_stream.clone(), evaluation_stream.clone()),
+            BlendyProductProverConfig::new(
+                claim,
+                2,
+                NUM_VARIABLES,
+                evaluation_stream.clone(),
+                evaluation_stream.clone(),
+            ),
         );
         let mut time_prover =
             TimeProductProver::<F19, BenchEvaluationStream<F19>>::new(<TimeProductProver<
                 F19,
                 BenchEvaluationStream<F19>,
             > as Prover<F19>>::ProverConfig::default(
-                claim, NUM_VARIABLES, evaluation_stream.clone(), evaluation_stream,
+                claim,
+                NUM_VARIABLES,
+                evaluation_stream.clone(),
+                evaluation_stream,
             ));
         // run them and get the transcript
         let blendy_prover_transcript = ProductSumcheck::<F19>::prove::<

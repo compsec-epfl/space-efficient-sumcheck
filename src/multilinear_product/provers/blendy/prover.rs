@@ -37,6 +37,7 @@ impl<F: Field, S: EvaluationStream<F>> Prover<F> for BlendyProductProver<F, S> {
                 Hypercube::stop_value(stage_size)
             ],
             stage_size,
+            inverse_four: F::from(4_u32).inverse().unwrap(),
         }
     }
 

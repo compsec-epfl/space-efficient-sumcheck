@@ -6,15 +6,28 @@ use crate::{
     tests::{polynomials::four_variable_polynomial, streams::BasicEvaluationStream},
 };
 
-fn multilinear_product_round_sanity<F, S, P>(p: &mut P, message: Option<F>, eval_0: F, eval_1: F)
-where
+fn multilinear_product_round_sanity<F, S, P>(
+    round_num: usize,
+    p: &mut P,
+    message: Option<F>,
+    eval_0: F,
+    eval_1: F,
+) where
     F: Field,
     S: EvaluationStream<F>,
     P: Prover<F, VerifierMessage = Option<F>, ProverMessage = Option<(F, F, F)>>,
 {
     let round = p.next_message(message).unwrap();
-    assert_eq!(round.0, eval_0, "g0 should evaluate correctly",);
-    assert_eq!(round.1, eval_1, "g1 should evaluate correctly",);
+    assert_eq!(
+        round.0, eval_0,
+        "g0 should evaluate correctly round {}",
+        round_num
+    );
+    assert_eq!(
+        round.1, eval_1,
+        "g1 should evaluate correctly round {}",
+        round_num
+    );
 }
 
 pub fn sanity_test<F, S, P>()
@@ -26,7 +39,7 @@ where
 {
     let s_p: S = BasicEvaluationStream::new(four_variable_polynomial()).into();
     let s_q: S = BasicEvaluationStream::new(four_variable_polynomial()).into();
-    let mut p = P::new(P::ProverConfig::default(F::from(18_u32), 4, s_p, s_q));
+    let mut p = P::new(ProductProverConfig::default(F::from(18_u32), 4, s_p, s_q));
     /*
      * Zeroth Round:
      *
@@ -53,7 +66,7 @@ where
      *   ----------------------
      *   Sum g₀(1) = 7
      */
-    multilinear_product_round_sanity::<F, S, P>(&mut p, None, F::from(11_u32), F::from(7_u32));
+    multilinear_product_round_sanity::<F, S, P>(0, &mut p, None, F::from(11_u32), F::from(7_u32));
     /*
      * First Round: x₀ fixed to 3
      *
@@ -74,6 +87,7 @@ where
      *   Sum g₁(1) = 10
      */
     multilinear_product_round_sanity::<F, S, P>(
+        1,
         &mut p,
         Some(F::from(3_u32)),
         F::from(18_u32),
@@ -95,6 +109,7 @@ where
      *   Sum g₂(1) = 5
      */
     multilinear_product_round_sanity::<F, S, P>(
+        2,
         &mut p,
         Some(F::from(4_u32)),
         F::from(18_u32),
@@ -114,6 +129,7 @@ where
      *   Sum g₃(1) = 1
      */
     multilinear_product_round_sanity::<F, S, P>(
+        3,
         &mut p,
         Some(F::from(7_u32)),
         F::from(4_u32),
