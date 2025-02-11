@@ -79,6 +79,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
         // update
         let sum_0 = j_prime_table.0 .0;
         let sum_1 = j_prime_table.1 .1;
+        println!("time round: {:?}, sum0: {:?}, sum1: {:?}", self.current_round + 1, sum_0, sum_1);
         sum_half +=
             j_prime_table.0 .0 + j_prime_table.1 .1 + j_prime_table.0 .1 + j_prime_table.1 .0;
         sum_half = sum_half * self.inverse_four;

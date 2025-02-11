@@ -71,13 +71,13 @@ mod tests {
 
     #[test]
     fn algorithm_consistency() {
-        const NUM_VARIABLES: usize = 4;
+        const NUM_VARIABLES: usize = 8;
         // take an evaluation stream
         let evaluation_stream: BenchEvaluationStream<F19> =
             BenchEvaluationStream::new(NUM_VARIABLES);
         let claim = evaluation_stream.claimed_sum;
         // initialize the provers
-        let mut blendy_k3_prover = BlendyProductProver::<F19, BenchEvaluationStream<F19>>::new(
+        let mut blendy_k2_prover = BlendyProductProver::<F19, BenchEvaluationStream<F19>>::new(
             BlendyProductProverConfig::new(
                 claim,
                 2,
@@ -97,14 +97,14 @@ mod tests {
                 evaluation_stream,
             ));
         // run them and get the transcript
-        let blendy_prover_transcript = ProductSumcheck::<F19>::prove::<
-            BenchEvaluationStream<F19>,
-            BlendyProductProver<F19, BenchEvaluationStream<F19>>,
-        >(&mut blendy_k3_prover, &mut ark_std::test_rng());
         let time_prover_transcript = ProductSumcheck::<F19>::prove::<
             BenchEvaluationStream<F19>,
             TimeProductProver<F19, BenchEvaluationStream<F19>>,
         >(&mut time_prover, &mut ark_std::test_rng());
+        let blendy_prover_transcript = ProductSumcheck::<F19>::prove::<
+            BenchEvaluationStream<F19>,
+            BlendyProductProver<F19, BenchEvaluationStream<F19>>,
+        >(&mut blendy_k2_prover, &mut ark_std::test_rng());
         // ensure the transcript is identical
         assert_eq!(
             time_prover_transcript.prover_messages,
