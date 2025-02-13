@@ -4,9 +4,7 @@ use ark_ff::{
 };
 use std::env;
 
-use space_efficient_sumcheck::provers::{
-    lagrange_polynomial::LagrangePolynomial, verifier_messages::VerifierMessages,
-};
+use space_efficient_sumcheck::{interpolation::LagrangePolynomial, messages::VerifierMessages};
 
 #[derive(MontConfig)]
 #[modulus = "143244528689204659050391023439224324689"] // q = 143244528689204659050391023439224324689

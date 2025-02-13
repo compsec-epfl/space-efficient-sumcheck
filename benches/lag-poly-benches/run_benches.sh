@@ -4,8 +4,8 @@
 
 num_vars=15
 while [ $num_vars -le 30 ]; do
-    # NOTE: mac users change "time" --> "gtime" on next line
-    output=`(time -v ./target/release/lag-poly-benches $num_vars) 2>&1`
+    # NOTE FOR NEXT LINE: mac --> "gtime", linux --> "time"
+    output=`(gtime -v ./target/release/lag-poly-benches $num_vars) 2>&1`
     user_time_seconds=$(echo "$output" | grep "User time (seconds):" | awk '{print $4}')
     user_time_ms=$(awk "BEGIN {printf \"%.0f\", $user_time_seconds * 1000}")
     ram_kilobytes=$(echo "$output" | grep "Maximum resident set size (kbytes)" | awk '{print $6}')

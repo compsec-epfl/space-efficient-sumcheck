@@ -8,7 +8,7 @@ ark-ff = "0.4.0"
 ark-poly = "0.4.0"
 ark-std ="0.4.0"
 ark-bn254 = "0.4.0"
-space-efficient-sumcheck = { path = "../." }
+space-efficient-sumcheck = { path = "../../." }
 
 [profile.release]
 debug = true
