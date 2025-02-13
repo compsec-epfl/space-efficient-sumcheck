@@ -15,3 +15,7 @@ edition = "2021"
 ark-ff = "0.4.0"
 ark-poly = "0.4.0"
 ark-std ="0.4.0"
+
+[[bench]]
+name = "explanation"
+harness = false

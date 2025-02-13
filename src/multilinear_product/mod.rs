@@ -1,7 +1,7 @@
-mod prove;
+mod product_sumcheck;
 mod provers;
 
-pub use prove::ProductSumcheck;
+pub use product_sumcheck::ProductSumcheck;
 pub use provers::{
     blendy::{BlendyProductProver, BlendyProductProverConfig},
     time::{TimeProductProver, TimeProductProverConfig},

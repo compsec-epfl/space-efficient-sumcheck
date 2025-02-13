@@ -26,7 +26,7 @@ impl<F: Field, S: EvaluationStream<F>> TimeProver<F, S> {
         // Determine the length of evaluations to iterate through
         let evaluations_len = match &self.evaluations {
             Some(evaluations) => evaluations.len(),
-            None => 2usize.pow(self.evaluation_stream.get_num_variables() as u32),
+            None => 2usize.pow(self.evaluation_stream.num_variables() as u32),
         };
 
         // Iterate through evaluations
@@ -37,7 +37,7 @@ impl<F: Field, S: EvaluationStream<F>> TimeProver<F, S> {
             // Get the point evaluation for the current index
             let point_evaluation = match &self.evaluations {
                 Some(evaluations) => evaluations[i],
-                None => self.evaluation_stream.get_evaluation(i),
+                None => self.evaluation_stream.evaluation(i),
             };
 
             // Accumulate the value based on whether the bit is set or not
@@ -56,12 +56,7 @@ impl<F: Field, S: EvaluationStream<F>> TimeProver<F, S> {
             Some(evaluations) => evaluations.clone(),
             None => vec![
                 F::ZERO;
-                2usize.pow(
-                    self.evaluation_stream
-                        .get_num_variables()
-                        .try_into()
-                        .unwrap()
-                ) / 2
+                2usize.pow(self.evaluation_stream.num_variables().try_into().unwrap()) / 2
             ],
         };
 
@@ -80,11 +75,11 @@ impl<F: Field, S: EvaluationStream<F>> TimeProver<F, S> {
 
             // Get point evaluations for indices i0 and i1
             let point_evaluation_i0 = match &self.evaluations {
-                None => self.evaluation_stream.get_evaluation(i0),
+                None => self.evaluation_stream.evaluation(i0),
                 Some(evaluations) => evaluations[i0],
             };
             let point_evaluation_i1 = match &self.evaluations {
-                None => self.evaluation_stream.get_evaluation(i1),
+                None => self.evaluation_stream.evaluation(i1),
                 Some(evaluations) => evaluations[i1],
             };
 

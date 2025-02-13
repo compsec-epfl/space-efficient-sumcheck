@@ -43,13 +43,13 @@ impl<F: Field> BenchEvaluationStream<F> {
     }
 }
 impl<F: Field> EvaluationStream<F> for BenchEvaluationStream<F> {
-    fn get_claimed_sum(&self) -> F {
+    fn claim(&self) -> F {
         self.claimed_sum
     }
-    fn get_evaluation(&self, point: usize) -> F {
+    fn evaluation(&self, point: usize) -> F {
         F::from(point as u64)
     }
-    fn get_num_variables(&self) -> usize {
+    fn num_variables(&self) -> usize {
         self.num_variables
     }
 }

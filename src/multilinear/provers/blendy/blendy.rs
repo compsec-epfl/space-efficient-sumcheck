@@ -127,10 +127,10 @@ where
                     self.sums[b2_index] =
                         match b1_index == 0 && b3_index == 0 && b2_index < len_sums {
                             // SEE HERE zero out the array on first access per update
-                            true => lag_poly * self.evaluation_stream.get_evaluation(index),
+                            true => lag_poly * self.evaluation_stream.evaluation(index),
                             false => {
                                 self.sums[b2_index]
-                                    + lag_poly * self.evaluation_stream.get_evaluation(index)
+                                    + lag_poly * self.evaluation_stream.evaluation(index)
                             }
                         };
                 }
@@ -167,7 +167,7 @@ where
             .enumerate()
             .scan(F::ZERO, |sum, (index, item)| {
                 match self.is_single_staged() {
-                    true => *sum += self.evaluation_stream.get_evaluation(index),
+                    true => *sum += self.evaluation_stream.evaluation(index),
                     false => *sum += item,
                 }
                 Some(*sum)

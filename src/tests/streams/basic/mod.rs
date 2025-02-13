@@ -39,13 +39,13 @@ impl<F: Field> BasicEvaluationStream<F> {
 }
 
 impl<F: Field> EvaluationStream<F> for BasicEvaluationStream<F> {
-    fn get_claimed_sum(&self) -> F {
+    fn claim(&self) -> F {
         self.evaluations.iter().sum()
     }
-    fn get_evaluation(&self, point: usize) -> F {
+    fn evaluation(&self, point: usize) -> F {
         self.evaluations[point]
     }
-    fn get_num_variables(&self) -> usize {
+    fn num_variables(&self) -> usize {
         self.evaluations.len().ilog2() as usize
     }
 }

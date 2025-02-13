@@ -152,10 +152,10 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                         // println!(
                         //     "lag_poly: {:?}, eval: {:?}",
                         //     lag_poly,
-                        //     self.stream_p.get_evaluation(evaluation_point)
+                        //     self.stream_p.evaluation(evaluation_point)
                         // );
                         self.x_table[b_prime_index] +=
-                            lag_poly * self.stream_q.get_evaluation(evaluation_point);
+                            lag_poly * self.stream_q.evaluation(evaluation_point);
                         // println!("x_table: {:?}", self.x_table);
                     }
                 }
@@ -178,10 +178,10 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                         // println!(
                         //     "lag_poly: {:?}, eval: {:?}",
                         //     lag_poly,
-                        //     self.stream_p.get_evaluation(evaluation_point)
+                        //     self.stream_p.evaluation(evaluation_point)
                         // );
                         self.y_table[b_prime_prime_index] +=
-                            lag_poly * self.stream_q.get_evaluation(evaluation_point);
+                            lag_poly * self.stream_q.evaluation(evaluation_point);
                         // println!("y_table: {:?}", self.y_table);
                     }
                 }

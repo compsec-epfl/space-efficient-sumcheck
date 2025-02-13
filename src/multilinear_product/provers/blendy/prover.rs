@@ -80,9 +80,9 @@ mod tests {
 
         // // create evaluation streams for a known polynomials
         // let stream_p: BasicEvaluationStream<F19> =
-        //     BasicEvaluationStream::new(four_variable_polynomial());
+        //     BasicEvaluationStream::new(four_variable_polynomial_evaluations());
         // let stream_q: BasicEvaluationStream<F19> =
-        //     BasicEvaluationStream::new(four_variable_polynomial());
+        //     BasicEvaluationStream::new(four_variable_polynomial_evaluations());
 
         // // k=2 (DEFAULT)
         // sanity_test_4_variables(BlendyProductProver::new(

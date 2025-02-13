@@ -1,13 +1,5 @@
 #!/bin/sh
 
-# ATTENTION
-# You can pipe the output of this script to a file like so:
-#   nohup ./run_benches.sh &> output_file.txt &
-# If you need to kill the running process you can find pid with:
-#   lsof | grep output_file
-# Then:
-#   kill <pid>
-
 algorithms="Blendy2 VSBW" # "Blendy1 Blendy2 VSBW Blendy3 Blendy4 CTY"
 fields="Field64 Field128 FieldBn254"
 
@@ -33,7 +25,7 @@ for algorithm in $algorithms; do
                 "CTY") algorithm_label="CTY" ;;
                 *) ;;
             esac
-            # NOTE: if you're on mac you might install gnu-time and change next line to "gtime"
+            # NOTE: mac users change "time" --> "gtime" on next line
             output=`(gtime -v ./target/release/benches $algorithm_label $field $num_vars $stage_size) 2>&1`
             user_time_seconds=$(echo "$output" | grep "User time (seconds):" | awk '{print $4}')
             user_time_ms=$(awk "BEGIN {printf \"%.0f\", $user_time_seconds * 1000}")
@@ -44,3 +36,13 @@ for algorithm in $algorithms; do
         done
     done
 done
+
+# NOTE: helpful Unix commands
+#
+# 1) You can run this shell in the background while piping the output to a file like so:
+#   nohup ./run_benches.sh &> output_file.txt &
+#
+# 2) If you need to kill the running process you can find pid with:
+#   lsof | grep output_file
+#  Then:
+#     kill <pid>

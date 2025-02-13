@@ -47,7 +47,7 @@ impl<F: Field, S: EvaluationStream<F>> SpaceProver<F, S> {
                 let is_set: bool = (evaluation_index & bitmask) != 0;
 
                 // Use match to accumulate the appropriate value based on whether the bit is set or not
-                let inner_sum = self.evaluation_stream.get_evaluation(evaluation_index) * lag_poly;
+                let inner_sum = self.evaluation_stream.evaluation(evaluation_index) * lag_poly;
                 match is_set {
                     false => sum_0 += inner_sum,
                     true => sum_1 += inner_sum,

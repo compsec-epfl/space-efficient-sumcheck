@@ -36,7 +36,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
         // Determine the length of evaluations to iterate through
         let evaluations_len = match &self.evaluations_p {
             Some(evaluations) => evaluations.len(),
-            None => 2usize.pow(self.stream_p.get_num_variables() as u32),
+            None => 2usize.pow(self.stream_p.num_variables() as u32),
         };
 
         // Iterate through evaluations
@@ -47,19 +47,19 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
 
             // get all the values
             let p_zero = match &self.evaluations_p {
-                None => self.stream_p.get_evaluation(i),
+                None => self.stream_p.evaluation(i),
                 Some(evaluations_p) => evaluations_p[i],
             };
             let q_zero = match &self.evaluations_q {
-                None => self.stream_q.get_evaluation(i),
+                None => self.stream_q.evaluation(i),
                 Some(evaluations_q) => evaluations_q[i],
             };
             let p_one = match &self.evaluations_p {
-                None => self.stream_p.get_evaluation(i | bitmask),
+                None => self.stream_p.evaluation(i | bitmask),
                 Some(evaluations_p) => evaluations_p[i | bitmask],
             };
             let q_one = match &self.evaluations_q {
-                None => self.stream_q.get_evaluation(i | bitmask),
+                None => self.stream_q.evaluation(i | bitmask),
                 Some(evaluations_q) => evaluations_q[i | bitmask],
             };
 
@@ -90,7 +90,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
         let mut evaluations = match &self.evaluations_p {
             Some(evaluations) => evaluations.clone(),
             None => {
-                vec![F::ZERO; 2usize.pow(self.stream_p.get_num_variables().try_into().unwrap()) / 2]
+                vec![F::ZERO; 2usize.pow(self.stream_p.num_variables().try_into().unwrap()) / 2]
             }
         };
 
@@ -109,11 +109,11 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
 
             // Get point evaluations for indices i0 and i1
             let point_evaluation_i0 = match &self.evaluations_p {
-                None => self.stream_p.get_evaluation(i0),
+                None => self.stream_p.evaluation(i0),
                 Some(evaluations) => evaluations[i0],
             };
             let point_evaluation_i1 = match &self.evaluations_p {
-                None => self.stream_p.get_evaluation(i1),
+                None => self.stream_p.evaluation(i1),
                 Some(evaluations) => evaluations[i1],
             };
             // Update the i0-th evaluation based on the reduction operation
@@ -133,7 +133,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
         let mut evaluations = match &self.evaluations_q {
             Some(evaluations) => evaluations.clone(),
             None => {
-                vec![F::ZERO; 2usize.pow(self.stream_q.get_num_variables().try_into().unwrap()) / 2]
+                vec![F::ZERO; 2usize.pow(self.stream_q.num_variables().try_into().unwrap()) / 2]
             }
         };
 
@@ -152,11 +152,11 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
 
             // Get point evaluations for indices i0 and i1
             let point_evaluation_i0 = match &self.evaluations_q {
-                None => self.stream_q.get_evaluation(i0),
+                None => self.stream_q.evaluation(i0),
                 Some(evaluations) => evaluations[i0],
             };
             let point_evaluation_i1 = match &self.evaluations_q {
-                None => self.stream_q.get_evaluation(i1),
+                None => self.stream_q.evaluation(i1),
                 Some(evaluations) => evaluations[i1],
             };
             // Update the i0-th evaluation based on the reduction operation
