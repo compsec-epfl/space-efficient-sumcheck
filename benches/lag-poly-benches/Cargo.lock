@@ -334,11 +334,15 @@ checksum = "f79dfe2d285b0488816f30e700a7438c5a73d816b5b7d3ac72fbc48b0d185e03"
 
 [[package]]
 name = "space-efficient-sumcheck"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "ark-ff",
  "ark-poly",
+ "ark-serialize",
  "ark-std",
+ "num-bigint",
+ "num-traits",
+ "zeroize",
 ]
 
 [[package]]
