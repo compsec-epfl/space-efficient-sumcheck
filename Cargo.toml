@@ -1,6 +1,6 @@
 [package]
 name = "space-efficient-sumcheck"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
     "Giacomo Fenzi <giacomo.fenzi@epfl.ch>",
     "Elisabetta Fedele <efedele@ethz.ch>",
@@ -15,3 +15,7 @@ edition = "2021"
 ark-ff = "0.4.0"
 ark-poly = "0.4.0"
 ark-std ="0.4.0"
+
+[[bench]]
+name = "explanation"
+harness = false
