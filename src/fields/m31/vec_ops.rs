@@ -22,7 +22,7 @@ pub fn reduce_sum_naive(vec: &[u32]) -> u32 {
 
 impl VecOps for M31 {
     fn reduce_sum(vec: &[M31]) -> Self {
-        // #[cfg(target_arch = "aarch64")]
+        #[cfg(target_arch = "aarch64")]
         return M31 {
             value: aarch64_neon::reduce_sum_32_bit_modulus(
                 unsafe { from_raw_parts(vec.as_ptr() as *mut u32, vec.len()) },
