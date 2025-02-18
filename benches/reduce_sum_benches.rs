@@ -5,7 +5,9 @@ use ark_std::{
     test_rng,
 };
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use space_efficient_sumcheck::fields::{reduce_sum_naive, VecOps, M31, M31_MODULUS, aarch64_neon::reduce_sum_32_bit_modulus_asm};
+use space_efficient_sumcheck::fields::{
+    aarch64_neon::reduce_sum_32_bit_modulus_asm, reduce_sum_naive, VecOps, M31, M31_MODULUS,
+};
 
 // TODO (z-tech): this is the benchmark we should hit with both Neon and AVX
 const LANES: usize = 4;
