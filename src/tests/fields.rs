@@ -1,7 +1,4 @@
-use ark_ff::{
-    fields::{Fp128, Fp64, MontBackend, MontConfig},
-    Field,
-};
+use ark_ff::fields::{Fp128, Fp64, MontBackend, MontConfig};
 
 #[derive(MontConfig)]
 #[modulus = "19"]

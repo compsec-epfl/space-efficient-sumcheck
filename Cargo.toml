@@ -1,6 +1,6 @@
 [package]
 name = "space-efficient-sumcheck"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
     "Giacomo Fenzi <giacomo.fenzi@epfl.ch>",
     "Elisabetta Fedele <efedele@ethz.ch>",
