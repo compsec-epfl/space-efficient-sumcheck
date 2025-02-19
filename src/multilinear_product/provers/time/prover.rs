@@ -61,16 +61,73 @@ impl<F: Field, S: EvaluationStream<F>> Prover<F> for TimeProductProver<F, S> {
 
 #[cfg(test)]
 mod tests {
+    use ark_poly::multivariate::{SparsePolynomial, SparseTerm};
+
     use crate::{
-        multilinear_product::TimeProductProver,
-        tests::{multilinear_product::sanity_test, BasicEvaluationStream, F19},
+        multilinear_product::{ProductSumcheck, TimeProductProver},
+        prover::{ProductProverConfig, Prover},
+        streams::EvaluationStream,
+        tests::{
+            multilinear_product::sanity_test,
+            multilinear_product::{BasicProductProver, ProductProverPolynomialConfig},
+            polynomials::Polynomial,
+            BasicEvaluationStream, BenchEvaluationStream, F19,
+        },
     };
     #[test]
-    fn sumcheck() {
+    fn sanity() {
         sanity_test::<
             F19,
             BasicEvaluationStream<F19>,
             TimeProductProver<F19, BasicEvaluationStream<F19>>,
         >();
+    }
+    #[test]
+    fn parity_with_basic_prover() {
+        // take an evaluation stream
+        const NUM_VARIABLES: usize = 16;
+        let s: BenchEvaluationStream<F19> = BenchEvaluationStream::new(NUM_VARIABLES);
+        let claim = s.claimed_sum;
+
+        // prove over it using TimeProver
+        let mut time_prover =
+            TimeProductProver::<F19, BenchEvaluationStream<F19>>::new(<TimeProductProver<
+                F19,
+                BenchEvaluationStream<F19>,
+            > as Prover<F19>>::ProverConfig::default(
+                claim,
+                NUM_VARIABLES,
+                s.clone(),
+                s.clone(),
+            ));
+        let time_prover_transcript = ProductSumcheck::<F19>::prove::<
+            BenchEvaluationStream<F19>,
+            TimeProductProver<F19, BenchEvaluationStream<F19>>,
+        >(&mut time_prover, &mut ark_std::test_rng());
+
+        // Prove over it using BasicProver
+        let p_evaluations: Vec<F19> = (0..1 << NUM_VARIABLES).map(|i| s.evaluation(i)).collect();
+        let p: SparsePolynomial<F19, SparseTerm> =
+            <SparsePolynomial<F19, SparseTerm> as Polynomial<F19>>::from_hypercube_evaluations(
+                p_evaluations.clone(),
+            );
+        let mut basic_prover = BasicProductProver::<F19>::new(
+            <BasicProductProver<F19> as Prover<F19>>::ProverConfig::default(
+                claim,
+                NUM_VARIABLES,
+                p.clone(),
+                p,
+            ),
+        );
+        let basic_prover_transcript = ProductSumcheck::<F19>::prove::<
+            BenchEvaluationStream<F19>,
+            BasicProductProver<F19>,
+        >(&mut basic_prover, &mut ark_std::test_rng());
+
+        // Assert they computed the same thing
+        assert_eq!(
+            basic_prover_transcript.prover_messages,
+            time_prover_transcript.prover_messages
+        );
     }
 }

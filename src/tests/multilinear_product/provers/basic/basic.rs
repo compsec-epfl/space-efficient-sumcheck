@@ -14,10 +14,9 @@ pub struct BasicProductProver<F: Field> {
 
 impl<F: Field> BasicProductProver<F> {
     pub fn compute_round(&self) -> (F, F, F) {
-        let mut sum0 = F::ZERO;
-        let mut sum1 = F::ZERO;
-        for (_, b) in Hypercube::new(self.num_variables - self.current_round) {
-            let mut partial_point: Vec<F> = b
+        let mut m: ((F, F), (F, F)) = ((F::ZERO, F::ZERO), (F::ZERO, F::ZERO));
+        for (_, b) in Hypercube::new(self.num_variables - self.current_round - 1) {
+            let partial_point: Vec<F> = b
                 .to_vec_bool()
                 .into_iter()
                 .map(|bit: bool| -> F {
@@ -28,21 +27,40 @@ impl<F: Field> BasicProductProver<F> {
                     }
                 })
                 .collect();
-            let update_zero = partial_point[0] == F::ZERO;
-            let mut point: Vec<F> = self.verifier_messages.messages.clone();
-            point.append(&mut partial_point);
-
-            let p_val = self.p.evaluate(point.clone()).unwrap();
-            let q_val = self.q.evaluate(point).unwrap();
-            let val = p_val * q_val;
-            if update_zero {
-                sum0 += val;
-            } else {
-                sum1 += val;
-            }
+            let partial_point_zero: Vec<F> = std::iter::once(F::ZERO)
+                .chain(partial_point.iter().cloned())
+                .collect();
+            let partial_point_one: Vec<F> = std::iter::once(F::ONE)
+                .chain(partial_point.iter().cloned())
+                .collect();
+            let point_zero: Vec<F> = self
+                .verifier_messages
+                .messages
+                .iter()
+                .cloned()
+                .chain(partial_point_zero.iter().cloned())
+                .collect();
+            let point_one: Vec<F> = self
+                .verifier_messages
+                .messages
+                .iter()
+                .cloned()
+                .chain(partial_point_one.iter().cloned())
+                .collect();
+            let p_zero = self.p.evaluate(point_zero.clone()).unwrap();
+            let p_one = self.p.evaluate(point_one.clone()).unwrap();
+            let q_zero = self.q.evaluate(point_zero.clone()).unwrap();
+            let q_one = self.q.evaluate(point_one.clone()).unwrap();
+            m.0 .0 += p_zero * q_zero;
+            m.1 .1 += p_one * q_one;
+            m.0 .1 += p_zero * q_one;
+            m.1 .0 += p_one * q_zero;
         }
-        // TODO(z-tech): sum_half
-        (sum0, sum1, F::ONE)
+        (
+            m.0 .0,
+            m.1 .1,
+            (F::ONE / F::from(4_u32)) * (m.0 .0 + m.1 .1 + m.0 .1 + m.1 .0),
+        )
     }
     pub fn is_initial_round(&self) -> bool {
         self.current_round == 0
