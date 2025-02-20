@@ -22,7 +22,6 @@ pub struct BlendyProductProver<F: Field, S: EvaluationStream<F>> {
 }
 
 impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
-
     pub fn is_initial_round(&self) -> bool {
         self.current_round == 0
     }
@@ -60,22 +59,23 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
         let v_num_vars: usize = t + j_prime - j - 1;
         let b_prime_index_left_shift = v_num_vars + 1;
 
-        // Outer LagPoly
-        let mut sequential_lag_poly_1: LagrangePolynomial<F> =
-            LagrangePolynomial::new(verifier_messages.clone());
+        // Lag Poly
+        let mut sequential_lag_poly: LagrangePolynomial<F> =
+            LagrangePolynomial::new(&verifier_messages);
+        let lag_polys_len = Hypercube::stop_value(b_prime_num_vars);
+        let mut lag_polys: Vec<F> = vec![F::ZERO; lag_polys_len];
 
         // Sums
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
         let mut sum_half = F::ZERO;
         for (b_prime_index, _) in Hypercube::new(b_prime_num_vars) {
-            let lag_poly_1 = sequential_lag_poly_1.next().unwrap();
-
-            // Inner LagPoly
-            let mut sequential_lag_poly_2: LagrangePolynomial<F> =
-                LagrangePolynomial::new(verifier_messages.clone());
             for (b_prime_prime_index, _) in Hypercube::new(b_prime_num_vars) {
-                let lag_poly_2 = sequential_lag_poly_2.next().unwrap();
+                // doing it like this, for each hypercube member lag_poly is computed exactly once
+                if b_prime_index == 0 {
+                    lag_polys[b_prime_prime_index] = sequential_lag_poly.next().unwrap();
+                }
+
                 for (v_index, _) in Hypercube::new(v_num_vars) {
                     let b_prime_0_v =
                         b_prime_index << b_prime_index_left_shift | 0 << v_num_vars | v_index;
@@ -85,6 +85,8 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                         b_prime_index << b_prime_index_left_shift | 1 << v_num_vars | v_index;
                     let b_prime_prime_1_v =
                         b_prime_prime_index << b_prime_index_left_shift | 1 << v_num_vars | v_index;
+                    let lag_poly_1 = lag_polys[b_prime_index];
+                    let lag_poly_2 = lag_polys[b_prime_prime_index];
                     sum_0 += lag_poly_1
                         * lag_poly_2
                         * self.j_prime_table[b_prime_0_v][b_prime_prime_0_v];
@@ -144,10 +146,11 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                     self.y_table[b_prime_index] = F::ZERO;
                     // LagPoly
                     let mut sequential_lag_poly: LagrangePolynomial<F> =
-                        LagrangePolynomial::new(self.verifier_messages.clone());
+                        LagrangePolynomial::new(&self.verifier_messages);
                     for (x_index, _) in Hypercube::new(x_num_vars) {
                         let evaluation_point =
                             x_index << x_index_left_shift | b_prime_index << b_num_vars | b_index;
+                        // I imagine it's this next line that's taking a lot of runtime
                         let lag_poly = sequential_lag_poly.next().unwrap();
                         self.x_table[b_prime_index] +=
                             lag_poly * self.stream_p.evaluation(evaluation_point);
@@ -157,9 +160,8 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                 }
                 for (b_prime_index, _) in Hypercube::new(t) {
                     for (b_prime_prime_index, _) in Hypercube::new(t) {
-                        self.j_prime_table[b_prime_index][b_prime_prime_index] = self.j_prime_table
-                            [b_prime_index][b_prime_prime_index]
-                            + (self.x_table[b_prime_index] * self.y_table[b_prime_prime_index]);
+                        self.j_prime_table[b_prime_index][b_prime_prime_index] +=
+                            self.x_table[b_prime_index] * self.y_table[b_prime_prime_index];
                     }
                 }
             }

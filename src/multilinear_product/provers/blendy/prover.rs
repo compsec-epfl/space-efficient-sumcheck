@@ -30,10 +30,10 @@ impl<F: Field, S: EvaluationStream<F>> Prover<F> for BlendyProductProver<F, S> {
             num_stages,
             num_variables,
             verifier_messages: VerifierMessages::new(&vec![]),
-            x_table: vec![F::ZERO; Hypercube::stop_value(num_variables.div_ceil(2 * num_stages))],
+            x_table: vec![F::ZERO; Hypercube::stop_value(num_variables.div_ceil(2 * num_stages))], // these correct?
             y_table: vec![F::ZERO; Hypercube::stop_value(num_variables.div_ceil(2 * num_stages))],
             j_prime_table: vec![
-                vec![F::ZERO; Hypercube::stop_value(stage_size)];
+                vec![F::ZERO; Hypercube::stop_value(stage_size)]; // this correct?
                 Hypercube::stop_value(stage_size)
             ],
             stage_size,
