@@ -1,20 +1,16 @@
 [package]
 name = "space-efficient-sumcheck"
 version = "0.0.2"
-authors = [
-    "Giacomo Fenzi <giacomo.fenzi@epfl.ch>",
-    "Elisabetta Fedele <efedele@ethz.ch>",
-    "Andrew Zitek-Estrada <andrew.zitek@epfl.ch>",
-]
+authors = ["arkworks maintainers"]
 description = "TODO"
 repository = "https://github.com/compsec-epfl/space-efficient-sumcheck"
 include = ["Cargo.toml", "src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
 edition = "2021"
 
 [dependencies]
-ark-ff = "0.4.0"
-ark-poly = "0.4.0"
-ark-std ="0.4.0"
+ark-ff = "0.5.0"
+ark-poly = "0.5.0"
+ark-std ="0.5.0"
 
 [[bench]]
 name = "explanation"
