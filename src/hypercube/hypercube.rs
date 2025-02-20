@@ -84,7 +84,8 @@ impl Hypercube {
         }
     }
     pub fn stop_value(num_vars: usize) -> usize {
-        1 << num_vars // this is exclusive, meaning should stop *before* this value
+        // println!("num_vars: {}", num_vars);
+        return 1 << num_vars; // this is exclusive, meaning should stop *before* this value
     }
     pub fn next_gray_code(value: usize) -> usize {
         let mask = match value.count_ones() & 1 == 0 {

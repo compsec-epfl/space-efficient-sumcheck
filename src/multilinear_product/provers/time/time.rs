@@ -26,6 +26,7 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
      * from the streams (instead of the tables), which reduces max memory usage by 1/2
      */
     pub fn vsbw_evaluate(&self) -> (F, F, F) {
+        println!("round: {}", self.current_round + 1);
         // Initialize accumulators
         let mut sum_half = F::ZERO;
         let mut j_prime_table: ((F, F), (F, F)) = ((F::ZERO, F::ZERO), (F::ZERO, F::ZERO));
@@ -75,6 +76,8 @@ impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
             j_prime_table.0 .1 = j_prime_table.0 .1 + x_table.0 * y_table.1;
             j_prime_table.1 .0 = j_prime_table.1 .0 + x_table.1 * y_table.0;
         }
+
+        // println!("j_prime_table: {:?}", j_prime_table);
 
         // update
         let sum_0 = j_prime_table.0 .0;
