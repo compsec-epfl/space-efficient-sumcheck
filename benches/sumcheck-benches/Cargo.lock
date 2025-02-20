@@ -316,7 +316,7 @@ checksum = "b97ed7a9823b74f99c7742f5336af7be5ecd3eeafcb1507d1fa93347b1d589b0"
 
 [[package]]
 name = "space-efficient-sumcheck"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "ark-ff",
  "ark-poly",

@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn algorithm_consistency() {
-        const NUM_VARIABLES: usize = 9;
+        const NUM_VARIABLES: usize = 16;
         // take an evaluation stream
         let evaluation_stream: BenchEvaluationStream<F19> =
             BenchEvaluationStream::new(NUM_VARIABLES);
@@ -80,7 +80,7 @@ mod tests {
         let mut blendy_k2_prover = BlendyProductProver::<F19, BenchEvaluationStream<F19>>::new(
             BlendyProductProverConfig::new(
                 claim,
-                3,
+                2,
                 NUM_VARIABLES,
                 evaluation_stream.clone(),
                 evaluation_stream.clone(),
