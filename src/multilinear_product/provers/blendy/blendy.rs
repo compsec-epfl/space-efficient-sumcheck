@@ -148,9 +148,9 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                     let mut sequential_lag_poly: LagrangePolynomial<F> =
                         LagrangePolynomial::new(&self.verifier_messages);
                     for (x_index, _) in Hypercube::new(x_num_vars) {
+                        // I imagine it's this loop taking lots of runtime
                         let evaluation_point =
                             x_index << x_index_left_shift | b_prime_index << b_num_vars | b_index;
-                        // I imagine it's this next line that's taking a lot of runtime
                         let lag_poly = sequential_lag_poly.next().unwrap();
                         self.x_table[b_prime_index] +=
                             lag_poly * self.stream_p.evaluation(evaluation_point);
@@ -158,6 +158,7 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                             lag_poly * self.stream_q.evaluation(evaluation_point);
                     }
                 }
+                // here
                 for (b_prime_index, _) in Hypercube::new(t) {
                     for (b_prime_prime_index, _) in Hypercube::new(t) {
                         self.j_prime_table[b_prime_index][b_prime_prime_index] +=
