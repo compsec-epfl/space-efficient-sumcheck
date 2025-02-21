@@ -158,7 +158,6 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                             lag_poly * self.stream_q.evaluation(evaluation_point);
                     }
                 }
-                // here
                 for (b_prime_index, _) in Hypercube::new(t) {
                     for (b_prime_prime_index, _) in Hypercube::new(t) {
                         self.j_prime_table[b_prime_index][b_prime_prime_index] +=
