@@ -107,7 +107,7 @@ where
 
         // 2. Initialize st := LagInit((s - l)l, r)
         let mut sequential_lag_poly: LagrangePolynomial<F> =
-            LagrangePolynomial::new(self.verifier_messages.clone());
+            LagrangePolynomial::new(&self.verifier_messages);
 
         // 3. For each b1 ∈ {0,1}^(s-1)l
         let len_sums: usize = self.sums.len();
