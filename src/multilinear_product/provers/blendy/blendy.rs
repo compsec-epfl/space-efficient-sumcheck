@@ -76,6 +76,9 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                     lag_polys[b_prime_prime_index] = sequential_lag_poly.next().unwrap();
                 }
 
+                let lag_poly_1 = lag_polys[b_prime_index];
+                let lag_poly_2 = lag_polys[b_prime_prime_index];
+                let lag_poly = lag_poly_1 * lag_poly_2;
                 for (v_index, _) in Hypercube::new(v_num_vars) {
                     let b_prime_0_v =
                         b_prime_index << b_prime_index_left_shift | 0 << v_num_vars | v_index;
@@ -85,16 +88,9 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
                         b_prime_index << b_prime_index_left_shift | 1 << v_num_vars | v_index;
                     let b_prime_prime_1_v =
                         b_prime_prime_index << b_prime_index_left_shift | 1 << v_num_vars | v_index;
-                    let lag_poly_1 = lag_polys[b_prime_index];
-                    let lag_poly_2 = lag_polys[b_prime_prime_index];
-                    sum_0 += lag_poly_1
-                        * lag_poly_2
-                        * self.j_prime_table[b_prime_0_v][b_prime_prime_0_v];
-                    sum_1 += lag_poly_1
-                        * lag_poly_2
-                        * self.j_prime_table[b_prime_1_v][b_prime_prime_1_v];
-                    sum_half += lag_poly_1
-                        * lag_poly_2
+                    sum_0 += lag_poly * self.j_prime_table[b_prime_0_v][b_prime_prime_0_v];
+                    sum_1 += lag_poly * self.j_prime_table[b_prime_1_v][b_prime_prime_1_v];
+                    sum_half += lag_poly
                         * (self.j_prime_table[b_prime_0_v][b_prime_prime_0_v]
                             + self.j_prime_table[b_prime_0_v][b_prime_prime_1_v]
                             + self.j_prime_table[b_prime_1_v][b_prime_prime_0_v]
