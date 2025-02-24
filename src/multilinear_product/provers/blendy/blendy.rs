@@ -14,6 +14,7 @@ pub struct BlendyProductProver<F: Field, S: EvaluationStream<F>> {
     pub num_stages: usize,
     pub num_variables: usize,
     pub verifier_messages: VerifierMessages<F>,
+    pub verifier_messages_round_comp: VerifierMessages<F>,
     pub x_table: Vec<F>,
     pub y_table: Vec<F>,
     pub j_prime_table: Vec<Vec<F>>,
@@ -47,13 +48,6 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
             (j_prime, t)
         };
 
-        // TODO (z-tech): we can store this between rounds to avoid |r2| mults every round
-        let verifier_messages = VerifierMessages::new_from_self(
-            &self.verifier_messages,
-            j_prime - 1,
-            self.verifier_messages.messages.len(),
-        );
-
         // things to help iterating
         let b_prime_num_vars = j - j_prime;
         let v_num_vars: usize = t + j_prime - j - 1;
@@ -61,9 +55,9 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
 
         // Lag Poly
         let mut sequential_lag_poly: LagrangePolynomial<F> =
-            LagrangePolynomial::new(&verifier_messages);
+            LagrangePolynomial::new(&self.verifier_messages_round_comp);
         let lag_polys_len = Hypercube::stop_value(b_prime_num_vars);
-        let mut lag_polys: Vec<F> = vec![F::ZERO; lag_polys_len];
+        let mut lag_polys: Vec<F> = vec![F::ONE; lag_polys_len];
 
         // Sums
         let mut sum_0 = F::ZERO;
@@ -128,8 +122,17 @@ impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
 
         if p {
             // zero out the table
-            let j_prime_table_len = Hypercube::stop_value(t);
-            self.j_prime_table = vec![vec![F::ZERO; j_prime_table_len]; j_prime_table_len];
+            let table_len = Hypercube::stop_value(t);
+            self.j_prime_table = vec![vec![F::ZERO; table_len]; table_len];
+            self.x_table = vec![F::ZERO; table_len];
+            self.y_table = vec![F::ZERO; table_len];
+
+            // basically, this needs to get "zeroed" out at the beginning of state computation
+            self.verifier_messages_round_comp = VerifierMessages::new_from_self(
+                &self.verifier_messages,
+                j_prime - 1,
+                self.verifier_messages.messages.len(),
+            );
 
             // some stuff for iterating
             let b_num_vars: usize = n + 1 - j_prime - t;

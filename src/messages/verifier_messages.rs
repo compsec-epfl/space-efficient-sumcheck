@@ -27,25 +27,9 @@ impl<F: Field> VerifierMessages<F> {
         }
         verifier_messages
     }
-    pub fn new_from_self(verifier_messages: &Self, start: usize, end: usize) -> Self {
-        let mut verifier_messages = Self {
-            messages: verifier_messages.messages[start..end].to_vec(),
-            message_hats: verifier_messages.message_hats[start..end].to_vec(),
-            product_of_message_hats: F::ONE,
-            message_and_message_hat_inverses: verifier_messages.message_and_message_hat_inverses
-                [start..end]
-                .to_vec(),
-            message_hat_and_message_inverses: verifier_messages.message_hat_and_message_inverses
-                [start..end]
-                .to_vec(),
-            messages_zeros_and_ones_usize: 0, // TODO (z-tech): I don't even remember what this is
-            zero_ones_mask: 0,                // TODO (z-tech): I don't even remember what this is
-        };
-        verifier_messages.product_of_message_hats = verifier_messages
-            .message_hats
-            .iter()
-            .fold(F::ONE, |acc, &x| acc * x);
-        verifier_messages
+    pub fn new_from_self(vm: &Self, start: usize, end: usize) -> Self {
+        // TODO (z-tech): this can be redone more efficiently
+        Self::new(&vm.messages[start..end].to_vec())
     }
     pub fn receive_message(&mut self, message: F) {
         // Step 1: compute some things
@@ -65,6 +49,7 @@ impl<F: Field> VerifierMessages<F> {
             .push(message * message_hat_inverse);
         self.message_hat_and_message_inverses
             .push(message_hat * message_inverse);
+
         if message == F::ZERO || message_hat == F::ZERO {
             self.zero_ones_mask = (self.zero_ones_mask << 1) | 1;
             self.messages_zeros_and_ones_usize = if message == F::ONE {

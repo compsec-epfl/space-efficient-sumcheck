@@ -1,7 +1,6 @@
 use ark_ff::Field;
 
 use crate::{
-    hypercube::Hypercube,
     messages::VerifierMessages,
     multilinear_product::{BlendyProductProver, BlendyProductProverConfig},
     prover::Prover,
@@ -30,12 +29,10 @@ impl<F: Field, S: EvaluationStream<F>> Prover<F> for BlendyProductProver<F, S> {
             num_stages,
             num_variables,
             verifier_messages: VerifierMessages::new(&vec![]),
-            x_table: vec![F::ZERO; Hypercube::stop_value(num_variables.div_ceil(2 * num_stages))], // these correct?
-            y_table: vec![F::ZERO; Hypercube::stop_value(num_variables.div_ceil(2 * num_stages))],
-            j_prime_table: vec![
-                vec![F::ZERO; Hypercube::stop_value(stage_size)]; // this correct?
-                Hypercube::stop_value(stage_size)
-            ],
+            verifier_messages_round_comp: VerifierMessages::new(&vec![]),
+            x_table: vec![],
+            y_table: vec![],
+            j_prime_table: vec![],
             stage_size,
             inverse_four: F::from(4_u32).inverse().unwrap(),
         }
@@ -48,7 +45,11 @@ impl<F: Field, S: EvaluationStream<F>> Prover<F> for BlendyProductProver<F, S> {
         }
 
         if !self.is_initial_round() {
+            // this holds everything
             self.verifier_messages
+                .receive_message(verifier_message.unwrap());
+            // this holds the randomness for between state computation r2
+            self.verifier_messages_round_comp
                 .receive_message(verifier_message.unwrap());
         }
 
