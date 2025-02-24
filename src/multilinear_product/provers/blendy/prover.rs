@@ -67,9 +67,18 @@ impl<F: Field, S: EvaluationStream<F>> Prover<F> for BlendyProductProver<F, S> {
 
 #[cfg(test)]
 mod tests {
+    use ark_poly::multivariate::{SparsePolynomial, SparseTerm};
+
     use crate::{
         multilinear_product::BlendyProductProver,
-        tests::{multilinear_product::sanity_test, BasicEvaluationStream, F19},
+        prover::{ProductProverConfig, Prover},
+        streams::EvaluationStream,
+        tests::{
+            multilinear_product::{sanity_test, BasicProductProver, ProductProverPolynomialConfig},
+            polynomials::Polynomial,
+            BasicEvaluationStream, BenchEvaluationStream, F19,
+        },
+        ProductSumcheck,
     };
     #[test]
     fn sumcheck() {
@@ -78,24 +87,54 @@ mod tests {
             BasicEvaluationStream<F19>,
             BlendyProductProver<F19, BasicEvaluationStream<F19>>,
         >();
+    }
 
-        // // create evaluation streams for a known polynomials
-        // let stream_p: BasicEvaluationStream<F19> =
-        //     BasicEvaluationStream::new(four_variable_polynomial_evaluations());
-        // let stream_q: BasicEvaluationStream<F19> =
-        //     BasicEvaluationStream::new(four_variable_polynomial_evaluations());
+    #[test]
+    fn parity_with_basic_prover() {
+        // take an evaluation stream
+        const NUM_VARIABLES: usize = 16;
+        let s: BenchEvaluationStream<F19> = BenchEvaluationStream::new(NUM_VARIABLES);
+        let claim = s.claimed_sum;
 
-        // // k=2 (DEFAULT)
-        // sanity_test_4_variables(BlendyProductProver::new(
-        //     BlendyProductProver::generate_default_args(&stream_p, &stream_q, F19::from(18_u32)),
-        // ));
-        // // k=3
-        // sanity_test_4_variables(BlendyProductProver::new(ProverArgs {
-        //     stream_p: &stream_p,
-        //     stream_q: &stream_q,
-        //     claimed_sum: F19::from(18_u32),
-        //     stage_info: Some(ProverArgsStageInfo { num_stages: 3 }),
-        //     _phantom: PhantomData,
-        // }));
+        // prove over it using BlendyProver
+        let mut blendy_prover =
+            BlendyProductProver::<F19, BenchEvaluationStream<F19>>::new(<BlendyProductProver<
+                F19,
+                BenchEvaluationStream<F19>,
+            > as Prover<F19>>::ProverConfig::default(
+                claim,
+                NUM_VARIABLES,
+                s.clone(),
+                s.clone(),
+            ));
+        let blendy_prover_transcript = ProductSumcheck::<F19>::prove::<
+            BenchEvaluationStream<F19>,
+            BlendyProductProver<F19, BenchEvaluationStream<F19>>,
+        >(&mut blendy_prover, &mut ark_std::test_rng());
+
+        // Prove over it using BasicProver
+        let p_evaluations: Vec<F19> = (0..1 << NUM_VARIABLES).map(|i| s.evaluation(i)).collect();
+        let p: SparsePolynomial<F19, SparseTerm> =
+            <SparsePolynomial<F19, SparseTerm> as Polynomial<F19>>::from_hypercube_evaluations(
+                p_evaluations.clone(),
+            );
+        let mut basic_prover = BasicProductProver::<F19>::new(
+            <BasicProductProver<F19> as Prover<F19>>::ProverConfig::default(
+                claim,
+                NUM_VARIABLES,
+                p.clone(),
+                p,
+            ),
+        );
+        let basic_prover_transcript = ProductSumcheck::<F19>::prove::<
+            BenchEvaluationStream<F19>,
+            BasicProductProver<F19>,
+        >(&mut basic_prover, &mut ark_std::test_rng());
+
+        // Assert they computed the same thing
+        assert_eq!(
+            basic_prover_transcript.prover_messages,
+            blendy_prover_transcript.prover_messages
+        );
     }
 }
