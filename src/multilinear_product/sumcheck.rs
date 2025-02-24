@@ -3,11 +3,37 @@ use ark_std::{rand::Rng, vec::Vec};
 
 use crate::{prover::Prover, streams::EvaluationStream};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ProductSumcheck<F: Field> {
     pub prover_messages: Vec<(F, F, F)>,
     pub verifier_messages: Vec<F>,
     pub is_accepted: bool,
+}
+
+fn evaluate_at<F: Field>(verifier_message: F, prover_message: (F, F, F)) -> F {
+    // Hardcoded x-values:
+    let zero = F::zero();
+    let one = F::one();
+    let half = F::from(2_u32).inverse().unwrap();
+
+    // Compute denominators for the Lagrange basis polynomials
+    let inv_denom0 = ((zero - one) * (zero - half))
+        .inverse()
+        .expect("x0, x1, x2 must be distinct");
+    let inv_denom1 = ((one - zero) * (one - half))
+        .inverse()
+        .expect("x0, x1, x2 must be distinct");
+    let inv_denom2 = ((half - zero) * (half - one))
+        .inverse()
+        .expect("x0, x1, x2 must be distinct");
+
+    // Compute the Lagrange basis polynomials evaluated at x
+    let l0 = (verifier_message - one) * (verifier_message - half) * inv_denom0;
+    let l1 = (verifier_message - zero) * (verifier_message - half) * inv_denom1;
+    let l2 = (verifier_message - zero) * (verifier_message - one) * inv_denom2;
+
+    // Return the evaluation of the unique quadratic polynomial
+    prover_message.0 * l0 + prover_message.1 * l1 + prover_message.2 * l2
 }
 
 impl<F: Field> ProductSumcheck<F> {
@@ -25,21 +51,15 @@ impl<F: Field> ProductSumcheck<F> {
         let mut verifier_message: Option<F> = None;
         while let Some(message) = prover.next_message(verifier_message) {
             let round_sum = message.0 + message.1;
-            let is_round_accepted = true;
-            // let is_round_accepted = match verifier_message {
-            //     // If first round, compare to claimed_sum
-            //     None => round_sum == prover.claim(),
-            //     // Else compute f(prev_verifier_msg) = prev_sum_0 - (prev_sum_0 - prev_sum_1) * prev_verifier_msg == round_sum, store verifier message
-            //     Some(prev_verifier_message) => {
-            //         verifier_messages.push(prev_verifier_message);
-            //         let prev_prover_message = prover_messages.last().unwrap();
-            //         true
-            //         // round_sum
-            //         //     == prev_prover_message.0
-            //         //         - (prev_prover_message.0 - prev_prover_message.1)
-            //         //             * prev_verifier_message
-            //     }
-            // };
+            let is_round_accepted = match verifier_message {
+                // If first round, compare to claimed_sum
+                None => round_sum == prover.claim(),
+                Some(prev_verifier_message) => {
+                    verifier_messages.push(prev_verifier_message);
+                    let prev_prover_message = prover_messages.last().unwrap();
+                    round_sum == evaluate_at(prev_verifier_message, *prev_prover_message)
+                }
+            };
 
             // Handle how to proceed
             prover_messages.push(message);
@@ -75,7 +95,7 @@ mod tests {
         // take an evaluation stream
         let evaluation_stream: BenchEvaluationStream<F19> =
             BenchEvaluationStream::new(NUM_VARIABLES);
-        let claim = evaluation_stream.claimed_sum;
+        let claim = F19::from(11);
         // initialize the provers
         let mut blendy_k2_prover = BlendyProductProver::<F19, BenchEvaluationStream<F19>>::new(
             BlendyProductProverConfig::new(
@@ -106,9 +126,7 @@ mod tests {
             TimeProductProver<F19, BenchEvaluationStream<F19>>,
         >(&mut time_prover, &mut ark_std::test_rng());
         // ensure the transcript is identical
-        assert_eq!(
-            time_prover_transcript.prover_messages,
-            blendy_prover_transcript.prover_messages
-        );
+        assert_eq!(time_prover_transcript.is_accepted, true);
+        assert_eq!(time_prover_transcript, blendy_prover_transcript);
     }
 }
