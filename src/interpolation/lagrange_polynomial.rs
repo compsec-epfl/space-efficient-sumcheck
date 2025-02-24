@@ -5,15 +5,25 @@ use crate::{
 use ark_ff::Field;
 
 #[derive(Debug)]
-pub struct LagrangePolynomial<F: Field> {
+pub struct LagrangePolynomial<'a, F: Field> {
     last_position: usize,
     position: usize,
     value: F,
-    verifier_messages: VerifierMessages<F>,
+    verifier_messages: &'a VerifierMessages<F>,
     stop_position: usize,
 }
 
-impl<F: Field> LagrangePolynomial<F> {
+impl<'a, F: Field> LagrangePolynomial<'a, F> {
+    pub fn new(verifier_messages: &'a VerifierMessages<F>) -> Self {
+        let num_vars = verifier_messages.messages.len();
+        Self {
+            last_position: 0,
+            position: 0,
+            value: verifier_messages.product_of_message_hats,
+            verifier_messages,
+            stop_position: Hypercube::stop_value(num_vars),
+        }
+    }
     pub fn lag_poly(x: Vec<F>, x_hat: Vec<F>, b: HypercubeMember) -> F {
         // Iterate over the zipped triple x, x_hat, and boolean hypercube vectors
         x.iter().zip(x_hat.iter()).zip(b).fold(
@@ -29,19 +39,9 @@ impl<F: Field> LagrangePolynomial<F> {
             },
         )
     }
-    pub fn new(verifier_messages: VerifierMessages<F>) -> Self {
-        let num_vars = verifier_messages.messages.len();
-        Self {
-            last_position: 0,
-            position: 0,
-            value: verifier_messages.product_of_message_hats,
-            verifier_messages,
-            stop_position: Hypercube::stop_value(num_vars),
-        }
-    }
 }
 
-impl<F: Field> Iterator for LagrangePolynomial<F> {
+impl<'a, F: Field> Iterator for LagrangePolynomial<'a, F> {
     type Item = F;
     fn next(&mut self) -> Option<Self::Item> {
         // Step 1: check if finished iterating
@@ -110,12 +110,8 @@ mod tests {
             .iter()
             .map(|message| F19::from(1) - message)
             .collect();
-        let mut lag_poly: LagrangePolynomial<F19> =
-            LagrangePolynomial::new(VerifierMessages::new(&vec![
-                F19::from(13),
-                F19::from(0),
-                F19::from(7),
-            ]));
+        let vm = VerifierMessages::new(&vec![F19::from(13), F19::from(0), F19::from(7)]);
+        let mut lag_poly: LagrangePolynomial<F19> = LagrangePolynomial::new(&vm);
         for gray_code_index in [0, 1, 3, 2, 6, 7, 5, 4] {
             let exp = LagrangePolynomial::lag_poly(
                 messages.clone(),
@@ -135,12 +131,8 @@ mod tests {
             .iter()
             .map(|message| F19::from(1) - message)
             .collect();
-        let mut lag_poly: LagrangePolynomial<F19> =
-            LagrangePolynomial::new(VerifierMessages::new(&vec![
-                F19::from(0),
-                F19::from(1),
-                F19::from(1),
-            ]));
+        let vm = VerifierMessages::new(&vec![F19::from(0), F19::from(1), F19::from(1)]);
+        let mut lag_poly: LagrangePolynomial<F19> = LagrangePolynomial::new(&vm);
         for gray_code_index in [0, 1, 3, 2, 6, 7, 5, 4] {
             let exp = LagrangePolynomial::lag_poly(
                 messages.clone(),
