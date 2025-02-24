@@ -76,6 +76,9 @@ pub trait Polynomial<F: Field> {
     // Converts the polynomial into a vector containing evaluations at every
     // point of the hypercube.
     fn to_evaluations(&self) -> Vec<F>;
+
+    // take the evaluations table and give back a sparsepolynomial
+    fn from_hypercube_evaluations(evaluations: Vec<F>) -> SparsePolynomial<F, SparseTerm>;
 }
 
 impl<F: Field> Polynomial<F> for SparsePolynomial<F, SparseTerm> {
@@ -119,5 +122,92 @@ impl<F: Field> Polynomial<F> for SparsePolynomial<F, SparseTerm> {
         }
 
         evaluations
+    }
+
+    // TODO (z-tech): this works but it's super slow
+    fn from_hypercube_evaluations(mut evaluations: Vec<F>) -> SparsePolynomial<F, SparseTerm> {
+        // Ensure that the evaluations vector length is a power of two.
+        assert!(
+            evaluations.len().is_power_of_two(),
+            "evaluations len must be a power of two"
+        );
+        let num_vars: usize = evaluations.len().ilog2() as usize;
+        let n = evaluations.len();
+
+        // In-place bit reversal permutation:
+        // If the evaluations were produced with the highest-index variable corresponding to the LSB,
+        // we need to swap elements so that the i-th bit corresponds to variable x_i.
+        for i in 0_usize..n {
+            // Reverse the lower `num_vars` bits of i.
+            let j = i.reverse_bits() >> (usize::BITS - num_vars as u32);
+            if i < j {
+                evaluations.swap(i, j);
+            }
+        }
+
+        // Perform in-place Möbius inversion on `evaluations` (now in standard binary order).
+        for i in 0..num_vars {
+            for mask in 0..n {
+                if mask & (1 << i) != 0 {
+                    evaluations[mask] = evaluations[mask] - evaluations[mask ^ (1 << i)];
+                }
+            }
+        }
+
+        // Build the sparse polynomial representation from the nonzero coefficients.
+        let mut terms = Vec::new();
+        for mask in 0..n {
+            if evaluations[mask] != F::zero() {
+                let mut exponents = Vec::new();
+                for var in 0..num_vars {
+                    if mask & (1 << var) != 0 {
+                        exponents.push((var, 1));
+                    }
+                }
+                let term = SparseTerm::new(exponents);
+                terms.push((evaluations[mask].clone(), term));
+            }
+        }
+
+        SparsePolynomial::from_coefficients_slice(num_vars, &terms)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        streams::EvaluationStream,
+        tests::{
+            polynomials::{four_variable_polynomial, Polynomial},
+            BenchEvaluationStream, F19,
+        },
+    };
+    use ark_poly::multivariate::{SparsePolynomial, SparseTerm};
+
+    #[test]
+    fn to_evaluations_from_evaluations_sanity() {
+        // we should get back the same polynomial
+        let p1: SparsePolynomial<F19, SparseTerm> = four_variable_polynomial::<F19>();
+        let p1_evaluations: Vec<F19> = p1.to_evaluations();
+        assert_eq!(
+            p1,
+            <SparsePolynomial<F19, SparseTerm> as Polynomial<F19>>::from_hypercube_evaluations(
+                p1_evaluations
+            )
+        );
+
+        // we should get back the same evaluations
+        let num_variables: usize = 16;
+        let s: BenchEvaluationStream<F19> = BenchEvaluationStream::new(num_variables);
+        let hypercube_len: usize = 2usize.pow(num_variables as u32);
+        let mut p2_evaluations: Vec<F19> = Vec::with_capacity(hypercube_len);
+        for i in 0..hypercube_len {
+            p2_evaluations.push(s.evaluation(i));
+        }
+        let p2: SparsePolynomial<F19, SparseTerm> =
+            <SparsePolynomial<F19, SparseTerm> as Polynomial<F19>>::from_hypercube_evaluations(
+                p2_evaluations.clone(),
+            );
+        assert_eq!(p2_evaluations, p2.to_evaluations());
     }
 }
