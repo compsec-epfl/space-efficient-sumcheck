@@ -5,13 +5,13 @@ use crate::{
     messages::VerifierMessages,
     multilinear::{BlendyProver, BlendyProverConfig},
     prover::Prover,
-    streams::EvaluationStream,
+    streams::Stream,
 };
 
 impl<'a, F, S> Prover<F> for BlendyProver<F, S>
 where
     F: Field,
-    S: EvaluationStream<F>,
+    S: Stream<F>,
 {
     type ProverConfig = BlendyProverConfig<F, S>;
     type ProverMessage = Option<(F, F)>;
@@ -71,12 +71,11 @@ where
 mod tests {
     use crate::{
         multilinear::BlendyProver,
-        tests::{multilinear::sanity_test, BasicEvaluationStream, F19},
+        tests::{multilinear::sanity_test, MemoryStream, F19},
     };
 
     #[test]
     fn sumcheck() {
-        sanity_test::<F19, BasicEvaluationStream<F19>, BlendyProver<F19, BasicEvaluationStream<F19>>>(
-        );
+        sanity_test::<F19, MemoryStream<F19>, BlendyProver<F19, MemoryStream<F19>>>();
     }
 }

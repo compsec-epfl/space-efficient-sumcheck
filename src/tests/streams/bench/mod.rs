@@ -1,4 +1,4 @@
-use crate::streams::EvaluationStream;
+use crate::streams::Stream;
 use ark_ff::Field;
 
 /*
@@ -11,11 +11,11 @@ use ark_ff::Field;
  */
 
 #[derive(Debug, Clone)]
-pub struct BenchEvaluationStream<F: Field> {
+pub struct BenchStream<F: Field> {
     pub num_variables: usize,
     pub claimed_sum: F,
 }
-impl<F: Field> BenchEvaluationStream<F> {
+impl<F: Field> BenchStream<F> {
     pub fn new(num_variables: usize) -> Self {
         let hypercube_len = 2usize.pow(num_variables.try_into().unwrap());
         let mut claimed_sum: F = F::ZERO;
@@ -42,7 +42,7 @@ impl<F: Field> BenchEvaluationStream<F> {
         decimal_value
     }
 }
-impl<F: Field> EvaluationStream<F> for BenchEvaluationStream<F> {
+impl<F: Field> Stream<F> for BenchStream<F> {
     fn claim(&self) -> F {
         self.claimed_sum
     }

@@ -3,10 +3,10 @@ use ark_std::vec::Vec;
 
 use crate::{
     hypercube::Hypercube, interpolation::LagrangePolynomial, messages::VerifierMessages,
-    streams::EvaluationStream,
+    streams::Stream,
 };
 
-pub struct BlendyProductProver<F: Field, S: EvaluationStream<F>> {
+pub struct BlendyProductProver<F: Field, S: Stream<F>> {
     pub claim: F,
     pub current_round: usize,
     pub stream_p: S,
@@ -22,7 +22,7 @@ pub struct BlendyProductProver<F: Field, S: EvaluationStream<F>> {
     pub inverse_four: F,
 }
 
-impl<F: Field, S: EvaluationStream<F>> BlendyProductProver<F, S> {
+impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
     pub fn is_initial_round(&self) -> bool {
         self.current_round == 0
     }

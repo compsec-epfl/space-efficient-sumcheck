@@ -176,10 +176,10 @@ impl<F: Field> Polynomial<F> for SparsePolynomial<F, SparseTerm> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        streams::EvaluationStream,
+        streams::Stream,
         tests::{
             polynomials::{four_variable_polynomial, Polynomial},
-            BenchEvaluationStream, F19,
+            BenchStream, F19,
         },
     };
     use ark_poly::multivariate::{SparsePolynomial, SparseTerm};
@@ -198,7 +198,7 @@ mod tests {
 
         // we should get back the same evaluations
         let num_variables: usize = 16;
-        let s: BenchEvaluationStream<F19> = BenchEvaluationStream::new(num_variables);
+        let s: BenchStream<F19> = BenchStream::new(num_variables);
         let hypercube_len: usize = 2usize.pow(num_variables as u32);
         let mut p2_evaluations: Vec<F19> = Vec::with_capacity(hypercube_len);
         for i in 0..hypercube_len {

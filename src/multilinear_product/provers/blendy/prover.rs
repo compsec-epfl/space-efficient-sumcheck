@@ -4,10 +4,10 @@ use crate::{
     messages::VerifierMessages,
     multilinear_product::{BlendyProductProver, BlendyProductProverConfig},
     prover::Prover,
-    streams::EvaluationStream,
+    streams::Stream,
 };
 
-impl<F: Field, S: EvaluationStream<F>> Prover<F> for BlendyProductProver<F, S> {
+impl<F: Field, S: Stream<F>> Prover<F> for BlendyProductProver<F, S> {
     type ProverConfig = BlendyProductProverConfig<F, S>;
     type ProverMessage = Option<(F, F, F)>;
     type VerifierMessage = Option<F>;
@@ -72,35 +72,31 @@ mod tests {
     use crate::{
         multilinear_product::BlendyProductProver,
         prover::{ProductProverConfig, Prover},
-        streams::EvaluationStream,
+        streams::Stream,
         tests::{
             multilinear_product::{sanity_test, BasicProductProver, ProductProverPolynomialConfig},
             polynomials::Polynomial,
-            BasicEvaluationStream, BenchEvaluationStream, F19,
+            BenchStream, MemoryStream, F19,
         },
         ProductSumcheck,
     };
     #[test]
     fn sumcheck() {
-        sanity_test::<
-            F19,
-            BasicEvaluationStream<F19>,
-            BlendyProductProver<F19, BasicEvaluationStream<F19>>,
-        >();
+        sanity_test::<F19, MemoryStream<F19>, BlendyProductProver<F19, MemoryStream<F19>>>();
     }
 
     #[test]
     fn parity_with_basic_prover() {
         // take an evaluation stream
         const NUM_VARIABLES: usize = 16;
-        let s: BenchEvaluationStream<F19> = BenchEvaluationStream::new(NUM_VARIABLES);
+        let s: BenchStream<F19> = BenchStream::new(NUM_VARIABLES);
         let claim = s.claimed_sum;
 
         // prove over it using BlendyProver
         let mut blendy_prover =
-            BlendyProductProver::<F19, BenchEvaluationStream<F19>>::new(<BlendyProductProver<
+            BlendyProductProver::<F19, BenchStream<F19>>::new(<BlendyProductProver<
                 F19,
-                BenchEvaluationStream<F19>,
+                BenchStream<F19>,
             > as Prover<F19>>::ProverConfig::default(
                 claim,
                 NUM_VARIABLES,
@@ -108,8 +104,8 @@ mod tests {
                 s.clone(),
             ));
         let blendy_prover_transcript = ProductSumcheck::<F19>::prove::<
-            BenchEvaluationStream<F19>,
-            BlendyProductProver<F19, BenchEvaluationStream<F19>>,
+            BenchStream<F19>,
+            BlendyProductProver<F19, BenchStream<F19>>,
         >(&mut blendy_prover, &mut ark_std::test_rng());
 
         // Prove over it using BasicProver
@@ -127,7 +123,7 @@ mod tests {
             ),
         );
         let basic_prover_transcript = ProductSumcheck::<F19>::prove::<
-            BenchEvaluationStream<F19>,
+            BenchStream<F19>,
             BasicProductProver<F19>,
         >(&mut basic_prover, &mut ark_std::test_rng());
 

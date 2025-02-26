@@ -8,18 +8,18 @@ use ark_ff::Field;
  */
 
 #[derive(Debug)]
-pub struct MemoryStream<F: Field> {
+pub struct FileStream<F: Field> {
     pub evaluations: Vec<F>,
 }
 
-impl<F: Field> MemoryStream<F> {
+impl<F: Field> FileStream<F> {
     pub fn new(evaluations: Vec<F>) -> Self {
         // abort if length not a power of two
         assert_eq!(
             evaluations.len() != 0 && evaluations.len().count_ones() == 1,
             true
         );
-        // return the MemoryStream instance
+        // return the FileStream instance
         Self { evaluations }
     }
     pub fn vec_of_field_to_usize(vec: Vec<F>) -> usize {
@@ -38,7 +38,7 @@ impl<F: Field> MemoryStream<F> {
     }
 }
 
-impl<F: Field> Stream<F> for MemoryStream<F> {
+impl<F: Field> Stream<F> for FileStream<F> {
     fn claim(&self) -> F {
         self.evaluations.iter().sum()
     }
