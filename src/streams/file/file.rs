@@ -1,12 +1,6 @@
 use crate::streams::Stream;
 use ark_ff::Field;
 
-/*
- * We want to run sumcheck over some known polynomials, so we can use this
- * stream to pass in a vector containing evaluations of the polynomial
- * from 0..n^2
- */
-
 #[derive(Debug)]
 pub struct FileStream<F: Field> {
     pub evaluations: Vec<F>,

@@ -2,9 +2,8 @@ use crate::streams::Stream;
 use ark_ff::Field;
 
 /*
- * We want to run sumcheck over some known polynomials, so we can use this
- * stream to pass in a vector containing evaluations of the polynomial
- * from 0..n^2
+ * It's totally reasonable to use this when the evaluations table
+ * fits in memory (and yes, it's not so much a stream in this case)
  */
 
 #[derive(Debug)]
