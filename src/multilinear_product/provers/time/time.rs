@@ -1,9 +1,9 @@
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
-use crate::streams::EvaluationStream;
+use crate::streams::Stream;
 
-pub struct TimeProductProver<F: Field, S: EvaluationStream<F>> {
+pub struct TimeProductProver<F: Field, S: Stream<F>> {
     pub claim: F,
     pub current_round: usize,
     pub evaluations_p: Option<Vec<F>>,
@@ -14,7 +14,7 @@ pub struct TimeProductProver<F: Field, S: EvaluationStream<F>> {
     pub inverse_four: F,
 }
 
-impl<'a, F: Field, S: EvaluationStream<F>> TimeProductProver<F, S> {
+impl<'a, F: Field, S: Stream<F>> TimeProductProver<F, S> {
     pub fn total_rounds(&self) -> usize {
         self.num_variables
     }

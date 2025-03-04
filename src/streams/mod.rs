@@ -1,7 +1,7 @@
-use ark_ff::Field;
+mod file;
+mod memory;
+mod stream;
 
-pub trait EvaluationStream<F: Field> {
-    fn claim(&self) -> F;
-    fn evaluation(&self, point: usize) -> F;
-    fn num_variables(&self) -> usize;
-}
+pub use file::FileStream;
+pub use memory::MemoryStream;
+pub use stream::Stream;

@@ -1,8 +1,8 @@
 use ark_ff::Field;
 
-use crate::{hypercube::Hypercube, interpolation::LagrangePolynomial, streams::EvaluationStream};
+use crate::{hypercube::Hypercube, interpolation::LagrangePolynomial, streams::Stream};
 
-pub struct SpaceProver<F: Field, S: EvaluationStream<F>> {
+pub struct SpaceProver<F: Field, S: Stream<F>> {
     pub claim: F,
     pub current_round: usize,
     pub evaluation_stream: S,
@@ -11,7 +11,7 @@ pub struct SpaceProver<F: Field, S: EvaluationStream<F>> {
     pub verifier_message_hats: Vec<F>,
 }
 
-impl<F: Field, S: EvaluationStream<F>> SpaceProver<F, S> {
+impl<F: Field, S: Stream<F>> SpaceProver<F, S> {
     pub fn cty_evaluate(&self) -> (F, F) {
         // Initialize accumulators for sum_0 and sum_1
         let mut sum_0: F = F::ZERO;
