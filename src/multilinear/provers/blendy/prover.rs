@@ -71,7 +71,8 @@ where
 mod tests {
     use crate::{
         multilinear::BlendyProver,
-        tests::{multilinear::sanity_test, MemoryStream, F19},
+        streams::MemoryStream,
+        tests::{multilinear::sanity_test, F19},
     };
 
     #[test]

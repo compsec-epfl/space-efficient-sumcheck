@@ -72,11 +72,11 @@ mod tests {
     use crate::{
         multilinear_product::BlendyProductProver,
         prover::{ProductProverConfig, Prover},
-        streams::Stream,
+        streams::{MemoryStream, Stream},
         tests::{
             multilinear_product::{sanity_test, BasicProductProver, ProductProverPolynomialConfig},
             polynomials::Polynomial,
-            BenchStream, MemoryStream, F19,
+            BenchStream, F19,
         },
         ProductSumcheck,
     };

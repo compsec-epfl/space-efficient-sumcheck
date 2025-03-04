@@ -53,7 +53,8 @@ impl<F: Field, S: Stream<F>> Prover<F> for SpaceProver<F, S> {
 mod tests {
     use crate::{
         multilinear::SpaceProver,
-        tests::{multilinear::sanity_test, MemoryStream, F19},
+        streams::MemoryStream,
+        tests::{multilinear::sanity_test, F19},
     };
 
     #[test]

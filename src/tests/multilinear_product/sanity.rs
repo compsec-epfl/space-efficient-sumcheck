@@ -2,8 +2,8 @@ use ark_ff::Field;
 
 use crate::{
     prover::{ProductProverConfig, Prover},
-    streams::Stream,
-    tests::{polynomials::four_variable_polynomial_evaluations, streams::MemoryStream},
+    streams::{MemoryStream, Stream},
+    tests::polynomials::four_variable_polynomial_evaluations,
 };
 
 fn multilinear_product_round_sanity<F, P>(

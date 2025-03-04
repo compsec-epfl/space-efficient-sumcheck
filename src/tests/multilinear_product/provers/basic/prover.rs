@@ -52,13 +52,13 @@ impl<F: Field> Prover<F> for BasicProductProver<F> {
 mod tests {
     use crate::{
         prover::Prover,
-        streams::Stream,
+        streams::{MemoryStream, Stream},
         tests::{
             multilinear_product::{
                 sanity_test_driver, BasicProductProver, BasicProductProverConfig,
             },
             polynomials::{four_variable_polynomial, four_variable_polynomial_evaluations},
-            MemoryStream, F19,
+            F19,
         },
     };
     #[test]

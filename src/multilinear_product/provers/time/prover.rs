@@ -66,12 +66,12 @@ mod tests {
     use crate::{
         multilinear_product::{ProductSumcheck, TimeProductProver},
         prover::{ProductProverConfig, Prover},
-        streams::Stream,
+        streams::{MemoryStream, Stream},
         tests::{
             multilinear_product::sanity_test,
             multilinear_product::{BasicProductProver, ProductProverPolynomialConfig},
             polynomials::Polynomial,
-            BenchStream, MemoryStream, F19,
+            BenchStream, F19,
         },
     };
     #[test]
