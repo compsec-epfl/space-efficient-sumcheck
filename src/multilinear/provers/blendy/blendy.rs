@@ -3,13 +3,13 @@ use ark_std::vec::Vec;
 
 use crate::{
     hypercube::Hypercube, interpolation::LagrangePolynomial, messages::VerifierMessages,
-    streams::EvaluationStream,
+    streams::Stream,
 };
 
 pub struct BlendyProver<F, S>
 where
     F: Field,
-    S: EvaluationStream<F>,
+    S: Stream<F>,
 {
     pub claimed_sum: F,
     pub current_round: usize,
@@ -26,7 +26,7 @@ where
 impl<'a, F, S> BlendyProver<F, S>
 where
     F: Field,
-    S: EvaluationStream<F>,
+    S: Stream<F>,
 {
     fn shift_and_one_fill(num: usize, shift_amount: usize) -> usize {
         (num << shift_amount) | (1 << shift_amount) - 1

@@ -3,10 +3,10 @@ use ark_ff::Field;
 use crate::{
     multilinear_product::{TimeProductProver, TimeProductProverConfig},
     prover::Prover,
-    streams::EvaluationStream,
+    streams::Stream,
 };
 
-impl<F: Field, S: EvaluationStream<F>> Prover<F> for TimeProductProver<F, S> {
+impl<F: Field, S: Stream<F>> Prover<F> for TimeProductProver<F, S> {
     type ProverConfig = TimeProductProverConfig<F, S>;
     type ProverMessage = Option<(F, F, F)>;
     type VerifierMessage = Option<F>;
@@ -66,43 +66,38 @@ mod tests {
     use crate::{
         multilinear_product::{ProductSumcheck, TimeProductProver},
         prover::{ProductProverConfig, Prover},
-        streams::EvaluationStream,
+        streams::{MemoryStream, Stream},
         tests::{
             multilinear_product::sanity_test,
             multilinear_product::{BasicProductProver, ProductProverPolynomialConfig},
             polynomials::Polynomial,
-            BasicEvaluationStream, BenchEvaluationStream, F19,
+            BenchStream, F19,
         },
     };
     #[test]
     fn sanity() {
-        sanity_test::<
-            F19,
-            BasicEvaluationStream<F19>,
-            TimeProductProver<F19, BasicEvaluationStream<F19>>,
-        >();
+        sanity_test::<F19, MemoryStream<F19>, TimeProductProver<F19, MemoryStream<F19>>>();
     }
     #[test]
     fn parity_with_basic_prover() {
         // take an evaluation stream
         const NUM_VARIABLES: usize = 16;
-        let s: BenchEvaluationStream<F19> = BenchEvaluationStream::new(NUM_VARIABLES);
+        let s: BenchStream<F19> = BenchStream::new(NUM_VARIABLES);
         let claim = s.claimed_sum;
 
         // prove over it using TimeProver
-        let mut time_prover =
-            TimeProductProver::<F19, BenchEvaluationStream<F19>>::new(<TimeProductProver<
-                F19,
-                BenchEvaluationStream<F19>,
-            > as Prover<F19>>::ProverConfig::default(
-                claim,
-                NUM_VARIABLES,
-                s.clone(),
-                s.clone(),
-            ));
+        let mut time_prover = TimeProductProver::<F19, BenchStream<F19>>::new(<TimeProductProver<
+            F19,
+            BenchStream<F19>,
+        > as Prover<F19>>::ProverConfig::default(
+            claim,
+            NUM_VARIABLES,
+            s.clone(),
+            s.clone(),
+        ));
         let time_prover_transcript = ProductSumcheck::<F19>::prove::<
-            BenchEvaluationStream<F19>,
-            TimeProductProver<F19, BenchEvaluationStream<F19>>,
+            BenchStream<F19>,
+            TimeProductProver<F19, BenchStream<F19>>,
         >(&mut time_prover, &mut ark_std::test_rng());
 
         // Prove over it using BasicProver
@@ -120,7 +115,7 @@ mod tests {
             ),
         );
         let basic_prover_transcript = ProductSumcheck::<F19>::prove::<
-            BenchEvaluationStream<F19>,
+            BenchStream<F19>,
             BasicProductProver<F19>,
         >(&mut basic_prover, &mut ark_std::test_rng());
 

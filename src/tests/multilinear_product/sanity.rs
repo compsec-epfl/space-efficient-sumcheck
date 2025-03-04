@@ -2,8 +2,8 @@ use ark_ff::Field;
 
 use crate::{
     prover::{ProductProverConfig, Prover},
-    streams::EvaluationStream,
-    tests::{polynomials::four_variable_polynomial_evaluations, streams::BasicEvaluationStream},
+    streams::{MemoryStream, Stream},
+    tests::polynomials::four_variable_polynomial_evaluations,
 };
 
 fn multilinear_product_round_sanity<F, P>(
@@ -134,12 +134,12 @@ where
 pub fn sanity_test<F, S, P>()
 where
     F: Field,
-    S: EvaluationStream<F> + From<BasicEvaluationStream<F>>,
+    S: Stream<F> + From<MemoryStream<F>>,
     P: Prover<F, VerifierMessage = Option<F>, ProverMessage = Option<(F, F, F)>>,
     P::ProverConfig: ProductProverConfig<F, S>,
 {
-    let s_p: S = BasicEvaluationStream::new(four_variable_polynomial_evaluations()).into();
-    let s_q: S = BasicEvaluationStream::new(four_variable_polynomial_evaluations()).into();
+    let s_p: S = MemoryStream::new(four_variable_polynomial_evaluations()).into();
+    let s_q: S = MemoryStream::new(four_variable_polynomial_evaluations()).into();
     let mut p = P::new(ProductProverConfig::default(F::from(18_u32), 4, s_p, s_q));
     sanity_test_driver(&mut p);
 }
