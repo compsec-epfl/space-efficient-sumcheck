@@ -55,8 +55,6 @@ impl<F: Field> FileStream<F> {
     pub fn read_point(mmap: &Mmap, point: usize, size_of_serialized: usize) -> F {
         let offset = point * size_of_serialized;
         let bytes = &mmap[offset..offset + size_of_serialized];
-
-        // Convert bytes to `F`
         F::deserialize_uncompressed(bytes).unwrap()
     }
     pub fn write_to_file(path: String, data: &Vec<F>) {
