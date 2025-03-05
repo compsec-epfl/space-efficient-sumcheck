@@ -29,12 +29,15 @@ impl<F: Field> BenchStream<F> {
     }
 }
 impl<F: Field> Stream<F> for BenchStream<F> {
+    #[inline(always)]
     fn claim(&self) -> F {
         self.claimed_sum
     }
+    #[inline(always)]
     fn evaluation(&self, point: usize) -> F {
         F::from(point as u64)
     }
+    #[inline(always)]
     fn num_variables(&self) -> usize {
         self.num_variables
     }

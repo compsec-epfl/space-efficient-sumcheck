@@ -124,8 +124,10 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
             // zero out the table
             let table_len = Hypercube::stop_value(t);
             self.j_prime_table = vec![vec![F::ZERO; table_len]; table_len];
-            self.x_table = vec![F::ZERO; table_len];
-            self.y_table = vec![F::ZERO; table_len];
+            self.x_table.clear();
+            self.y_table.clear();
+            self.x_table.extend(std::iter::repeat(F::ZERO).take(table_len));
+            self.y_table.extend(std::iter::repeat(F::ZERO).take(table_len));
 
             // basically, this needs to get "zeroed" out at the beginning of state computation
             self.verifier_messages_round_comp = VerifierMessages::new_from_self(
@@ -139,31 +141,30 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
             let x_num_vars = j_prime - 1;
             let x_index_left_shift = t + b_num_vars;
 
-            for (b_index, _) in Hypercube::new(b_num_vars) {
-                for (b_prime_index, _) in Hypercube::new(t) {
-                    self.x_table[b_prime_index] = F::ZERO;
-                    self.y_table[b_prime_index] = F::ZERO;
-                    // LagPoly
-                    let mut sequential_lag_poly: LagrangePolynomial<F> =
-                        LagrangePolynomial::new(&self.verifier_messages);
-                    for (x_index, _) in Hypercube::new(x_num_vars) {
-                        // I imagine it's this loop taking lots of runtime
-                        let evaluation_point =
-                            x_index << x_index_left_shift | b_prime_index << b_num_vars | b_index;
-                        let lag_poly = sequential_lag_poly.next().unwrap();
-                        self.x_table[b_prime_index] +=
-                            lag_poly * self.stream_p.evaluation(evaluation_point);
-                        self.y_table[b_prime_index] +=
-                            lag_poly * self.stream_q.evaluation(evaluation_point);
-                    }
-                }
+            Hypercube::new(b_num_vars).for_each(|(b_index, _)| {
+                Hypercube::new(t)
+                    .zip(&mut self.x_table)
+                    .zip(&mut self.y_table)
+                    .for_each(|(((b_prime_index, _), x), y)| {
+                        *x = F::ZERO;
+                        *y = F::ZERO;
+
+                        let sequential_lag_poly =
+                            LagrangePolynomial::new(&self.verifier_messages);
+                        for ((x_index, _), lag_poly) in Hypercube::new(x_num_vars).zip(sequential_lag_poly) {
+                            let evaluation_point =
+                                x_index << x_index_left_shift | b_prime_index << b_num_vars | b_index;
+                            *x += lag_poly * self.stream_p.evaluation(evaluation_point);
+                            *y += lag_poly * self.stream_q.evaluation(evaluation_point);
+                        }
+                });
                 for (b_prime_index, _) in Hypercube::new(t) {
                     for (b_prime_prime_index, _) in Hypercube::new(t) {
                         self.j_prime_table[b_prime_index][b_prime_prime_index] +=
                             self.x_table[b_prime_index] * self.y_table[b_prime_prime_index];
                     }
                 }
-            }
+            });
         }
     }
 }

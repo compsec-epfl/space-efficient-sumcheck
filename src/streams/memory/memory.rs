@@ -24,12 +24,17 @@ impl<F: Field> MemoryStream<F> {
 }
 
 impl<F: Field> Stream<F> for MemoryStream<F> {
+    #[inline(always)]
     fn claim(&self) -> F {
         self.evaluations.iter().sum()
     }
+
+    #[inline(always)]
     fn evaluation(&self, point: usize) -> F {
         self.evaluations[point]
     }
+
+    #[inline(always)]
     fn num_variables(&self) -> usize {
         self.evaluations.len().ilog2() as usize
     }

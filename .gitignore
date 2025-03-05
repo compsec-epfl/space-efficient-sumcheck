@@ -1,5 +1,5 @@
 /target
-/Cargo.lock
+Cargo.lock
 /sumcheck-benches/Cargo.lock
 **/sumcheck-benches/target/
 /lag-poly-benches/Cargo.lock
