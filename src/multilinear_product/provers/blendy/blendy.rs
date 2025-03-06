@@ -123,12 +123,13 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
         if p {
             // zero out the table
             let table_len = Hypercube::stop_value(t);
-            self.j_prime_table = vec![vec![F::ZERO; table_len]; table_len];
+            self.j_prime_table.clear();
+            self.j_prime_table.resize(table_len, vec![F::ZERO; table_len]);
             self.x_table.clear();
             self.y_table.clear();
-            self.x_table.extend(std::iter::repeat(F::ZERO).take(table_len));
-            self.y_table.extend(std::iter::repeat(F::ZERO).take(table_len));
-
+            self.x_table.resize(table_len, F::ZERO);
+            self.y_table.resize(table_len, F::ZERO);
+            
             // basically, this needs to get "zeroed" out at the beginning of state computation
             self.verifier_messages_round_comp = VerifierMessages::new_from_self(
                 &self.verifier_messages,
@@ -141,6 +142,9 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
             let x_num_vars = j_prime - 1;
             let x_index_left_shift = t + b_num_vars;
 
+
+            let sequential_lag_poly =
+                LagrangePolynomial::new(&self.verifier_messages);
             Hypercube::new(b_num_vars).for_each(|(b_index, _)| {
                 Hypercube::new(t)
                     .zip(&mut self.x_table)
@@ -149,9 +153,7 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
                         *x = F::ZERO;
                         *y = F::ZERO;
 
-                        let sequential_lag_poly =
-                            LagrangePolynomial::new(&self.verifier_messages);
-                        for ((x_index, _), lag_poly) in Hypercube::new(x_num_vars).zip(sequential_lag_poly) {
+                        for ((x_index, _), lag_poly) in Hypercube::new(x_num_vars).zip(sequential_lag_poly.clone()) {
                             let evaluation_point =
                                 x_index << x_index_left_shift | b_prime_index << b_num_vars | b_index;
                             *x += lag_poly * self.stream_p.evaluation(evaluation_point);

@@ -4,7 +4,7 @@ use crate::{
 };
 use ark_ff::Field;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LagrangePolynomial<'a, F: Field> {
     last_position: usize,
     position: usize,
@@ -24,6 +24,7 @@ impl<'a, F: Field> LagrangePolynomial<'a, F> {
             stop_position: Hypercube::stop_value(num_vars),
         }
     }
+
     pub fn lag_poly(x: Vec<F>, x_hat: Vec<F>, b: HypercubeMember) -> F {
         // Iterate over the zipped triple x, x_hat, and boolean hypercube vectors
         x.iter().zip(x_hat.iter()).zip(b).fold(
