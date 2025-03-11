@@ -11,7 +11,6 @@ use crate::streams::Stream;
 
 #[derive(Debug)]
 pub struct FileStream<F: Field> {
-    claim: F,
     num_variables: usize,
     path: String,
     s: Mmap,
@@ -42,9 +41,6 @@ impl<F: Field> FileStream<F> {
 
         let num_variables = len.ilog2() as usize;
         Self {
-            claim: (0..len)
-                .map(|i| Self::read_point(&mmap, i, size_of_serialized))
-                .sum(),
             num_variables,
             path,
             s: mmap,
@@ -75,10 +71,6 @@ impl<F: Field> FileStream<F> {
 }
 
 impl<F: Field> Stream<F> for FileStream<F> {
-    fn claim(&self) -> F {
-        self.claim
-    }
-
     fn evaluation(&self, point: usize) -> F {
         Self::read_point(&self.s, point, self.size_of_serialized)
     }
@@ -93,7 +85,7 @@ mod tests {
     use crate::{
         multilinear_product::BlendyProductProver,
         prover::{ProductProverConfig, Prover},
-        streams::{FileStream, MemoryStream, Stream},
+        streams::{stream::multivariate_claim, FileStream, MemoryStream, Stream},
         tests::F19,
         ProductSumcheck,
     };
@@ -116,7 +108,7 @@ mod tests {
 
         // instantiate the file stream
         let s_file: FileStream<F19> = FileStream::new(path.clone());
-        let claim: F19 = s_file.claim();
+        let claim: F19 = multivariate_claim(s_file.clone());
 
         // prove over it using BlendyProver
         let mut blendy_prover_file_stream =
@@ -137,7 +129,7 @@ mod tests {
 
         // instantiate the memory stream
         let s_memory: MemoryStream<F19> = MemoryStream::new(evals);
-        let claim: F19 = s_memory.claim();
+        let claim: F19 = multivariate_claim(s_memory.clone());
 
         // prove over it using BlendyProver
         let mut blendy_prover_memory_stream =

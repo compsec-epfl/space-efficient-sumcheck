@@ -24,9 +24,6 @@ impl<F: Field> MemoryStream<F> {
 }
 
 impl<F: Field> Stream<F> for MemoryStream<F> {
-    fn claim(&self) -> F {
-        self.evaluations.iter().sum()
-    }
     fn evaluation(&self, point: usize) -> F {
         self.evaluations[point]
     }

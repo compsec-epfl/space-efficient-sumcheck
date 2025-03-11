@@ -52,7 +52,7 @@ impl<F: Field> Prover<F> for BasicProductProver<F> {
 mod tests {
     use crate::{
         prover::Prover,
-        streams::{MemoryStream, Stream},
+        streams::{multivariate_product_claim, MemoryStream},
         tests::{
             multilinear_product::{
                 sanity_test_driver, BasicProductProver, BasicProductProverConfig,
@@ -63,8 +63,9 @@ mod tests {
     };
     #[test]
     fn sumcheck() {
+        let s = MemoryStream::<F19>::new(four_variable_polynomial_evaluations());
         sanity_test_driver(&mut BasicProductProver::new(BasicProductProverConfig::new(
-            MemoryStream::<F19>::new(four_variable_polynomial_evaluations()).claim(),
+            multivariate_product_claim(vec![s.clone(), s]),
             4,
             four_variable_polynomial(),
             four_variable_polynomial(),
