@@ -9,7 +9,8 @@ use space_efficient_sumcheck::{
     multilinear_product::{
         BlendyProductProver, BlendyProductProverConfig, TimeProductProver, TimeProductProverConfig,
     },
-    prover::{ProductProverConfig, Prover, ProverConfig},
+    prover::{Prover, ProverConfig},
+    streams::{multivariate_claim, multivariate_product_claim},
     tests::{BenchStream, F128, F64},
     ProductSumcheck, Sumcheck,
 };
@@ -19,19 +20,16 @@ use validation::{validate_and_format_command_line_args, AlgorithmLabel, BenchArg
 
 fn run_on_field<F: Field>(bench_args: BenchArgs) {
     let mut rng = ark_std::test_rng();
-    let mut claim = F64::from(0);
-    for i in 0..2usize.pow(NUM_VARIABLES as u32) {
-        claim += evaluation_stream.evaluation(i) * evaluation_stream.evaluation(i);
-    };
+    let s = BenchStream::<F>::new(bench_args.num_variables);
 
     // switch on algorithm_label
     match bench_args.algorithm_label {
         AlgorithmLabel::Blendy => {
             let config: BlendyProverConfig<F, BenchStream<F>> =
                 BlendyProverConfig::<F, BenchStream<F>>::default(
-                    stream.claimed_sum,
+                    multivariate_claim(s.clone()),
                     bench_args.num_variables,
-                    stream,
+                    s,
                 );
             let transcript = Sumcheck::<F>::prove::<BenchStream<F>, BlendyProver<F, BenchStream<F>>>(
                 &mut BlendyProver::<F, BenchStream<F>>::new(config),
@@ -42,9 +40,9 @@ fn run_on_field<F: Field>(bench_args: BenchArgs) {
         AlgorithmLabel::VSBW => {
             let config: TimeProverConfig<F, BenchStream<F>> =
                 TimeProverConfig::<F, BenchStream<F>>::default(
-                    stream.claimed_sum,
+                    multivariate_claim(s.clone()),
                     bench_args.num_variables,
-                    stream,
+                    s,
                 );
             let transcript = Sumcheck::<F>::prove::<BenchStream<F>, TimeProver<F, BenchStream<F>>>(
                 &mut TimeProver::<F, BenchStream<F>>::new(config),
@@ -55,9 +53,9 @@ fn run_on_field<F: Field>(bench_args: BenchArgs) {
         AlgorithmLabel::CTY => {
             let config: SpaceProverConfig<F, BenchStream<F>> =
                 SpaceProverConfig::<F, BenchStream<F>>::default(
-                    stream.claimed_sum,
+                    multivariate_claim(s.clone()),
                     bench_args.num_variables,
-                    stream,
+                    s,
                 );
             let transcript = Sumcheck::<F>::prove::<BenchStream<F>, SpaceProver<F, BenchStream<F>>>(
                 &mut SpaceProver::<F, BenchStream<F>>::new(config),
@@ -67,12 +65,11 @@ fn run_on_field<F: Field>(bench_args: BenchArgs) {
         }
         AlgorithmLabel::ProductVSBW => {
             let config: TimeProductProverConfig<F, BenchStream<F>> =
-                TimeProductProverConfig::<F, BenchStream<F>>::default(
-                    stream.claimed_sum,
-                    bench_args.num_variables,
-                    stream.clone(),
-                    stream,
-                );
+                TimeProductProverConfig::<F, BenchStream<F>> {
+                    claim: multivariate_product_claim(vec![s.clone(), s.clone()]),
+                    num_variables: bench_args.num_variables,
+                    streams: vec![s.clone(), s],
+                };
             let transcript = ProductSumcheck::<F>::prove::<
                 BenchStream<F>,
                 TimeProductProver<F, BenchStream<F>>,
@@ -85,11 +82,10 @@ fn run_on_field<F: Field>(bench_args: BenchArgs) {
         AlgorithmLabel::ProductBlendy => {
             let config: BlendyProductProverConfig<F, BenchStream<F>> =
                 BlendyProductProverConfig::<F, BenchStream<F>> {
-                    claim: stream.claimed_sum,
+                    claim: multivariate_product_claim(vec![s.clone(), s.clone()]),
                     num_variables: bench_args.num_variables,
                     num_stages: bench_args.stage_size,
-                    stream_p: stream.clone(),
-                    stream_q: stream,
+                    streams: vec![s.clone(), s],
                 };
             let transcript = ProductSumcheck::<F>::prove::<
                 BenchStream<F>,
