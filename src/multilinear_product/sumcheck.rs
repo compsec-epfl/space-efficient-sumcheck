@@ -80,41 +80,45 @@ mod tests {
     use crate::{
         multilinear_product::{BlendyProductProver, BlendyProductProverConfig, TimeProductProver},
         prover::{ProductProverConfig, Prover},
-        tests::{BenchStream, F19},
+        streams::Stream,
+        tests::{BenchStream, F64},
     };
 
     #[test]
     fn algorithm_consistency() {
         const NUM_VARIABLES: usize = 16;
         // take an evaluation stream
-        let evaluation_stream: BenchStream<F19> = BenchStream::new(NUM_VARIABLES);
-        let claim = F19::from(11);
+        let evaluation_stream: BenchStream<F64> = BenchStream::new(NUM_VARIABLES);
+        let mut claim = F64::from(0);
+        for i in 0..2usize.pow(NUM_VARIABLES as u32) {
+            claim += evaluation_stream.evaluation(i) * evaluation_stream.evaluation(i);
+        }
         // initialize the provers
         let mut blendy_k2_prover =
-            BlendyProductProver::<F19, BenchStream<F19>>::new(BlendyProductProverConfig::new(
+            BlendyProductProver::<F64, BenchStream<F64>>::new(BlendyProductProverConfig::new(
                 claim,
                 2,
                 NUM_VARIABLES,
                 evaluation_stream.clone(),
                 evaluation_stream.clone(),
             ));
-        let blendy_prover_transcript = ProductSumcheck::<F19>::prove::<
-            BenchStream<F19>,
-            BlendyProductProver<F19, BenchStream<F19>>,
+        let blendy_prover_transcript = ProductSumcheck::<F64>::prove::<
+            BenchStream<F64>,
+            BlendyProductProver<F64, BenchStream<F64>>,
         >(&mut blendy_k2_prover, &mut ark_std::test_rng());
 
-        let mut time_prover = TimeProductProver::<F19, BenchStream<F19>>::new(<TimeProductProver<
-            F19,
-            BenchStream<F19>,
-        > as Prover<F19>>::ProverConfig::default(
+        let mut time_prover = TimeProductProver::<F64, BenchStream<F64>>::new(<TimeProductProver<
+            F64,
+            BenchStream<F64>,
+        > as Prover<F64>>::ProverConfig::default(
             claim,
             NUM_VARIABLES,
             evaluation_stream.clone(),
             evaluation_stream,
         ));
-        let time_prover_transcript = ProductSumcheck::<F19>::prove::<
-            BenchStream<F19>,
-            TimeProductProver<F19, BenchStream<F19>>,
+        let time_prover_transcript = ProductSumcheck::<F64>::prove::<
+            BenchStream<F64>,
+            TimeProductProver<F64, BenchStream<F64>>,
         >(&mut time_prover, &mut ark_std::test_rng());
         // ensure the transcript is identical
         assert_eq!(time_prover_transcript.is_accepted, true);
