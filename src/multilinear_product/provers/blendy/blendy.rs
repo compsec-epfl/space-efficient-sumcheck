@@ -9,8 +9,7 @@ use crate::{
 pub struct BlendyProductProver<F: Field, S: Stream<F>> {
     pub claim: F,
     pub current_round: usize,
-    pub stream_p: S,
-    pub stream_q: S,
+    pub streams: Vec<S>,
     pub num_stages: usize,
     pub num_variables: usize,
     pub verifier_messages: VerifierMessages<F>,
@@ -152,9 +151,9 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
                             x_index << x_index_left_shift | b_prime_index << b_num_vars | b_index;
                         let lag_poly = sequential_lag_poly.next().unwrap();
                         self.x_table[b_prime_index] +=
-                            lag_poly * self.stream_p.evaluation(evaluation_point);
+                            lag_poly * self.streams[0].evaluation(evaluation_point);
                         self.y_table[b_prime_index] +=
-                            lag_poly * self.stream_q.evaluation(evaluation_point);
+                            lag_poly * self.streams[1].evaluation(evaluation_point);
                     }
                 }
                 for (b_prime_index, _) in Hypercube::new(t) {
