@@ -6,7 +6,7 @@ pub trait ProverConfig<F: Field, S: Stream<F>> {
 }
 
 pub trait ProductProverConfig<F: Field, S: Stream<F>> {
-    fn default(claim: F, num_variables: usize, stream_p: S, stream_q: S) -> Self;
+    fn default(claim: F, num_variables: usize, steams: Vec<S>) -> Self;
 }
 
 pub trait Prover<F: Field> {

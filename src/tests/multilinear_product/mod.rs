@@ -1,6 +1,8 @@
+mod consistency;
 mod provers;
 mod sanity;
 
+pub use consistency::consistency_test;
 pub use provers::basic::{
     BasicProductProver, BasicProductProverConfig, ProductProverPolynomialConfig,
 };
