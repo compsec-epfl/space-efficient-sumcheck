@@ -118,8 +118,7 @@ mod tests {
             > as Prover<F19>>::ProverConfig::default(
                 claim,
                 s_file.num_variables(),
-                s_file.clone(),
-                s_file,
+                vec![s_file.clone(), s_file],
             ));
         let blendy_prover_file_stream_transcript =
             ProductSumcheck::<F19>::prove::<
@@ -139,8 +138,7 @@ mod tests {
             > as Prover<F19>>::ProverConfig::default(
                 claim,
                 s_memory.num_variables(),
-                s_memory.clone(),
-                s_memory,
+                vec![s_memory.clone(), s_memory],
             ));
         let blendy_prover_memory_stream_transcript =
             ProductSumcheck::<F19>::prove::<

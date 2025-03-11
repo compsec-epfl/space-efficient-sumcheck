@@ -140,6 +140,10 @@ where
 {
     let s_p: S = MemoryStream::new(four_variable_polynomial_evaluations()).into();
     let s_q: S = MemoryStream::new(four_variable_polynomial_evaluations()).into();
-    let mut p = P::new(ProductProverConfig::default(F::from(18_u32), 4, s_p, s_q));
+    let mut p = P::new(ProductProverConfig::default(
+        F::from(18_u32),
+        4,
+        vec![s_p, s_q],
+    ));
     sanity_test_driver(&mut p);
 }
