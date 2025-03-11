@@ -10,17 +10,19 @@ use space_efficient_sumcheck::{
         BlendyProductProver, BlendyProductProverConfig, TimeProductProver, TimeProductProverConfig,
     },
     prover::{ProductProverConfig, Prover, ProverConfig},
-    tests::{BenchStream, F64, F128},
+    tests::{BenchStream, F128, F64},
     ProductSumcheck, Sumcheck,
 };
 
 pub mod validation;
-use validation::{BenchArgs, AlgorithmLabel, FieldLabel, validate_and_format_command_line_args};
+use validation::{validate_and_format_command_line_args, AlgorithmLabel, BenchArgs, FieldLabel};
 
 fn run_on_field<F: Field>(bench_args: BenchArgs) {
     let mut rng = ark_std::test_rng();
-    let stream: BenchStream<F> =
-        BenchStream::<F>::new(bench_args.num_variables);
+    let mut claim = F64::from(0);
+    for i in 0..2usize.pow(NUM_VARIABLES as u32) {
+        claim += evaluation_stream.evaluation(i) * evaluation_stream.evaluation(i);
+    };
 
     // switch on algorithm_label
     match bench_args.algorithm_label {
@@ -31,13 +33,11 @@ fn run_on_field<F: Field>(bench_args: BenchArgs) {
                     bench_args.num_variables,
                     stream,
                 );
-            Sumcheck::<F>::prove::<
-                BenchStream<F>,
-                BlendyProver<F, BenchStream<F>>,
-            >(
+            let transcript = Sumcheck::<F>::prove::<BenchStream<F>, BlendyProver<F, BenchStream<F>>>(
                 &mut BlendyProver::<F, BenchStream<F>>::new(config),
                 &mut rng,
             );
+            assert!(transcript.is_accepted);
         }
         AlgorithmLabel::VSBW => {
             let config: TimeProverConfig<F, BenchStream<F>> =
@@ -46,10 +46,11 @@ fn run_on_field<F: Field>(bench_args: BenchArgs) {
                     bench_args.num_variables,
                     stream,
                 );
-            Sumcheck::<F>::prove::<BenchStream<F>, TimeProver<F, BenchStream<F>>>(
+            let transcript = Sumcheck::<F>::prove::<BenchStream<F>, TimeProver<F, BenchStream<F>>>(
                 &mut TimeProver::<F, BenchStream<F>>::new(config),
                 &mut rng,
             );
+            assert!(transcript.is_accepted);
         }
         AlgorithmLabel::CTY => {
             let config: SpaceProverConfig<F, BenchStream<F>> =
@@ -58,13 +59,11 @@ fn run_on_field<F: Field>(bench_args: BenchArgs) {
                     bench_args.num_variables,
                     stream,
                 );
-            Sumcheck::<F>::prove::<
-                BenchStream<F>,
-                SpaceProver<F, BenchStream<F>>,
-            >(
+            let transcript = Sumcheck::<F>::prove::<BenchStream<F>, SpaceProver<F, BenchStream<F>>>(
                 &mut SpaceProver::<F, BenchStream<F>>::new(config),
                 &mut rng,
             );
+            assert!(transcript.is_accepted);
         }
         AlgorithmLabel::ProductVSBW => {
             let config: TimeProductProverConfig<F, BenchStream<F>> =
@@ -74,13 +73,14 @@ fn run_on_field<F: Field>(bench_args: BenchArgs) {
                     stream.clone(),
                     stream,
                 );
-            ProductSumcheck::<F>::prove::<
+            let transcript = ProductSumcheck::<F>::prove::<
                 BenchStream<F>,
                 TimeProductProver<F, BenchStream<F>>,
             >(
                 &mut TimeProductProver::<F, BenchStream<F>>::new(config),
                 &mut rng,
             );
+            assert!(transcript.is_accepted);
         }
         AlgorithmLabel::ProductBlendy => {
             let config: BlendyProductProverConfig<F, BenchStream<F>> =
@@ -91,13 +91,14 @@ fn run_on_field<F: Field>(bench_args: BenchArgs) {
                     stream_p: stream.clone(),
                     stream_q: stream,
                 };
-            ProductSumcheck::<F>::prove::<
+            let transcript = ProductSumcheck::<F>::prove::<
                 BenchStream<F>,
                 BlendyProductProver<F, BenchStream<F>>,
             >(
                 &mut BlendyProductProver::<F, BenchStream<F>>::new(config),
                 &mut rng,
             );
+            assert!(transcript.is_accepted);
         }
     };
 }
