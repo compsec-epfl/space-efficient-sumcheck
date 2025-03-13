@@ -1,4 +1,5 @@
 use ark_ff::Field;
+use ark_serialize::Compress;
 use ark_std::{
     fs::{self, File},
     io::{BufWriter, Write},
@@ -26,16 +27,9 @@ impl<F: Field> Clone for FileStream<F> {
 
 impl<F: Field> FileStream<F> {
     pub fn new(path: String) -> Self {
-        fn size_of_serialized<F: Field>() -> usize {
-            let mut tmp_buffer: Vec<u8> = Vec::new();
-            F::ONE.serialize_uncompressed(&mut tmp_buffer).unwrap();
-            let num_bytes = tmp_buffer.len();
-            num_bytes
-        }
-
         let file = File::open(Path::new(&path)).unwrap();
         let mmap = unsafe { Mmap::map(&file) }.unwrap();
-        let size_of_serialized = size_of_serialized::<F>();
+        let size_of_serialized = F::ONE.serialized_size(Compress::No);
         let len = mmap.len() / size_of_serialized;
         assert!(len.is_power_of_two());
 
