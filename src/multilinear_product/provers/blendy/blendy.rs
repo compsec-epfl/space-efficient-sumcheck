@@ -1,8 +1,10 @@
+use std::time::{Duration, Instant};
+
 use ark_ff::Field;
 use ark_std::vec::Vec;
 
 use crate::{
-    hypercube::Hypercube, interpolation::LagrangePolynomial, messages::VerifierMessages,
+    hypercube::{Hypercube, HypercubeIndices}, interpolation::LagrangePolynomial, messages::VerifierMessages,
     streams::Stream,
 };
 
@@ -31,6 +33,11 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
     }
 
     pub fn compute_round(&self) -> (F, F, F) {
+        let mut section_1_total = Duration::new(0, 0);
+        let mut section_2_total = Duration::new(0, 0);
+        let mut section_3_total = Duration::new(0, 0);
+        let mut section_4_total = Duration::new(0, 0);
+        let section_4 = Instant::now();
         let n = self.num_variables;
         let k = self.num_stages;
         let l = n.div_ceil(2 * k);
@@ -62,8 +69,10 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
         let mut sum_0 = F::ZERO;
         let mut sum_1 = F::ZERO;
         let mut sum_half = F::ZERO;
-        for (b_prime_index, _) in Hypercube::new(b_prime_num_vars) {
-            for (b_prime_prime_index, _) in Hypercube::new(b_prime_num_vars) {
+        let section_3 = Instant::now();
+        for b_prime_index in HypercubeIndices::new(b_prime_num_vars) {
+            let section_2 = Instant::now();
+            for b_prime_prime_index in HypercubeIndices::new(b_prime_num_vars) {
                 // doing it like this, for each hypercube member lag_poly is computed exactly once
                 if b_prime_index == 0 {
                     lag_polys[b_prime_prime_index] = sequential_lag_poly.next().unwrap();
@@ -72,7 +81,8 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
                 let lag_poly_1 = lag_polys[b_prime_index];
                 let lag_poly_2 = lag_polys[b_prime_prime_index];
                 let lag_poly = lag_poly_1 * lag_poly_2;
-                for (v_index, _) in Hypercube::new(v_num_vars) {
+                let section_1 = Instant::now();
+                for v_index in HypercubeIndices::new(v_num_vars) {
                     let b_prime_0_v =
                         b_prime_index << b_prime_index_left_shift | 0 << v_num_vars | v_index;
                     let b_prime_prime_0_v =
@@ -89,13 +99,26 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
                             + self.j_prime_table[b_prime_1_v][b_prime_prime_0_v]
                             + self.j_prime_table[b_prime_1_v][b_prime_prime_1_v]);
                 }
+                section_1_total += section_1.elapsed();
             }
+            section_2_total += section_2.elapsed();
         }
+        section_3_total += section_3.elapsed();
         sum_half = sum_half * self.inverse_four;
+        section_4_total += section_4.elapsed();
+        println!("roundcomp_1, {:.4?}", section_1_total.as_millis());
+        println!("roundcomp_2, {:.4?}", (section_2_total - section_1_total).as_millis());
+        println!("roundcomp_3, {:.4?}", (section_3_total - section_2_total).as_millis());
+        println!("roundcomp_4, {:.4?}", (section_4_total - section_3_total).as_millis());
         (sum_0, sum_1, sum_half)
     }
 
     pub fn compute_state(&mut self) {
+        let mut section_1_total = Duration::new(0, 0);
+        let mut section_2_total = Duration::new(0, 0);
+        let mut section_3_total = Duration::new(0, 0);
+        let mut section_4_total = Duration::new(0, 0);
+        let section_4 = Instant::now();
         let n = self.num_variables;
         let k = self.num_stages;
         let l = n.div_ceil(2 * k);
@@ -138,14 +161,17 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
             let x_num_vars = j_prime - 1;
             let x_index_left_shift = t + b_num_vars;
 
-            for (b_index, _) in Hypercube::new(b_num_vars) {
-                for (b_prime_index, _) in Hypercube::new(t) {
+            let section_3 = Instant::now();
+            for b_index in HypercubeIndices::new(b_num_vars) {
+                let section_2 = Instant::now();
+                for b_prime_index in HypercubeIndices::new(t) {
                     self.x_table[b_prime_index] = F::ZERO;
                     self.y_table[b_prime_index] = F::ZERO;
                     // LagPoly
                     let mut sequential_lag_poly: LagrangePolynomial<F> =
                         LagrangePolynomial::new(&self.verifier_messages);
-                    for (x_index, _) in Hypercube::new(x_num_vars) {
+                    let section_1 = Instant::now();
+                    for x_index in HypercubeIndices::new(x_num_vars) {
                         // I imagine it's this loop taking lots of runtime
                         let evaluation_point =
                             x_index << x_index_left_shift | b_prime_index << b_num_vars | b_index;
@@ -155,14 +181,22 @@ impl<F: Field, S: Stream<F>> BlendyProductProver<F, S> {
                         self.y_table[b_prime_index] +=
                             lag_poly * self.streams[1].evaluation(evaluation_point);
                     }
+                    section_1_total += section_1.elapsed();
                 }
-                for (b_prime_index, _) in Hypercube::new(t) {
-                    for (b_prime_prime_index, _) in Hypercube::new(t) {
+                section_2_total += section_2.elapsed();
+                for b_prime_index in HypercubeIndices::new(t) {
+                    for b_prime_prime_index in HypercubeIndices::new(t) {
                         self.j_prime_table[b_prime_index][b_prime_prime_index] +=
                             self.x_table[b_prime_index] * self.y_table[b_prime_prime_index];
                     }
                 }
             }
+            section_3_total += section_3.elapsed();
         }
+        section_4_total += section_4.elapsed();
+        println!("computestate_1, {:.4?}", section_1_total.as_millis());
+        println!("computestate_2, {:.4?}", (section_2_total - section_1_total).as_millis());
+        println!("computestate_3, {:.4?}", (section_3_total - section_2_total).as_millis());
+        println!("computestate_4, {:.4?}", (section_4_total - section_3_total).as_millis());
     }
 }
