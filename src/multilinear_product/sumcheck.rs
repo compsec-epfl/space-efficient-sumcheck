@@ -1,34 +1,13 @@
 use ark_ff::Field;
 use ark_std::{rand::Rng, vec::Vec};
 
-use crate::{prover::Prover, streams::Stream};
+use crate::{interpolation::LagrangePolynomial, prover::Prover, streams::Stream};
 
 #[derive(Debug, PartialEq)]
 pub struct ProductSumcheck<F: Field> {
     pub prover_messages: Vec<(F, F, F)>,
     pub verifier_messages: Vec<F>,
     pub is_accepted: bool,
-}
-
-// TODO: this can be moved to interpolation folder
-fn evaluate_at<F: Field>(verifier_message: F, prover_message: (F, F, F)) -> F {
-    // Hardcoded x-values:
-    let zero = F::zero();
-    let one = F::one();
-    let half = F::from(2_u32).inverse().unwrap();
-
-    // Compute denominators for the Lagrange basis polynomials
-    let inv_denom_0 = ((zero - one) * (zero - half)).inverse().unwrap();
-    let inv_denom_1 = ((one - zero) * (one - half)).inverse().unwrap();
-    let inv_denom_2 = ((half - zero) * (half - one)).inverse().unwrap();
-
-    // Compute the Lagrange basis polynomials evaluated at x
-    let basis_p_0 = (verifier_message - one) * (verifier_message - half) * inv_denom_0;
-    let basis_p_1 = (verifier_message - zero) * (verifier_message - half) * inv_denom_1;
-    let basis_p_2 = (verifier_message - zero) * (verifier_message - one) * inv_denom_2;
-
-    // Return the evaluation of the unique quadratic polynomial
-    prover_message.0 * basis_p_0 + prover_message.1 * basis_p_1 + prover_message.2 * basis_p_2
 }
 
 impl<F: Field> ProductSumcheck<F> {
@@ -52,7 +31,11 @@ impl<F: Field> ProductSumcheck<F> {
                 Some(prev_verifier_message) => {
                     verifier_messages.push(prev_verifier_message);
                     let prev_prover_message = prover_messages.last().unwrap();
-                    round_sum == evaluate_at(prev_verifier_message, *prev_prover_message)
+                    round_sum
+                        == LagrangePolynomial::evaluate_from_three_points(
+                            prev_verifier_message,
+                            *prev_prover_message,
+                        )
                 }
             };
 
