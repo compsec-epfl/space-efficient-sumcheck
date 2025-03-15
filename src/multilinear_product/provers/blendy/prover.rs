@@ -20,6 +20,7 @@ impl<F: Field, S: Stream<F>> Prover<F> for BlendyProductProver<F, S> {
         let num_variables: usize = prover_config.num_variables;
         let num_stages: usize = prover_config.num_stages;
         let stage_size: usize = num_variables / num_stages;
+        let max_rounds_phase1: usize = num_variables.div_ceil(2 * num_stages);
         // return the BlendyProver instance
         Self {
             claim: prover_config.claim,
@@ -27,6 +28,8 @@ impl<F: Field, S: Stream<F>> Prover<F> for BlendyProductProver<F, S> {
             streams: prover_config.streams,
             num_stages,
             num_variables,
+            max_rounds_phase1,
+            last_round_phase1: (1usize << (num_variables.div_ceil(num_stages)).ilog2()) + max_rounds_phase1 - 1,
             verifier_messages: VerifierMessages::new(&vec![]),
             verifier_messages_round_comp: VerifierMessages::new(&vec![]),
             x_table: vec![],
@@ -34,6 +37,8 @@ impl<F: Field, S: Stream<F>> Prover<F> for BlendyProductProver<F, S> {
             j_prime_table: vec![],
             stage_size,
             inverse_four: F::from(4_u32).inverse().unwrap(),
+            prev_table_round_num: 0,
+            prev_table_size: 0,
         }
     }
 
@@ -51,6 +56,8 @@ impl<F: Field, S: Stream<F>> Prover<F> for BlendyProductProver<F, S> {
             self.verifier_messages_round_comp
                 .receive_message(verifier_message.unwrap());
         }
+
+        self.init_round_vars();
 
         self.compute_state();
 
