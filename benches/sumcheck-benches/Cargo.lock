@@ -366,6 +366,7 @@ version = "0.0.2"
 dependencies = [
  "ark-ff",
  "ark-poly",
+ "ark-serialize",
  "ark-std",
  "memmap2",
 ]
