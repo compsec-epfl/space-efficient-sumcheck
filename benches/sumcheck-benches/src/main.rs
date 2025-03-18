@@ -2,17 +2,12 @@ use ark_bn254::Fr as BN254Field;
 use ark_ff::Field;
 
 use space_efficient_sumcheck::{
-    multilinear::{
+    hypercube::Hypercube, multilinear::{
         BlendyProver, BlendyProverConfig, SpaceProver, SpaceProverConfig, TimeProver,
         TimeProverConfig,
-    },
-    multilinear_product::{
+    }, multilinear_product::{
         BlendyProductProver, BlendyProductProverConfig, TimeProductProver, TimeProductProverConfig,
-    },
-    prover::{Prover, ProverConfig},
-    streams::{multivariate_claim, multivariate_product_claim},
-    tests::{BenchStream, F128, F64},
-    ProductSumcheck, Sumcheck,
+    }, prover::{Prover, ProverConfig}, streams::{multivariate_claim, multivariate_product_claim, FileStream, Stream}, tests::{BenchStream, F128, F64}, ProductSumcheck, Sumcheck
 };
 
 pub mod validation;
@@ -64,19 +59,29 @@ fn run_on_field<F: Field>(bench_args: BenchArgs) {
             assert!(transcript.is_accepted);
         }
         AlgorithmLabel::ProductVSBW => {
-            let config: TimeProductProverConfig<F, BenchStream<F>> =
-                TimeProductProverConfig::<F, BenchStream<F>> {
+            let path = "file_stream_bench_evals.bin".to_string();
+            // FileStream::<F>::delete_file(path.clone());
+            // let mut evals: Vec<F> = Vec::with_capacity(Hypercube::stop_value(bench_args.num_variables));
+            // for i in 0..Hypercube::stop_value(bench_args.num_variables) {
+            //     evals.push(s.evaluation(i));
+            // }
+            // FileStream::<F>::write_to_file(path.clone(), &evals);
+            let s_file: FileStream<F> = FileStream::new(path.clone());
+            
+            let config: TimeProductProverConfig<F, FileStream<F>> =
+                TimeProductProverConfig::<F, FileStream<F>> {
                     claim: multivariate_product_claim(vec![s.clone(), s.clone()]),
                     num_variables: bench_args.num_variables,
-                    streams: vec![s.clone(), s],
+                    streams: vec![s_file.clone(), s_file],
                 };
             let transcript = ProductSumcheck::<F>::prove::<
-                BenchStream<F>,
-                TimeProductProver<F, BenchStream<F>>,
+                FileStream<F>,
+                TimeProductProver<F, FileStream<F>>,
             >(
-                &mut TimeProductProver::<F, BenchStream<F>>::new(config),
+                &mut TimeProductProver::<F, FileStream<F>>::new(config),
                 &mut rng,
             );
+            // FileStream::<F>::delete_file(path);
             assert!(transcript.is_accepted);
         }
         AlgorithmLabel::ProductBlendy => {
