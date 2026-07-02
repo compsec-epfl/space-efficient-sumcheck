@@ -140,7 +140,6 @@ pub fn fold<F: SumcheckField>(values: &mut Vec<F>, weight: F) {
     ))]
     {
         if crate::simd_sumcheck::dispatch::try_simd_reduce_msb(values, weight) {
-            values.shrink_to_fit();
             return;
         }
     }
@@ -174,7 +173,8 @@ pub fn fold<F: SumcheckField>(values: &mut Vec<F>, weight: F) {
     scalar_mul(tail, F::ONE - weight);
 
     values.truncate(half);
-    values.shrink_to_fit();
+    // Skip shrink_to_fit — realloc per round is pricier than the capacity
+    // we carry; the capacity frees once the Vec drops.
 }
 
 /// Two-pass fold-then-compute. Reference only.

@@ -172,7 +172,8 @@ pub fn fold<F: SumcheckField>(values: &mut Vec<F>, weight: F) {
     scalar_mul(tail, F::ONE - weight);
 
     values.truncate(half);
-    values.shrink_to_fit();
+    // Skip shrink_to_fit — realloc per round is pricier than the capacity
+    // we carry; the capacity frees once the Vec drops.
 }
 
 /// Two-pass fold-then-compute; reference version kept for testing.

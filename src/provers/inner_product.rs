@@ -59,56 +59,15 @@ where
     }
 
     fn round(&mut self, challenge: Option<F>) -> Vec<F> {
-        // Fold with previous challenge (if any).
-        if let Some(w) = challenge {
-            ip::fold(&mut self.a, w);
-            ip::fold(&mut self.b, w);
-        }
-
         // EvalsInfty: emit [q(0), q(∞)] where
         //   q(0)  = dot(a_lo, b_lo)
         //   q(∞)  = [x²] q(x) = dot(a_hi − a_lo, b_hi − b_lo)
-        //         = Σ (ah − al)·(bh − bl)
         // The verifier derives q(1) = claim - q(0).
-        let n = self.a.len();
-        if n <= 1 {
-            let v = if n == 1 {
-                self.a[0] * self.b[0]
-            } else {
-                F::ZERO
-            };
-            return vec![v, F::ZERO];
-        }
-
-        let half = n.next_power_of_two() >> 1;
-        let (a_lo, a_hi) = self.a.split_at(half);
-        let (b_lo, b_hi) = self.b.split_at(half);
-
-        // a_lo may be longer than a_hi (non-pow2 input, implicit zero padding).
-        let paired = a_hi.len();
-        let a_lo_paired = &a_lo[..paired];
-        let b_lo_paired = &b_lo[..paired];
-        let a_lo_tail = &a_lo[paired..];
-        let b_lo_tail = &b_lo[paired..];
-
-        let mut q0 = F::ZERO;
-        let mut q_inf = F::ZERO;
-        for i in 0..paired {
-            let al = a_lo_paired[i];
-            let ah = a_hi[i];
-            let bl = b_lo_paired[i];
-            let bh = b_hi[i];
-            q0 += al * bl;
-            q_inf += (ah - al) * (bh - bl);
-        }
-
-        // Tail (hi implicitly zero): ah = bh = 0, so
-        //   q(0)  += al·bl
-        //   q(∞)  += (0 − al)·(0 − bl) = al·bl
-        let tail_dot: F = a_lo_tail.iter().zip(b_lo_tail).map(|(&a, &b)| a * b).sum();
-        q0 += tail_dot;
-        q_inf += tail_dot;
-
+        let (q0, q_inf) = if let Some(w) = challenge {
+            ip::fused_fold_and_compute_polynomial(&mut self.a, &mut self.b, w)
+        } else {
+            ip::compute_sumcheck_polynomial(&self.a, &self.b)
+        };
         vec![q0, q_inf]
     }
 
